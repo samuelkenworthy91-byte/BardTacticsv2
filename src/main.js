@@ -203,6 +203,14 @@ const POST_BATTLE_SCENE = [
     text: "It's OK.",
   },
   {
+    type: "sceneNarration",
+    sceneName: "Panel Van",
+    scene: "vanInteriorScene",
+    speaker: "Narration",
+    portrait: null,
+    text: "Heath pulls Leon into a hug as Leon sobs against him.",
+  },
+  {
     type: "overlapDialogue",
     sceneName: "Panel Van",
     scene: "vanInteriorScene",
@@ -1196,6 +1204,24 @@ class BattleScene extends Phaser.Scene {
     return floating;
   }
  
+  fitImageInBox(image, textureKey, maxWidth, maxHeight) {
+    if (!image) return;
+ 
+    if (textureKey && this.textures.exists(textureKey)) {
+      image.setTexture(textureKey);
+    }
+ 
+    const source = image.texture?.getSourceImage?.();
+ 
+    if (!source?.width || !source?.height) {
+      image.setDisplaySize(maxWidth, maxHeight);
+      return;
+    }
+ 
+    const scale = Math.min(maxWidth / source.width, maxHeight / source.height);
+    image.setDisplaySize(source.width * scale, source.height * scale);
+  }
+ 
   createPostBattleUI() {
     this.postBattleContainer = this.add.container(0, 0);
     this.postBattleContainer.setVisible(false);
@@ -1221,13 +1247,13 @@ class BattleScene extends Phaser.Scene {
     this.postBattleMainPanel = this.add.rectangle(480, 250, 860, 430, 0x020617, 0.78);
     this.postBattleMainPanel.setStrokeStyle(2, 0x475569);
  
-    this.postBattleSceneFrame = this.add.rectangle(240, 175, 320, 200, 0x111827, 1);
+    this.postBattleSceneFrame = this.add.rectangle(315, 175, 560, 315, 0x111827, 1);
     this.postBattleSceneFrame.setStrokeStyle(2, 0x64748b);
  
-    this.postBattleSceneImage = this.add.image(240, 175, "vanInteriorScene");
-    this.postBattleSceneImage.setDisplaySize(312, 192);
+    this.postBattleSceneImage = this.add.image(315, 175, "vanInteriorScene");
+    this.fitImageInBox(this.postBattleSceneImage, "vanInteriorScene", 548, 308);
  
-    this.postBattleSceneName = this.add.text(84, 62, "", {
+    this.postBattleSceneName = this.add.text(54, 30, "", {
       fontSize: "16px",
       color: "#fcd34d",
       fontStyle: "bold",
@@ -1362,7 +1388,18 @@ class BattleScene extends Phaser.Scene {
   setPostBattlePortrait(portraitKey, overlapPortraitKey = null) {
     this.postBattleOverlapPortrait.setVisible(false);
  
-    if (portraitKey && this.textures.exists(portraitKey)) {
+    if (!portraitKey) {
+      this.postBattlePortraitPanel.setVisible(false);
+      this.postBattlePortraitFrame.setVisible(false);
+      this.postBattlePortrait.setVisible(false);
+      this.postBattlePortraitPlaceholder.setVisible(false);
+      return;
+    }
+ 
+    this.postBattlePortraitPanel.setVisible(true);
+    this.postBattlePortraitFrame.setVisible(true);
+ 
+    if (this.textures.exists(portraitKey)) {
       this.postBattlePortrait.setTexture(portraitKey);
       this.postBattlePortrait.setDisplaySize(110, 132);
       this.postBattlePortrait.setVisible(true);
@@ -1486,7 +1523,7 @@ class BattleScene extends Phaser.Scene {
     if (line.type === "fullScreenScene") {
       this.postBattleDim.setAlpha(1);
       if (line.scene && this.textures.exists(line.scene)) {
-        this.postBattleFullSceneImage.setTexture(line.scene);
+        this.fitImageInBox(this.postBattleFullSceneImage, line.scene, GAME_WIDTH, GAME_HEIGHT);
       }
       this.postBattleFullSceneImage.setVisible(true);
       this.postBattleMainPanel.setVisible(false);
@@ -1503,7 +1540,11 @@ class BattleScene extends Phaser.Scene {
       return;
     }
  
-    if (line.type === "sceneDialogue" || line.type === "overlapDialogue") {
+    if (
+      line.type === "sceneDialogue" ||
+      line.type === "sceneNarration" ||
+      line.type === "overlapDialogue"
+    ) {
       this.postBattleDim.setAlpha(0.82);
       this.postBattleSceneFrame.setVisible(true);
       this.postBattleSceneImage.setVisible(true);
@@ -1511,7 +1552,7 @@ class BattleScene extends Phaser.Scene {
       this.postBattleSceneName.setText(line.sceneName || "");
  
       if (line.scene && this.textures.exists(line.scene)) {
-        this.postBattleSceneImage.setTexture(line.scene);
+        this.fitImageInBox(this.postBattleSceneImage, line.scene, 548, 308);
       }
     }
  
@@ -1549,7 +1590,7 @@ class BattleScene extends Phaser.Scene {
     this.postBattleDim.setAlpha(1);
     this.postBattleFullSceneImage.setVisible(false);
     if (this.textures.exists("byronFarmScene")) {
-      this.postBattleFullSceneImage.setTexture("byronFarmScene");
+      this.fitImageInBox(this.postBattleFullSceneImage, "byronFarmScene", GAME_WIDTH, GAME_HEIGHT);
     }
     this.postBattleFullSceneImage.setVisible(true);
  
@@ -1662,13 +1703,13 @@ class BattleScene extends Phaser.Scene {
     const mainPanel = this.add.rectangle(480, 250, 860, 430, 0x020617, 0.92);
     mainPanel.setStrokeStyle(2, 0x475569);
  
-    const sceneFrame = this.add.rectangle(240, 175, 320, 200, 0x111827, 1);
+    const sceneFrame = this.add.rectangle(315, 175, 560, 315, 0x111827, 1);
     sceneFrame.setStrokeStyle(2, 0x64748b);
  
-    this.dialogueSceneImage = this.add.image(240, 175, "prologueScene");
-    this.dialogueSceneImage.setDisplaySize(312, 192);
+    this.dialogueSceneImage = this.add.image(315, 175, "prologueScene");
+    this.fitImageInBox(this.dialogueSceneImage, "prologueScene", 548, 308);
  
-    this.dialogueSceneName = this.add.text(84, 62, "", {
+    this.dialogueSceneName = this.add.text(54, 30, "", {
       fontSize: "16px",
       color: "#fcd34d",
       fontStyle: "bold",
@@ -1959,7 +2000,7 @@ class BattleScene extends Phaser.Scene {
     this.dialogueSceneName.setText(step.sceneName);
     const sceneTextureKey = step.background || "prologueScene";
     if (this.textures.exists(sceneTextureKey)) {
-      this.dialogueSceneImage.setTexture(sceneTextureKey);
+      this.fitImageInBox(this.dialogueSceneImage, sceneTextureKey, 548, 308);
     }
     this.dialogueSceneImage.setAlpha(isImpact ? 0.3 : 1);
     this.impactContainer.setVisible(isImpact);
