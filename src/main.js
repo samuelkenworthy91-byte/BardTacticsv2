@@ -31,6 +31,65 @@ const BIOMES = {
   },
 };
  
+const UNIT_SPRITE_SETS = {
+  edwin: {
+    idle: { key: "edwinIdleSprite", path: "/sprites/edwin/edwin_idle.png" },
+    move: { key: "edwinMoveSprite", path: "/sprites/edwin/edwin_move.png" },
+    attack: { key: "edwinAttackSprite", path: "/sprites/edwin/edwin_attack.png" },
+    hurt: { key: "edwinHurtSprite", path: "/sprites/edwin/edwin_hurt.png" },
+    death: { key: "edwinDeathSprite", path: "/sprites/edwin/edwin_death.png" },
+  },
+  leon: {
+    idle: { key: "leonIdleSprite", path: "/sprites/leon/leon_idle.png" },
+    move: { key: "leonMoveSprite", path: "/sprites/leon/leon_move.png" },
+    attack: { key: "leonAttackSprite", path: "/sprites/leon/leon_attack.png" },
+    hurt: { key: "leonHurtSprite", path: "/sprites/leon/leon_hurt.png" },
+    death: { key: "leonDeathSprite", path: "/sprites/leon/leon_death.png" },
+  },
+  falan: {
+    idle: { key: "falanIdleSprite", path: "/sprites/falan/falan_idle.png" },
+    move: { key: "falanMoveSprite", path: "/sprites/falan/falan_move.png" },
+    attack: { key: "falanAttackSprite", path: "/sprites/falan/falan_attack.png" },
+    hurt: { key: "falanHurtSprite", path: "/sprites/falan/falan_hurt.png" },
+    death: { key: "falanDeathSprite", path: "/sprites/falan/falan_death.png" },
+  },
+  thug_sword: {
+    idle: { key: "thugSwordIdleSprite", path: "/sprites/thug_sword/thug_sword_idle.png" },
+    move: { key: "thugSwordMoveSprite", path: "/sprites/thug_sword/thug_sword_move.png" },
+    attack: { key: "thugSwordAttackSprite", path: "/sprites/thug_sword/thug_sword_attack.png" },
+    hurt: { key: "thugSwordHurtSprite", path: "/sprites/thug_sword/thug_sword_hurt.png" },
+    death: { key: "thugSwordDeathSprite", path: "/sprites/thug_sword/thug_sword_death.png" },
+  },
+  thug_axe: {
+    idle: { key: "thugAxeIdleSprite", path: "/sprites/thug_axe/thug_axe_idle.png" },
+    move: { key: "thugAxeMoveSprite", path: "/sprites/thug_axe/thug_axe_move.png" },
+    attack: { key: "thugAxeAttackSprite", path: "/sprites/thug_axe/thug_axe_attack.png" },
+    hurt: { key: "thugAxeHurtSprite", path: "/sprites/thug_axe/thug_axe_hurt.png" },
+    death: { key: "thugAxeDeathSprite", path: "/sprites/thug_axe/thug_axe_death.png" },
+  },
+  thug_chakram: {
+    idle: { key: "thugChakramIdleSprite", path: "/sprites/thug_chakram/thug_chakram_idle.png" },
+    move: { key: "thugChakramMoveSprite", path: "/sprites/thug_chakram/thug_chakram_move.png" },
+    attack: { key: "thugChakramAttackSprite", path: "/sprites/thug_chakram/thug_chakram_attack.png" },
+    hurt: { key: "thugChakramHurtSprite", path: "/sprites/thug_chakram/thug_chakram_hurt.png" },
+    death: { key: "thugChakramDeathSprite", path: "/sprites/thug_chakram/thug_chakram_death.png" },
+  },
+};
+ 
+const DIRECTION_FRAMES = {
+  down: { col: 0, row: 0 },
+  up: { col: 1, row: 0 },
+  left: { col: 0, row: 1 },
+  right: { col: 1, row: 1 },
+};
+ 
+const DEATH_FRAMES = [
+  { col: 0, row: 0 },
+  { col: 1, row: 0 },
+  { col: 0, row: 1 },
+  { col: 1, row: 1 },
+];
+ 
 const CHAPTER_OPENING = [
   {
     type: "title",
@@ -115,10 +174,9 @@ const POST_BATTLE_SCENE = [
     text: "I... didn't believe... Caleb... you're good, Bligh... but the others will end you.",
   },
   {
-    type: "fadeUnit",
+    type: "unitDeath",
     unitId: "falan",
-    speaker: "Narration",
-    text: "Falan drops to his knees. A moment later, he fades from the battlefield.",
+    autoAdvanceDelay: 1400,
   },
   {
     type: "mapDialogue",
@@ -251,6 +309,8 @@ const UNITS = [
     team: "player",
     className: "Spellsword",
     portraitKey: "edwinPortrait",
+    spriteSet: "edwin",
+    facing: "down",
     x: 2,
     y: 6,
     move: 5,
@@ -300,6 +360,8 @@ const UNITS = [
     team: "player",
     className: "Street Brawler",
     portraitKey: "leonPortrait",
+    spriteSet: "leon",
+    facing: "down",
     x: 4,
     y: 6,
     move: 5,
@@ -330,6 +392,8 @@ const UNITS = [
     team: "enemy",
     className: "Leader",
     portraitKey: "falanPortrait",
+    spriteSet: "falan",
+    facing: "down",
     x: 4,
     y: 1,
     move: 4,
@@ -362,6 +426,8 @@ const UNITS = [
     team: "enemy",
     className: "Thug",
     portraitKey: "thugPortrait",
+    spriteSet: "thug_sword",
+    facing: "down",
     x: 2,
     y: 1,
     move: 4,
@@ -392,6 +458,8 @@ const UNITS = [
     team: "enemy",
     className: "Thug",
     portraitKey: "thugPortrait",
+    spriteSet: "thug_axe",
+    facing: "down",
     x: 3,
     y: 0,
     move: 4,
@@ -422,6 +490,8 @@ const UNITS = [
     team: "enemy",
     className: "Thug",
     portraitKey: "thugPortrait",
+    spriteSet: "thug_chakram",
+    facing: "down",
     x: 5,
     y: 0,
     move: 4,
@@ -453,6 +523,8 @@ const UNITS = [
     team: "enemy",
     className: "Thug",
     portraitKey: "thugPortrait",
+    spriteSet: "thug_sword",
+    facing: "down",
     x: 6,
     y: 1,
     move: 4,
@@ -576,6 +648,21 @@ class BattleScene extends Phaser.Scene {
     this.load.audio(levelData.battleMusic.key, [levelData.battleMusic.path]);
   }
  
+ 
+ 
+  preloadUnitSpriteAtlases() {
+    const loadedKeys = new Set();
+ 
+    Object.values(UNIT_SPRITE_SETS).forEach((spriteSet) => {
+      Object.values(spriteSet).forEach((entry) => {
+        if (!entry || !entry.key || !entry.path || loadedKeys.has(entry.key)) return;
+ 
+        this.load.image(entry.key, entry.path);
+        loadedKeys.add(entry.key);
+      });
+    });
+  }
+ 
   preload() {
     const levelData = this.getCurrentLevel();
  
@@ -595,6 +682,7 @@ class BattleScene extends Phaser.Scene {
     this.load.image("byronFarmScene", "/scenes/byron_farm.jpg");
  
     this.preloadBiomeTiles(levelData.biome);
+    this.preloadUnitSpriteAtlases();
     this.preloadLevelAudio(levelData);
   }
  
@@ -607,6 +695,8 @@ class BattleScene extends Phaser.Scene {
  
     this.units = this.levelData.units.map((unit) => ({
       ...unit,
+      facing: unit.facing || "down",
+      spriteState: unit.spriteState || "idle",
       weapons: unit.weapons.map((weapon) => ({ ...weapon })),
     }));
  
@@ -1436,8 +1526,6 @@ class BattleScene extends Phaser.Scene {
     this.targetTiles = [];
     this.overlayLayer.removeAll(true);
     this.updateSelectedPanel();
-    this.setFalanFinalDeathPose();
- 
     this.phaseText.setText("Chapter Complete");
     this.phaseText.setColor("#86efac");
     this.helpText.setText("The battle is over.");
@@ -1464,17 +1552,28 @@ class BattleScene extends Phaser.Scene {
     falan.hp = 0;
     this.refreshUnitSprite(falan);
     sprite.hpText.setText("HP 0");
-    sprite.marker.setFillStyle(0x7f1d1d, 1);
-    if (sprite.label) sprite.label.setText("KO");
-    sprite.container.setScale(1, 0.72);
-    sprite.container.y += 6;
+ 
+    const usedDeathFrame = this.setUnitDeathFrame(falan, 1);
+ 
+    if (!usedDeathFrame) {
+      sprite.marker.setFillStyle(0x7f1d1d, 1);
+      if (sprite.label) sprite.label.setText("KO");
+      sprite.container.setScale(1, 0.72);
+      sprite.container.y += 6;
+    }
   }
  
   fadeUnitOut(unitId) {
+    const unit = this.units.find((candidate) => candidate.id === unitId);
     const sprite = this.unitSprites[unitId];
  
     if (!sprite) {
-      this.units = this.units.filter((unit) => unit.id !== unitId);
+      this.units = this.units.filter((candidate) => candidate.id !== unitId);
+      return;
+    }
+ 
+    if (unit) {
+      this.playUnitDeath(unit, () => this.removeUnitSpriteAndData(unitId));
       return;
     }
  
@@ -1483,11 +1582,38 @@ class BattleScene extends Phaser.Scene {
       alpha: 0,
       duration: 900,
       ease: "Quad.Out",
-      onComplete: () => {
-        sprite.container.destroy();
-        delete this.unitSprites[unitId];
-        this.units = this.units.filter((unit) => unit.id !== unitId);
-      },
+      onComplete: () => this.removeUnitSpriteAndData(unitId),
+    });
+  }
+ 
+  playPostBattleUnitDeath(unitId, autoAdvanceDelay = 1400) {
+    if (this.postBattleActionSteps.has(this.postBattleStep)) return;
+ 
+    this.postBattleActionSteps.add(this.postBattleStep);
+ 
+    const unit = this.units.find((candidate) => candidate.id === unitId);
+    const sprite = this.unitSprites[unitId];
+ 
+    if (unit && sprite) {
+      unit.hp = 0;
+      this.refreshUnitSprite(unit);
+      this.playUnitDeath(unit, () => this.removeUnitSpriteAndData(unitId));
+    } else if (sprite) {
+      this.tweens.add({
+        targets: sprite.container,
+        alpha: 0,
+        duration: 650,
+        ease: "Quad.Out",
+        onComplete: () => this.removeUnitSpriteAndData(unitId),
+      });
+    } else {
+      this.units = this.units.filter((candidate) => candidate.id !== unitId);
+    }
+ 
+    this.time.delayedCall(autoAdvanceDelay, () => {
+      if (this.phase !== "postbattle") return;
+      this.postBattleStep += 1;
+      this.updatePostBattleUI();
     });
   }
  
@@ -1537,6 +1663,26 @@ class BattleScene extends Phaser.Scene {
       this.postBattlePortraitPlaceholder.setVisible(false);
       this.postBattleSpeaker.setText(line.sceneName || "");
       this.postBattleText.setText(line.text || "");
+      return;
+    }
+ 
+    if (line.type === "unitDeath") {
+      this.postBattleDim.setAlpha(0.08);
+      this.postBattleMainPanel.setVisible(false);
+      this.postBattleSceneFrame.setVisible(false);
+      this.postBattleSceneImage.setVisible(false);
+      this.postBattleSceneName.setVisible(false);
+      this.postBattlePortraitPanel.setVisible(false);
+      this.postBattlePortraitFrame.setVisible(false);
+      this.postBattlePortrait.setVisible(false);
+      this.postBattleOverlapPortrait.setVisible(false);
+      this.postBattlePortraitPlaceholder.setVisible(false);
+      this.postBattleTextBox.setVisible(false);
+      this.postBattleSpeaker.setVisible(false);
+      this.postBattleText.setVisible(false);
+      this.postBattleNextButton.setVisible(false);
+      this.postBattleNextLabel.setVisible(false);
+      this.playPostBattleUnitDeath(line.unitId, line.autoAdvanceDelay || 1400);
       return;
     }
  
@@ -2211,11 +2357,12 @@ class BattleScene extends Phaser.Scene {
       this.unitSprites[unit.id] = sprite;
       this.unitLayer.add(sprite.container);
       this.refreshUnitSprite(unit);
+      this.setUnitSpriteFrame(unit, "idle", unit.facing || "down");
     }
   }
  
   createUnitSprite(unit) {
-    const marker = this.add.circle(0, 0, 14, unit.color);
+    const marker = this.add.circle(0, 0, 18, unit.color, 0.22);
     marker.setStrokeStyle(2, 0xffffff);
  
     const label = this.add.text(
@@ -2229,14 +2376,16 @@ class BattleScene extends Phaser.Scene {
       }
     );
  
-    const hpText = this.add.text(-14, 16, "", {
+    const hpText = this.add.text(-16, 20, "", {
       fontSize: "10px",
       color: "#e5e7eb",
+      stroke: "#000000",
+      strokeThickness: 3,
     });
  
     const container = this.add.container(0, 0, [marker, label, hpText]);
  
-    return { container, marker, label, hpText };
+    return { container, marker, label, hpText, image: null };
   }
  
   refreshUnitSprite(unit) {
@@ -2247,6 +2396,215 @@ class BattleScene extends Phaser.Scene {
     sprite.container.y = this.boardY + unit.y * TILE_SIZE + TILE_SIZE / 2;
     sprite.hpText.setText(`HP ${unit.hp}`);
     sprite.container.alpha = unit.team === "player" && unit.acted ? 0.55 : 1;
+  }
+ 
+  getUnitSpriteSet(unit) {
+    if (!unit) return null;
+    return UNIT_SPRITE_SETS[unit.spriteSet] || UNIT_SPRITE_SETS[unit.id] || null;
+  }
+ 
+  getUnitSpriteTextureKey(unit, state = "idle") {
+    const spriteSet = this.getUnitSpriteSet(unit);
+    if (!spriteSet) return null;
+ 
+    return spriteSet[state]?.key || spriteSet.idle?.key || null;
+  }
+ 
+  getDirectionFrame(direction) {
+    return DIRECTION_FRAMES[direction] || DIRECTION_FRAMES.down;
+  }
+ 
+  getDeathFrame(index) {
+    return DEATH_FRAMES[Phaser.Math.Clamp(index, 0, DEATH_FRAMES.length - 1)] || DEATH_FRAMES[0];
+  }
+ 
+  ensureUnitSpriteImage(unit, textureKey) {
+    const sprite = this.unitSprites[unit.id];
+    if (!sprite || !textureKey || !this.textures.exists(textureKey)) return null;
+ 
+    if (!sprite.image) {
+      sprite.image = this.add.image(0, -6, textureKey);
+      sprite.image.setOrigin(0.5, 0.82);
+      sprite.container.addAt(sprite.image, 1);
+    }
+ 
+    return sprite.image;
+  }
+ 
+  applyUnitSpriteCrop(unit, textureKey, frame) {
+    const sprite = this.unitSprites[unit.id];
+    const image = this.ensureUnitSpriteImage(unit, textureKey);
+ 
+    if (!sprite || !image || !this.textures.exists(textureKey)) {
+      this.showUnitFallbackSprite(unit);
+      return false;
+    }
+ 
+    const texture = this.textures.get(textureKey);
+    const source = texture.getSourceImage();
+    const cellWidth = Math.floor(source.width / 2);
+    const cellHeight = Math.floor(source.height / 2);
+    const cropX = frame.col * cellWidth;
+    const cropY = frame.row * cellHeight;
+    const scale = Math.min((TILE_SIZE * 0.9) / cellWidth, (TILE_SIZE * 1.18) / cellHeight);
+ 
+    image.setTexture(textureKey);
+    image.setCrop(cropX, cropY, cellWidth, cellHeight);
+    image.setScale(scale);
+    image.setVisible(true);
+    image.clearTint();
+ 
+    sprite.marker.setAlpha(0.2);
+    sprite.label.setVisible(false);
+    sprite.hpText.setY(20);
+ 
+    return true;
+  }
+ 
+  showUnitFallbackSprite(unit) {
+    const sprite = this.unitSprites[unit.id];
+    if (!sprite) return;
+ 
+    if (sprite.image) sprite.image.setVisible(false);
+    sprite.marker.setFillStyle(unit.color, 1);
+    sprite.marker.setAlpha(1);
+    sprite.label.setVisible(true);
+    sprite.hpText.setY(16);
+  }
+ 
+  setUnitSpriteFrame(unit, state = "idle", direction = null) {
+    if (!unit) return false;
+ 
+    const textureKey = this.getUnitSpriteTextureKey(unit, state);
+    const frame = this.getDirectionFrame(direction || unit.facing || "down");
+ 
+    unit.spriteState = state;
+ 
+    return this.applyUnitSpriteCrop(unit, textureKey, frame);
+  }
+ 
+  setUnitDeathFrame(unit, frameIndex = 0) {
+    if (!unit) return false;
+ 
+    const textureKey = this.getUnitSpriteTextureKey(unit, "death");
+    const frame = this.getDeathFrame(frameIndex);
+ 
+    unit.spriteState = "death";
+ 
+    return this.applyUnitSpriteCrop(unit, textureKey, frame);
+  }
+ 
+  getDirectionFromDelta(dx, dy, fallback = "down") {
+    if (Math.abs(dx) > Math.abs(dy)) {
+      return dx > 0 ? "right" : "left";
+    }
+ 
+    if (Math.abs(dy) > 0) {
+      return dy > 0 ? "down" : "up";
+    }
+ 
+    return fallback;
+  }
+ 
+  getDirectionToward(fromUnit, toUnit) {
+    if (!fromUnit || !toUnit) return "down";
+    return this.getDirectionFromDelta(toUnit.x - fromUnit.x, toUnit.y - fromUnit.y, fromUnit.facing || "down");
+  }
+ 
+  faceUnitToward(unit, target) {
+    if (!unit || !target) return;
+    unit.facing = this.getDirectionToward(unit, target);
+    this.setUnitSpriteFrame(unit, unit.spriteState || "idle", unit.facing);
+  }
+ 
+  playUnitState(unit, state, duration = 320) {
+    if (!unit) return;
+ 
+    this.setUnitSpriteFrame(unit, state, unit.facing || "down");
+ 
+    if (state !== "idle" && state !== "death") {
+      this.time.delayedCall(duration, () => {
+        if (unit.hp > 0) {
+          this.setUnitSpriteFrame(unit, "idle", unit.facing || "down");
+        }
+      });
+    }
+  }
+ 
+  playUnitHurt(unit, duration = 360) {
+    if (!unit) return;
+ 
+    const sprite = this.unitSprites[unit.id];
+    this.playUnitState(unit, "hurt", duration);
+ 
+    if (sprite?.image?.visible) {
+      sprite.image.setTintFill(0xff6666);
+      this.time.delayedCall(Math.floor(duration * 0.65), () => {
+        if (sprite.image) sprite.image.clearTint();
+      });
+    } else if (sprite?.marker) {
+      sprite.marker.setFillStyle(0xff4444, 1);
+      this.time.delayedCall(Math.floor(duration * 0.65), () => {
+        if (sprite.marker) sprite.marker.setFillStyle(unit.color, 1);
+      });
+    }
+  }
+ 
+  playUnitDeath(unit, onComplete = null) {
+    if (!unit) {
+      if (onComplete) onComplete();
+      return;
+    }
+ 
+    const sprite = this.unitSprites[unit.id];
+    if (!sprite) {
+      if (onComplete) onComplete();
+      return;
+    }
+ 
+    const hasDeathSprite = !!this.getUnitSpriteTextureKey(unit, "death") &&
+      this.textures.exists(this.getUnitSpriteTextureKey(unit, "death"));
+ 
+    if (!hasDeathSprite) {
+      this.tweens.add({
+        targets: sprite.container,
+        alpha: 0,
+        duration: 700,
+        ease: "Quad.Out",
+        onComplete,
+      });
+      return;
+    }
+ 
+    sprite.container.setScale(1);
+    sprite.container.alpha = 1;
+ 
+    DEATH_FRAMES.forEach((_, index) => {
+      this.time.delayedCall(index * 180, () => {
+        this.setUnitDeathFrame(unit, index);
+      });
+    });
+ 
+    this.time.delayedCall(DEATH_FRAMES.length * 180 + 80, () => {
+      this.tweens.add({
+        targets: sprite.container,
+        alpha: 0,
+        duration: 650,
+        ease: "Quad.Out",
+        onComplete,
+      });
+    });
+  }
+ 
+  removeUnitSpriteAndData(unitId) {
+    const sprite = this.unitSprites[unitId];
+ 
+    if (sprite) {
+      sprite.container.destroy();
+      delete this.unitSprites[unitId];
+    }
+ 
+    this.units = this.units.filter((unit) => unit.id !== unitId);
   }
  
   setupInput() {
@@ -2462,6 +2820,12 @@ class BattleScene extends Phaser.Scene {
     if (!unit || !sprite) return;
  
     this.busy = true;
+ 
+    const oldX = unit.x;
+    const oldY = unit.y;
+    unit.facing = this.getDirectionFromDelta(x - oldX, y - oldY, unit.facing || "down");
+    this.playUnitState(unit, "move", 260);
+ 
     unit.x = x;
     unit.y = y;
  
@@ -2474,6 +2838,7 @@ class BattleScene extends Phaser.Scene {
       y: targetY,
       duration: 180,
       onComplete: () => {
+        this.setUnitSpriteFrame(unit, "idle", unit.facing || "down");
         this.moveTiles = [];
         this.targetTiles = this.attackableEnemies(unit);
         this.redrawSelection();
@@ -2503,12 +2868,19 @@ class BattleScene extends Phaser.Scene {
     if (!weapon) return;
  
     this.busy = true;
+    this.faceUnitToward(attacker, defender);
+    this.faceUnitToward(defender, attacker);
+    this.playUnitState(attacker, "attack", 420);
  
     const defenderWasAlive = defender.hp > 0;
     const sequence = this.resolveAttackSequence(attacker, defender, weapon);
  
     sequence.results.forEach((result, index) => {
       this.showCombatResultText(defender, result, index);
+ 
+      if (result.hit) {
+        this.time.delayedCall(index * 140, () => this.playUnitHurt(defender));
+      }
     });
  
     const didKill = defenderWasAlive && defender.hp <= 0;
@@ -2526,17 +2898,11 @@ class BattleScene extends Phaser.Scene {
       if (defeatedFalan) {
         defender.hp = 0;
         this.refreshUnitSprite(defender);
-        this.setFalanFinalDeathPose();
+        this.playUnitHurt(defender);
         this.clearSelection(`${attacker.name} defeated ${defender.name}!`);
       } else {
-        const defenderSprite = this.unitSprites[defender.id];
- 
-        if (defenderSprite) {
-          defenderSprite.container.destroy();
-          delete this.unitSprites[defender.id];
-        }
- 
-        this.units = this.units.filter((u) => u.id !== defender.id);
+        defender.hp = 0;
+        this.playUnitDeath(defender, () => this.removeUnitSpriteAndData(defender.id));
         this.clearSelection(`${attacker.name} defeated ${defender.name}!`);
       }
     } else {
@@ -2554,7 +2920,7 @@ class BattleScene extends Phaser.Scene {
       return;
     }
  
-    this.time.delayedCall(250 + sequence.results.length * 140, () => {
+    this.time.delayedCall(650 + sequence.results.length * 140, () => {
       this.busy = false;
       this.checkEndOfPlayerPhase();
     });
@@ -2731,6 +3097,10 @@ class BattleScene extends Phaser.Scene {
     }
  
     const sprite = this.unitSprites[enemy.id];
+    const oldX = enemy.x;
+    const oldY = enemy.y;
+    enemy.facing = this.getDirectionFromDelta(moveTarget.x - oldX, moveTarget.y - oldY, enemy.facing || "down");
+    this.playUnitState(enemy, "move", 260);
     enemy.x = moveTarget.x;
     enemy.y = moveTarget.y;
  
@@ -2740,6 +3110,7 @@ class BattleScene extends Phaser.Scene {
       y: this.boardY + enemy.y * TILE_SIZE + TILE_SIZE / 2,
       duration: 180,
       onComplete: () => {
+        this.setUnitSpriteFrame(enemy, "idle", enemy.facing || "down");
         const targetsAfterMove = this.attackablePlayers(enemy);
  
         if (targetsAfterMove.length > 0) {
@@ -2796,23 +3167,26 @@ class BattleScene extends Phaser.Scene {
       return;
     }
  
+    this.faceUnitToward(attacker, defender);
+    this.faceUnitToward(defender, attacker);
+    this.playUnitState(attacker, "attack", 420);
+ 
     const sequence = this.resolveAttackSequence(attacker, defender, weapon);
  
     sequence.results.forEach((result, index) => {
       this.showCombatResultText(defender, result, index);
+ 
+      if (result.hit) {
+        this.time.delayedCall(index * 140, () => this.playUnitHurt(defender));
+      }
     });
  
     if (defender.hp <= 0) {
-      const defenderSprite = this.unitSprites[defender.id];
+      const defeatedEdwin = defender.id === "edwin";
+      defender.hp = 0;
+      this.playUnitDeath(defender, () => this.removeUnitSpriteAndData(defender.id));
  
-      if (defenderSprite) {
-        defenderSprite.container.destroy();
-        delete this.unitSprites[defender.id];
-      }
- 
-      this.units = this.units.filter((u) => u.id !== defender.id);
- 
-      if (!this.units.some((u) => u.id === "edwin")) {
+      if (defeatedEdwin) {
         this.stopBattleMusic();
  
         this.phaseText.setText("Defeat");
@@ -2828,7 +3202,7 @@ class BattleScene extends Phaser.Scene {
  
     this.updateSelectedPanel();
     this.enemyIndex += 1;
-    this.time.delayedCall(250 + sequence.results.length * 140, () => this.runNextEnemy());
+    this.time.delayedCall(650 + sequence.results.length * 140, () => this.runNextEnemy());
   }
  
   startPlayerPhase() {
@@ -2840,6 +3214,7 @@ class BattleScene extends Phaser.Scene {
       if (unit.team === "player") {
         unit.acted = false;
         this.refreshUnitSprite(unit);
+        this.setUnitSpriteFrame(unit, "idle", unit.facing || "down");
       }
     }
  
