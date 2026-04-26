@@ -650,17 +650,153 @@ class BattleScene extends Phaser.Scene {
  
  
  
+  getUnitSpriteCandidatePaths(spriteSetKey, state, entry) {
+    if (!entry) return [];
+ 
+    const folder = `/sprites/${spriteSetKey}`;
+    const aliases = new Set([spriteSetKey]);
+ 
+    if (spriteSetKey.startsWith("thug_")) {
+      const weaponName = spriteSetKey.replace("thug_", "");
+      aliases.add("thug");
+      aliases.add(`thug_${weaponName}`);
+      aliases.add(`${weaponName}_thug`);
+      aliases.add(`thug_${weaponName}_sheet`);
+    }
+ 
+    aliases.add(spriteSetKey.replace(/_/g, ""));
+ 
+    const paths = [entry.path];
+ 
+    aliases.forEach((alias) => {
+      paths.push(`${folder}/${alias}_${state}.png`);
+      paths.push(`${folder}/${state}.png`);
+    });
+ 
+    paths.push(`/sprites/${spriteSetKey}_${state}.png`);
+ 
+    return [...new Set(paths.filter(Boolean))];
+  }
+ 
   preloadUnitSpriteAtlases() {
     const loadedKeys = new Set();
  
-    Object.values(UNIT_SPRITE_SETS).forEach((spriteSet) => {
-      Object.values(spriteSet).forEach((entry) => {
-        if (!entry || !entry.key || !entry.path || loadedKeys.has(entry.key)) return;
+    Object.entries(UNIT_SPRITE_SETS).forEach(([spriteSetKey, spriteSet]) => {
+      Object.entries(spriteSet).forEach(([state, entry]) => {
+        if (!entry || !entry.key) return;
  
-        this.load.image(entry.key, entry.path);
-        loadedKeys.add(entry.key);
+        const paths = this.getUnitSpriteCandidatePaths(spriteSetKey, state, entry);
+        entry.candidateKeys = [];
+ 
+        paths.forEach((path, index) => {
+          const key = index === 0 ? entry.key : `${entry.key}Alt${index}`;
+          entry.candidateKeys.push(key);
+ 
+          if (loadedKeys.has(key)) return;
+ 
+          this.load.image(key, path);
+          loadedKeys.add(key);
+        });
       });
     });
+  }
+ 
+  createTransparentUnitTextures() {
+    Object.values(UNIT_SPRITE_SETS).forEach((spriteSet) => {
+      Object.values(spriteSet).forEach((entry) => {
+        const keys = entry?.candidateKeys || (entry?.key ? [entry.key] : []);
+ 
+        keys.forEach((key) => {
+          if (this.textures.exists(key)) {
+            this.createTransparentCopyForUnitTexture(key);
+          }
+        });
+      });
+    });
+  }
+ 
+  createTransparentCopyForUnitTexture(sourceKey) {
+    const cleanKey = `${sourceKey}Clean`;
+    if (this.textures.exists(cleanKey)) return cleanKey;
+    if (!this.textures.exists(sourceKey)) return sourceKey;
+ 
+    const texture = this.textures.get(sourceKey);
+    const source = texture.getSourceImage();
+ 
+    if (!source?.width || !source?.height) return sourceKey;
+ 
+    const canvasTexture = this.textures.createCanvas(cleanKey, source.width, source.height);
+    const canvas = canvasTexture.getCanvas();
+    const ctx = canvasTexture.getContext();
+ 
+    ctx.clearRect(0, 0, source.width, source.height);
+    ctx.drawImage(source, 0, 0);
+ 
+    const imageData = ctx.getImageData(0, 0, source.width, source.height);
+    const data = imageData.data;
+    const width = source.width;
+    const height = source.height;
+    const visited = new Uint8Array(width * height);
+    const queue = [];
+ 
+    const isLightNeutralBackground = (index) => {
+      const r = data[index];
+      const g = data[index + 1];
+      const b = data[index + 2];
+      const a = data[index + 3];
+ 
+      if (a < 8) return false;
+ 
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+ 
+      return r >= 218 && g >= 218 && b >= 218 && max - min <= 28;
+    };
+ 
+    const tryAdd = (x, y) => {
+      if (x < 0 || y < 0 || x >= width || y >= height) return;
+ 
+      const pixelIndex = y * width + x;
+      if (visited[pixelIndex]) return;
+ 
+      const dataIndex = pixelIndex * 4;
+      if (!isLightNeutralBackground(dataIndex)) return;
+ 
+      visited[pixelIndex] = 1;
+      queue.push([x, y]);
+    };
+ 
+    for (let x = 0; x < width; x += 1) {
+      tryAdd(x, 0);
+      tryAdd(x, height - 1);
+    }
+ 
+    for (let y = 0; y < height; y += 1) {
+      tryAdd(0, y);
+      tryAdd(width - 1, y);
+    }
+ 
+    let queueIndex = 0;
+    while (queueIndex < queue.length) {
+      const [x, y] = queue[queueIndex];
+      queueIndex += 1;
+ 
+      tryAdd(x + 1, y);
+      tryAdd(x - 1, y);
+      tryAdd(x, y + 1);
+      tryAdd(x, y - 1);
+    }
+ 
+    for (let pixelIndex = 0; pixelIndex < visited.length; pixelIndex += 1) {
+      if (visited[pixelIndex]) {
+        data[pixelIndex * 4 + 3] = 0;
+      }
+    }
+ 
+    ctx.putImageData(imageData, 0, 0);
+    canvasTexture.refresh();
+ 
+    return cleanKey;
   }
  
   preload() {
@@ -730,6 +866,7 @@ class BattleScene extends Phaser.Scene {
     this.unitLayer = this.add.layer();
     this.uiLayer = this.add.layer();
  
+    this.createTransparentUnitTextures();
     this.createTopUI();
     this.drawBoard();
     this.drawUnits();
@@ -2366,7 +2503,7 @@ class BattleScene extends Phaser.Scene {
     marker.setStrokeStyle(2, 0xffffff);
  
     const label = this.add.text(
-      unit.team === "player" ? -9 : -8,
+      0,
       -10,
       unit.team === "player" ? unit.name[0] : unit.boss ? "B" : "T",
       {
@@ -2374,14 +2511,14 @@ class BattleScene extends Phaser.Scene {
         fontStyle: "bold",
         color: "#ffffff",
       }
-    );
+    ).setOrigin(0.5);
  
-    const hpText = this.add.text(-16, 20, "", {
+    const hpText = this.add.text(0, 20, "", {
       fontSize: "10px",
       color: "#e5e7eb",
       stroke: "#000000",
       strokeThickness: 3,
-    });
+    }).setOrigin(0.5, 0);
  
     const container = this.add.container(0, 0, [marker, label, hpText]);
  
@@ -2407,7 +2544,17 @@ class BattleScene extends Phaser.Scene {
     const spriteSet = this.getUnitSpriteSet(unit);
     if (!spriteSet) return null;
  
-    return spriteSet[state]?.key || spriteSet.idle?.key || null;
+    const entry = spriteSet[state] || spriteSet.idle;
+    const candidateKeys = entry?.candidateKeys || (entry?.key ? [entry.key] : []);
+ 
+    for (const key of candidateKeys) {
+      const cleanKey = `${key}Clean`;
+ 
+      if (this.textures.exists(cleanKey)) return cleanKey;
+      if (this.textures.exists(key)) return key;
+    }
+ 
+    return null;
   }
  
   getDirectionFrame(direction) {
@@ -2423,10 +2570,13 @@ class BattleScene extends Phaser.Scene {
     if (!sprite || !textureKey || !this.textures.exists(textureKey)) return null;
  
     if (!sprite.image) {
-      sprite.image = this.add.image(0, -6, textureKey);
-      sprite.image.setOrigin(0.5, 0.82);
+      sprite.image = this.add.image(0, 0, textureKey);
+      sprite.image.setOrigin(0.5, 0.5);
       sprite.container.addAt(sprite.image, 1);
     }
+ 
+    sprite.image.setPosition(0, 0);
+    sprite.image.setOrigin(0.5, 0.5);
  
     return sprite.image;
   }
@@ -2446,17 +2596,19 @@ class BattleScene extends Phaser.Scene {
     const cellHeight = Math.floor(source.height / 2);
     const cropX = frame.col * cellWidth;
     const cropY = frame.row * cellHeight;
-    const scale = Math.min((TILE_SIZE * 0.9) / cellWidth, (TILE_SIZE * 1.18) / cellHeight);
+    const scale = Math.min((TILE_SIZE * 0.96) / cellWidth, (TILE_SIZE * 0.96) / cellHeight);
  
     image.setTexture(textureKey);
     image.setCrop(cropX, cropY, cellWidth, cellHeight);
     image.setScale(scale);
+    image.setPosition(0, 0);
+    image.setOrigin(0.5, 0.5);
     image.setVisible(true);
     image.clearTint();
  
-    sprite.marker.setAlpha(0.2);
+    sprite.marker.setVisible(false);
     sprite.label.setVisible(false);
-    sprite.hpText.setY(20);
+    sprite.hpText.setPosition(0, 20);
  
     return true;
   }
@@ -2466,10 +2618,11 @@ class BattleScene extends Phaser.Scene {
     if (!sprite) return;
  
     if (sprite.image) sprite.image.setVisible(false);
+    sprite.marker.setVisible(true);
     sprite.marker.setFillStyle(unit.color, 1);
     sprite.marker.setAlpha(1);
     sprite.label.setVisible(true);
-    sprite.hpText.setY(16);
+    sprite.hpText.setPosition(0, 16);
   }
  
   setUnitSpriteFrame(unit, state = "idle", direction = null) {
@@ -3058,7 +3211,7 @@ class BattleScene extends Phaser.Scene {
     this.busy = true;
     this.enemyIndex = 0;
     this.enemyTurnOrder = this.units.filter((u) => u.team === "enemy");
-    this.time.delayedCall(300, () => this.runNextEnemy());
+    this.time.delayedCall(700, () => this.runNextEnemy());
   }
  
   runNextEnemy() {
@@ -3076,9 +3229,13 @@ class BattleScene extends Phaser.Scene {
       return;
     }
  
+    this.selectedUnitId = enemy.id;
+    this.updateSelectedPanel();
+    this.helpText.setText(`${enemy.name} is acting...`);
+ 
     const targetsNow = this.attackablePlayers(enemy);
     if (targetsNow.length > 0) {
-      this.enemyAttack(enemy, targetsNow[0]);
+      this.time.delayedCall(350, () => this.enemyAttack(enemy, targetsNow[0]));
       return;
     }
  
@@ -3100,24 +3257,27 @@ class BattleScene extends Phaser.Scene {
     const oldX = enemy.x;
     const oldY = enemy.y;
     enemy.facing = this.getDirectionFromDelta(moveTarget.x - oldX, moveTarget.y - oldY, enemy.facing || "down");
-    this.playUnitState(enemy, "move", 260);
+    this.playUnitState(enemy, "move", 720);
     enemy.x = moveTarget.x;
     enemy.y = moveTarget.y;
+    this.helpText.setText(`${enemy.name} moves.`);
  
     this.tweens.add({
       targets: sprite.container,
       x: this.boardX + enemy.x * TILE_SIZE + TILE_SIZE / 2,
       y: this.boardY + enemy.y * TILE_SIZE + TILE_SIZE / 2,
-      duration: 180,
+      duration: 650,
+      ease: "Sine.easeInOut",
       onComplete: () => {
+        this.refreshUnitSprite(enemy);
         this.setUnitSpriteFrame(enemy, "idle", enemy.facing || "down");
         const targetsAfterMove = this.attackablePlayers(enemy);
  
         if (targetsAfterMove.length > 0) {
-          this.enemyAttack(enemy, targetsAfterMove[0]);
+          this.time.delayedCall(350, () => this.enemyAttack(enemy, targetsAfterMove[0]));
         } else {
           this.enemyIndex += 1;
-          this.time.delayedCall(120, () => this.runNextEnemy());
+          this.time.delayedCall(450, () => this.runNextEnemy());
         }
       },
     });
@@ -3167,17 +3327,22 @@ class BattleScene extends Phaser.Scene {
       return;
     }
  
+    this.selectedUnitId = attacker.id;
+    this.updateSelectedPanel();
+    this.helpText.setText(`${attacker.name} attacks ${defender.name}.`);
     this.faceUnitToward(attacker, defender);
     this.faceUnitToward(defender, attacker);
-    this.playUnitState(attacker, "attack", 420);
+    this.playUnitState(attacker, "attack", 620);
  
     const sequence = this.resolveAttackSequence(attacker, defender, weapon);
  
     sequence.results.forEach((result, index) => {
-      this.showCombatResultText(defender, result, index);
+      this.time.delayedCall(index * 220, () => {
+        this.showCombatResultText(defender, result, 0);
+      });
  
       if (result.hit) {
-        this.time.delayedCall(index * 140, () => this.playUnitHurt(defender));
+        this.time.delayedCall(index * 220, () => this.playUnitHurt(defender, 420));
       }
     });
  
@@ -3202,7 +3367,7 @@ class BattleScene extends Phaser.Scene {
  
     this.updateSelectedPanel();
     this.enemyIndex += 1;
-    this.time.delayedCall(650 + sequence.results.length * 140, () => this.runNextEnemy());
+    this.time.delayedCall(900 + sequence.results.length * 220, () => this.runNextEnemy());
   }
  
   startPlayerPhase() {
