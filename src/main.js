@@ -137,8 +137,22 @@ const UNITS = [
     res: 7,
     spd: 8,
     weapons: [
-      { name: "Iceblade", damage: 6, range: 1 },
-      { name: "Ice Sigil", damage: 7, range: 2 },
+      {
+        name: "Iceblade",
+        baseDamage: 4,
+        range: 1,
+        damageType: "physical",
+        stat: "str",
+        hitRate: 100,
+      },
+      {
+        name: "Ice Sigil",
+        baseDamage: 5,
+        range: 2,
+        damageType: "magical",
+        stat: "mag",
+        hitRate: 100,
+      },
     ],
     acted: false,
     color: 0x60a5fa,
@@ -147,7 +161,7 @@ const UNITS = [
     id: "leon",
     name: "Leon",
     title: "Brawler",
-    level: 0,
+    level: 1,
     xp: 0,
     xpRate: 1.5,
     growths: {
@@ -171,7 +185,16 @@ const UNITS = [
     def: 2,
     res: 1,
     spd: 7,
-    weapons: [{ name: "Fists", damage: 3, range: 1 }],
+    weapons: [
+      {
+        name: "Fists",
+        baseDamage: 1,
+        range: 1,
+        damageType: "physical",
+        stat: "str",
+        hitRate: 100,
+      },
+    ],
     acted: false,
     color: 0x38bdf8,
   },
@@ -192,7 +215,17 @@ const UNITS = [
     def: 3,
     res: 1,
     spd: 5,
-    weapons: [{ name: "Pipe", damage: 5, range: 1 }],
+    weapons: [
+      {
+        name: "Katars",
+        baseDamage: 3,
+        range: 1,
+        damageType: "physical",
+        stat: "str",
+        hitRate: 100,
+        speedBonus: 2,
+      },
+    ],
     acted: false,
     color: 0xf87171,
     boss: true,
@@ -214,7 +247,16 @@ const UNITS = [
     def: 1,
     res: 0,
     spd: 4,
-    weapons: [{ name: "Chain", damage: 3, range: 1 }],
+    weapons: [
+      {
+        name: "Sword",
+        baseDamage: 3,
+        range: 1,
+        damageType: "physical",
+        stat: "str",
+        hitRate: 100,
+      },
+    ],
     acted: false,
     color: 0xfb7185,
   },
@@ -235,7 +277,16 @@ const UNITS = [
     def: 1,
     res: 0,
     spd: 4,
-    weapons: [{ name: "Bat", damage: 3, range: 1 }],
+    weapons: [
+      {
+        name: "Axe",
+        baseDamage: 5,
+        range: 1,
+        damageType: "physical",
+        stat: "str",
+        hitRate: 75,
+      },
+    ],
     acted: false,
     color: 0xfb7185,
   },
@@ -256,7 +307,17 @@ const UNITS = [
     def: 1,
     res: 0,
     spd: 4,
-    weapons: [{ name: "Pipe", damage: 3, range: 1 }],
+    weapons: [
+      {
+        name: "Chakram",
+        baseDamage: 2,
+        minRange: 1,
+        maxRange: 2,
+        damageType: "physical",
+        stat: "str",
+        hitRate: 100,
+      },
+    ],
     acted: false,
     color: 0xfb7185,
   },
@@ -277,7 +338,16 @@ const UNITS = [
     def: 1,
     res: 0,
     spd: 4,
-    weapons: [{ name: "Chain", damage: 3, range: 1 }],
+    weapons: [
+      {
+        name: "Sword",
+        baseDamage: 3,
+        range: 1,
+        damageType: "physical",
+        stat: "str",
+        hitRate: 100,
+      },
+    ],
     acted: false,
     color: 0xfb7185,
   },
@@ -295,7 +365,7 @@ const LEVELS = {
     },
   },
 };
-
+ 
 function tileColor(type) {
   if (type === "street") return 0x374151;
   if (type === "cover") return 0x475569;
@@ -321,12 +391,31 @@ function distance(a, b) {
 }
  
 function getWeaponForTarget(attacker, defender) {
+  if (!attacker || !defender || !attacker.weapons) return null;
+ 
   const dist = distance(attacker, defender);
-  return attacker.weapons.find((weapon) => weapon.range === dist) || null;
+ 
+  return (
+    attacker.weapons.find((weapon) => {
+      const minRange = weapon.minRange ?? weapon.range;
+      const maxRange = weapon.maxRange ?? weapon.range;
+ 
+      return dist >= minRange && dist <= maxRange;
+    }) || null
+  );
 }
  
 function getDefaultWeapon(unit) {
   return unit.weapons[0];
+}
+ 
+function getWeaponRangeLabel(weapon) {
+  if (!weapon) return "-";
+ 
+  const minRange = weapon.minRange ?? weapon.range;
+  const maxRange = weapon.maxRange ?? weapon.range;
+ 
+  return minRange === maxRange ? `${minRange}` : `${minRange}-${maxRange}`;
 }
  
 function canAttack(attacker, defender) {
@@ -735,6 +824,109 @@ class BattleScene extends Phaser.Scene {
     animateChunk();
   }
  
+  getTerrainDefenseBonus(unit) {
+    if (!unit) return 0;
+ 
+    const terrain = this.getTerrainAt(unit.x, unit.y);
+ 
+    if (terrain === "cover") return 2;
+    if (terrain === "gate") return 5;
+ 
+    return 0;
+  }
+ 
+  getWeaponSpeedBonus(unit, weapon) {
+    if (!unit || !weapon) return 0;
+    return weapon.speedBonus || 0;
+  }
+ 
+  getEffectiveSpeed(unit, weapon = null) {
+    return (unit?.spd || 0) + this.getWeaponSpeedBonus(unit, weapon);
+  }
+ 
+  getDefenseForAttack(defender, weapon) {
+    if (!defender || !weapon) return 0;
+ 
+    if (weapon.damageType === "magical") {
+      return defender.res || 0;
+    }
+ 
+    return (defender.def || 0) + this.getTerrainDefenseBonus(defender);
+  }
+ 
+  calculateDamage(attacker, defender, weapon) {
+    if (!attacker || !defender || !weapon) return 0;
+ 
+    const attackStatName = weapon.stat || "str";
+    const attackStat = attacker[attackStatName] || 0;
+    const baseDamage = weapon.baseDamage ?? weapon.damage ?? 0;
+    const defense = this.getDefenseForAttack(defender, weapon);
+ 
+    return Math.max(0, baseDamage + attackStat - defense);
+  }
+ 
+  calculateAttackCount(attacker, defender, weapon) {
+    if (!attacker || !defender) return 1;
+ 
+    const attackerSpeed = this.getEffectiveSpeed(attacker, weapon);
+    const defenderWeapon = getWeaponForTarget(defender, attacker) || getDefaultWeapon(defender);
+    const defenderSpeed = this.getEffectiveSpeed(defender, defenderWeapon);
+    const speedGap = attackerSpeed - defenderSpeed;
+ 
+    return Math.max(1, 1 + Math.floor(speedGap / 5));
+  }
+ 
+  rollHit(weapon) {
+    const hitRate = weapon?.hitRate ?? 100;
+    const roll = Phaser.Math.Between(1, 100);
+ 
+    return roll <= hitRate;
+  }
+ 
+  resolveAttackSequence(attacker, defender, weapon) {
+    const attackCount = this.calculateAttackCount(attacker, defender, weapon);
+    const results = [];
+    let totalDamage = 0;
+    let didKill = false;
+ 
+    for (let i = 0; i < attackCount; i++) {
+      if (defender.hp <= 0) break;
+ 
+      const hit = this.rollHit(weapon);
+ 
+      if (!hit) {
+        results.push({ hit: false, damage: 0 });
+        continue;
+      }
+ 
+      const damage = this.calculateDamage(attacker, defender, weapon);
+      defender.hp = Math.max(0, defender.hp - damage);
+      totalDamage += damage;
+      results.push({ hit: true, damage });
+ 
+      if (defender.hp <= 0) {
+        didKill = true;
+        break;
+      }
+    }
+ 
+    return { attackCount, results, totalDamage, didKill };
+  }
+ 
+  showCombatResultText(unit, result, index = 0) {
+    const text = result.hit ? `-${result.damage}` : "MISS";
+    const color = result.hit ? "#fca5a5" : "#fef3c7";
+ 
+    this.time.delayedCall(index * 140, () => {
+      this.showFloatingText(
+        this.boardX + unit.x * TILE_SIZE + TILE_SIZE / 2,
+        this.boardY + unit.y * TILE_SIZE + 8,
+        text,
+        color
+      );
+    });
+  }
+ 
   calculateXpGain(attacker, defender, didKill) {
     if (!attacker || attacker.team !== "player") return 0;
     if (!defender || defender.team !== "enemy") return 0;
@@ -1129,7 +1321,7 @@ class BattleScene extends Phaser.Scene {
     if (line.defender === "Kayley") {
       this.startBattleMusic();
     }
-
+ 
     this.setImpactPortrait(
       this.impactAttackerImage,
       this.impactAttackerPlaceholder,
@@ -1330,40 +1522,43 @@ class BattleScene extends Phaser.Scene {
     const musicConfig = this.levelData?.battleMusic;
     if (!musicConfig?.key) return;
     if (this.battleMusicStarted) return;
-
+ 
     if (!this.cache.audio.exists(musicConfig.key)) {
       console.warn(`Battle music not found: ${musicConfig.path}`);
       return;
     }
-
+ 
     const playMusic = () => {
       if (this.battleMusic && this.battleMusic.isPlaying) return;
-
+ 
       this.battleMusic = this.sound.add(musicConfig.key, {
         loop: true,
         volume: musicConfig.volume ?? 0.45,
       });
-
+ 
       this.battleMusic.play();
       this.battleMusicStarted = true;
     };
-
+ 
     if (this.sound.locked) {
       this.sound.once(Phaser.Sound.Events.UNLOCKED, playMusic);
     } else {
       playMusic();
     }
   }
-
+ 
   stopBattleMusic() {
-    if (!this.battleMusic) return;
-
+    if (!this.battleMusic) {
+      this.battleMusicStarted = false;
+      return;
+    }
+ 
     this.battleMusic.stop();
     this.battleMusic.destroy();
     this.battleMusic = null;
     this.battleMusicStarted = false;
   }
-
+ 
   getCurrentBiome() {
     return BIOMES[this.currentBiomeKey] || null;
   }
@@ -1634,6 +1829,22 @@ class BattleScene extends Phaser.Scene {
  
     if (!attackerWeapon) return;
  
+    const attackerDamage = this.calculateDamage(attacker, defender, attackerWeapon);
+    const attackerHits = this.calculateAttackCount(attacker, defender, attackerWeapon);
+    const attackerSpeed = this.getEffectiveSpeed(attacker, attackerWeapon);
+    const attackerHitRate = attackerWeapon.hitRate ?? 100;
+ 
+    const defenderDamage = defenderWeapon
+      ? this.calculateDamage(defender, attacker, defenderWeapon)
+      : 0;
+    const defenderHits = defenderWeapon
+      ? this.calculateAttackCount(defender, attacker, defenderWeapon)
+      : 0;
+    const defenderSpeed = defenderWeapon
+      ? this.getEffectiveSpeed(defender, defenderWeapon)
+      : defender.spd;
+    const defenderHitRate = defenderWeapon?.hitRate ?? 100;
+ 
     this.previewData = {
       attackerId: attacker.id,
       defenderId: defender.id,
@@ -1641,12 +1852,12 @@ class BattleScene extends Phaser.Scene {
  
     this.previewLeftName.setText(`${attacker.name} - ${attackerWeapon.name}`);
     this.previewLeftStats.setText(
-      `HP ${attacker.hp}/${attacker.maxHp}\nDMG ${attackerWeapon.damage}\nRNG ${attackerWeapon.range}`
+      `HP ${attacker.hp}/${attacker.maxHp}\nDMG ${attackerDamage} x${attackerHits}\nHIT ${attackerHitRate}%\nSPD ${attackerSpeed}\nRNG ${getWeaponRangeLabel(attackerWeapon)}`
     );
  
     this.previewRightName.setText(`${defender.name} - ${defenderWeapon.name}`);
     this.previewRightStats.setText(
-      `HP ${defender.hp}/${defender.maxHp}\nDMG ${defenderWeapon.damage}\nRNG ${defenderWeapon.range}`
+      `HP ${defender.hp}/${defender.maxHp}\nDMG ${defenderDamage} x${defenderHits}\nHIT ${defenderHitRate}%\nSPD ${defenderSpeed}\nRNG ${getWeaponRangeLabel(defenderWeapon)}`
     );
  
     this.previewOpen = true;
@@ -1721,32 +1932,18 @@ class BattleScene extends Phaser.Scene {
     this.busy = true;
  
     const defenderWasAlive = defender.hp > 0;
-    defender.hp = Math.max(0, defender.hp - weapon.damage);
+    const sequence = this.resolveAttackSequence(attacker, defender, weapon);
+ 
+    sequence.results.forEach((result, index) => {
+      this.showCombatResultText(defender, result, index);
+    });
+ 
     const didKill = defenderWasAlive && defender.hp <= 0;
     const xpGain = this.calculateXpGain(attacker, defender, didKill);
  
     if (xpGain > 0) {
       this.awardXp(attacker, xpGain);
     }
- 
-    const damageText = this.add.text(
-      this.boardX + defender.x * TILE_SIZE + 4,
-      this.boardY + defender.y * TILE_SIZE + 8,
-      `${weapon.name} -${weapon.damage}`,
-      {
-        fontSize: "14px",
-        fontStyle: "bold",
-        color: "#fca5a5",
-      }
-    );
- 
-    this.tweens.add({
-      targets: damageText,
-      y: damageText.y - 18,
-      alpha: 0,
-      duration: 600,
-      onComplete: () => damageText.destroy(),
-    });
  
     attacker.acted = true;
     this.refreshUnitSprite(attacker);
@@ -1763,7 +1960,7 @@ class BattleScene extends Phaser.Scene {
       this.clearSelection(`${attacker.name} defeated ${defender.name}!`);
     } else {
       this.refreshUnitSprite(defender);
-      this.clearSelection(`${attacker.name} hit ${defender.name} with ${weapon.name}.`);
+      this.clearSelection(`${attacker.name} attacked ${defender.name} with ${weapon.name}.`);
     }
  
     this.updateSelectedPanel();
@@ -1778,7 +1975,7 @@ class BattleScene extends Phaser.Scene {
       return;
     }
  
-    this.time.delayedCall(250, () => {
+    this.time.delayedCall(250 + sequence.results.length * 140, () => {
       this.busy = false;
       this.checkEndOfPlayerPhase();
     });
@@ -1869,6 +2066,20 @@ class BattleScene extends Phaser.Scene {
  
     const level = unit.level || 1;
     const xp = unit.xp || 0;
+    const weapon = getDefaultWeapon(unit);
+    const terrain = this.getTerrainAt(unit.x, unit.y);
+    const terrainBonus = this.getTerrainDefenseBonus(unit);
+    const weaponSpeedBonus = this.getWeaponSpeedBonus(unit, weapon);
+ 
+    const terrainLabel = terrain
+      ? terrain.charAt(0).toUpperCase() + terrain.slice(1)
+      : "Terrain";
+    const defLine = terrainBonus > 0
+      ? `DEF ${unit.def} +${terrainBonus} ${terrainLabel}`
+      : `DEF ${unit.def}`;
+    const spdLine = weaponSpeedBonus > 0
+      ? `SPD ${unit.spd} +${weaponSpeedBonus} ${weapon.name}`
+      : `SPD ${unit.spd}`;
  
     this.unitNameText.setText(unit.name);
     this.unitClassText.setText(
@@ -1878,12 +2089,13 @@ class BattleScene extends Phaser.Scene {
     this.xpBarFill.displayWidth = 210 * Phaser.Math.Clamp(xp / 100, 0, 1);
  
     this.unitStatsText.setText(
-      `HP ${unit.hp}/${unit.maxHp}\nSTR ${unit.str}\nMAG ${unit.mag}\nDEF ${unit.def}\nRES ${unit.res}\nSPD ${unit.spd}\nMOV ${unit.move}`
+      `HP ${unit.hp}/${unit.maxHp}\nSTR ${unit.str}\nMAG ${unit.mag}\n${defLine}\nRES ${unit.res}\n${spdLine}\nMOV ${unit.move}`
     );
  
-    const weapon = getDefaultWeapon(unit);
     this.weaponText.setText(
-      weapon ? `Weapon: ${weapon.name} (${weapon.range})` : "Weapon: None"
+      weapon
+        ? `Weapon: ${weapon.name} | Base ${weapon.baseDamage ?? weapon.damage ?? 0} | ${weapon.damageType || "physical"} | Hit ${weapon.hitRate ?? 100}% | Range ${getWeaponRangeLabel(weapon)}`
+        : "Weapon: None"
     );
   }
  
@@ -1999,25 +2211,16 @@ class BattleScene extends Phaser.Scene {
  
   enemyAttack(attacker, defender) {
     const weapon = getWeaponForTarget(attacker, defender) || getDefaultWeapon(attacker);
-    defender.hp -= weapon.damage;
+    if (!weapon) {
+      this.enemyIndex += 1;
+      this.time.delayedCall(250, () => this.runNextEnemy());
+      return;
+    }
  
-    const damageText = this.add.text(
-      this.boardX + defender.x * TILE_SIZE + 4,
-      this.boardY + defender.y * TILE_SIZE + 8,
-      `${weapon.name} -${weapon.damage}`,
-      {
-        fontSize: "14px",
-        fontStyle: "bold",
-        color: "#fca5a5",
-      }
-    );
+    const sequence = this.resolveAttackSequence(attacker, defender, weapon);
  
-    this.tweens.add({
-      targets: damageText,
-      y: damageText.y - 18,
-      alpha: 0,
-      duration: 600,
-      onComplete: () => damageText.destroy(),
+    sequence.results.forEach((result, index) => {
+      this.showCombatResultText(defender, result, index);
     });
  
     if (defender.hp <= 0) {
@@ -2046,7 +2249,7 @@ class BattleScene extends Phaser.Scene {
  
     this.updateSelectedPanel();
     this.enemyIndex += 1;
-    this.time.delayedCall(250, () => this.runNextEnemy());
+    this.time.delayedCall(250 + sequence.results.length * 140, () => this.runNextEnemy());
   }
  
   startPlayerPhase() {
