@@ -18,6 +18,19 @@ const MAP = [
   ["street", "street", "street", "street", "street", "street", "street", "street"],
 ];
  
+ 
+const BIOMES = {
+  city: {
+    terrainTextures: {
+      street: { key: "cityStreetTile", path: "/tiles/city/street.png" },
+      cover: { key: "cityCoverTile", path: "/tiles/city/cover.png" },
+      wall: { key: "cityWallTile", path: "/tiles/city/wall.png" },
+      gate: { key: "cityGateTile", path: "/tiles/city/gate.png" },
+      default: { key: "cityStreetTile", path: "/tiles/city/street.png" },
+    },
+  },
+};
+ 
 const CHAPTER_OPENING = [
   {
     type: "title",
@@ -31,8 +44,8 @@ const CHAPTER_OPENING = [
     background: "/scenes/prologue.jpg",
     lines: [
       { speaker: "Leon", portrait: "leonPortrait", text: "They left already...?" },
-      { speaker: "Letter", portrait: null, text: "Leon, happy birthday. We went out early to put up more flyers. There are still streets we haven't covered." },
-      { speaker: "Letter", portrait: null, text: "We'll be back before evening. Love, Mum and Dad." },
+      { speaker: "Letter", portrait: null, text: "Leon, happy birthday. There's been a sighting of Edwin near Poole." },
+      { speaker: "Letter", portrait: null, text: "We'll be back probably this weekend. Love, Mum and Dad." },
       { speaker: "Leon", portrait: "leonPortrait", text: "...Still looking for him." },
       { speaker: "Leon", portrait: "leonPortrait", text: "Four years, and they still won't stop. Not even today." },
     ],
@@ -270,6 +283,19 @@ const UNITS = [
   },
 ];
  
+const LEVELS = {
+  chapter1: {
+    biome: "city",
+    map: MAP,
+    units: UNITS,
+    battleMusic: {
+      key: "chapter1BattleMusic",
+      path: "/audio/chapter1_battle.mp3",
+      volume: 0.45,
+    },
+  },
+};
+
 function tileColor(type) {
   if (type === "street") return 0x374151;
   if (type === "cover") return 0x475569;
@@ -312,7 +338,33 @@ class BattleScene extends Phaser.Scene {
     super("BattleScene");
   }
  
+  getCurrentLevel() {
+    return LEVELS.chapter1;
+  }
+ 
+  preloadBiomeTiles(biomeKey) {
+    const biome = BIOMES[biomeKey];
+    if (!biome) return;
+ 
+    const loadedKeys = new Set();
+ 
+    Object.values(biome.terrainTextures).forEach((entry) => {
+      if (!entry || loadedKeys.has(entry.key)) return;
+ 
+      this.load.image(entry.key, entry.path);
+      loadedKeys.add(entry.key);
+    });
+  }
+ 
+  preloadLevelAudio(levelData) {
+    if (!levelData?.battleMusic?.key || !levelData?.battleMusic?.path) return;
+ 
+    this.load.audio(levelData.battleMusic.key, [levelData.battleMusic.path]);
+  }
+ 
   preload() {
+    const levelData = this.getCurrentLevel();
+ 
     this.load.image("edwinPortrait", "/portraits/edwin.jpg");
     this.load.image("leonPortrait", "/portraits/leon.jpg");
     this.load.image("kayleyPortrait", "/portraits/kayley.jpg");
@@ -320,10 +372,19 @@ class BattleScene extends Phaser.Scene {
     this.load.image("falanPortrait", "/portraits/falan.jpg");
     this.load.image("thugPortrait", "/portraits/thug.jpg");
     this.load.image("prologueScene", "/scenes/prologue.jpg");
+ 
+    this.preloadBiomeTiles(levelData.biome);
+    this.preloadLevelAudio(levelData);
   }
  
   create() {
-    this.units = UNITS.map((unit) => ({
+    this.levelData = this.getCurrentLevel();
+    this.currentBiomeKey = this.levelData.biome;
+    this.map = this.levelData.map;
+    this.mapRows = this.map.length;
+    this.mapCols = this.map[0]?.length || 0;
+ 
+    this.units = this.levelData.units.map((unit) => ({
       ...unit,
       weapons: unit.weapons.map((weapon) => ({ ...weapon })),
     }));
@@ -336,6 +397,8 @@ class BattleScene extends Phaser.Scene {
     this.busy = false;
     this.previewOpen = false;
     this.previewData = null;
+    this.battleMusic = null;
+    this.battleMusicStarted = false;
  
     this.openingStep = 0;
     this.openingLine = 0;
@@ -343,8 +406,8 @@ class BattleScene extends Phaser.Scene {
  
     this.cameras.main.setBackgroundColor("#0f172a");
  
-    this.boardWidth = MAP_COLS * TILE_SIZE;
-    this.boardHeight = MAP_ROWS * TILE_SIZE;
+    this.boardWidth = this.mapCols * TILE_SIZE;
+    this.boardHeight = this.mapRows * TILE_SIZE;
     this.boardX = 240;
     this.boardY = 96;
  
@@ -1063,6 +1126,10 @@ class BattleScene extends Phaser.Scene {
   }
  
   playImpactBeat(line) {
+    if (line.defender === "Kayley") {
+      this.startBattleMusic();
+    }
+
     this.setImpactPortrait(
       this.impactAttackerImage,
       this.impactAttackerPlaceholder,
@@ -1259,29 +1326,113 @@ class BattleScene extends Phaser.Scene {
     this.helpText.setText("Player Phase. Click Edwin or Leon.");
   }
  
+  startBattleMusic() {
+    const musicConfig = this.levelData?.battleMusic;
+    if (!musicConfig?.key) return;
+    if (this.battleMusicStarted) return;
+
+    if (!this.cache.audio.exists(musicConfig.key)) {
+      console.warn(`Battle music not found: ${musicConfig.path}`);
+      return;
+    }
+
+    const playMusic = () => {
+      if (this.battleMusic && this.battleMusic.isPlaying) return;
+
+      this.battleMusic = this.sound.add(musicConfig.key, {
+        loop: true,
+        volume: musicConfig.volume ?? 0.45,
+      });
+
+      this.battleMusic.play();
+      this.battleMusicStarted = true;
+    };
+
+    if (this.sound.locked) {
+      this.sound.once(Phaser.Sound.Events.UNLOCKED, playMusic);
+    } else {
+      playMusic();
+    }
+  }
+
+  stopBattleMusic() {
+    if (!this.battleMusic) return;
+
+    this.battleMusic.stop();
+    this.battleMusic.destroy();
+    this.battleMusic = null;
+    this.battleMusicStarted = false;
+  }
+
+  getCurrentBiome() {
+    return BIOMES[this.currentBiomeKey] || null;
+  }
+ 
+  isInBounds(x, y) {
+    return x >= 0 && y >= 0 && x < this.mapCols && y < this.mapRows;
+  }
+ 
+  getTerrainAt(x, y) {
+    if (!this.isInBounds(x, y)) return null;
+    return this.map[y][x];
+  }
+ 
+  getTerrainTextureKey(x, y) {
+    const terrain = this.getTerrainAt(x, y);
+    const biome = this.getCurrentBiome();
+ 
+    if (!biome) return null;
+ 
+    const entry = biome.terrainTextures[terrain] || biome.terrainTextures.default;
+    return entry ? entry.key : null;
+  }
+ 
   drawBoard() {
-    for (let row = 0; row < MAP_ROWS; row++) {
-      for (let col = 0; col < MAP_COLS; col++) {
-        const type = MAP[row][col];
+    this.tileLayer.removeAll(true);
+ 
+    for (let row = 0; row < this.mapRows; row++) {
+      for (let col = 0; col < this.mapCols; col++) {
+        const type = this.getTerrainAt(col, row);
+        const textureKey = this.getTerrainTextureKey(col, row);
         const x = this.boardX + col * TILE_SIZE;
         const y = this.boardY + row * TILE_SIZE;
  
-        const tile = this.add.rectangle(
+        if (textureKey && this.textures.exists(textureKey)) {
+          const tileImage = this.add.image(
+            x + TILE_SIZE / 2,
+            y + TILE_SIZE / 2,
+            textureKey
+          );
+          tileImage.setDisplaySize(TILE_SIZE, TILE_SIZE);
+          this.tileLayer.add(tileImage);
+        } else {
+          const tile = this.add.rectangle(
+            x + TILE_SIZE / 2,
+            y + TILE_SIZE / 2,
+            TILE_SIZE - 2,
+            TILE_SIZE - 2,
+            tileColor(type)
+          );
+          tile.setStrokeStyle(1, 0x111827);
+          this.tileLayer.add(tile);
+ 
+          const label = this.add.text(x + 6, y + 4, tileLabel(type), {
+            fontSize: "12px",
+            color: "#e5e7eb",
+          });
+          this.tileLayer.add(label);
+        }
+ 
+        const border = this.add.rectangle(
           x + TILE_SIZE / 2,
           y + TILE_SIZE / 2,
-          TILE_SIZE - 2,
-          TILE_SIZE - 2,
-          tileColor(type)
+          TILE_SIZE,
+          TILE_SIZE,
+          0x000000,
+          0
         );
-        tile.setStrokeStyle(1, 0x111827);
- 
-        const label = this.add.text(x + 6, y + 4, tileLabel(type), {
-          fontSize: "12px",
-          color: "#e5e7eb",
-        });
- 
-        this.tileLayer.add(tile);
-        this.tileLayer.add(label);
+        border.setStrokeStyle(1, 0x0f172a, 0.45);
+        this.tileLayer.add(border);
       }
     }
   }
@@ -1412,8 +1563,8 @@ class BattleScene extends Phaser.Scene {
   }
  
   isWalkable(x, y) {
-    if (x < 0 || y < 0 || x >= MAP_COLS || y >= MAP_ROWS) return false;
-    return MAP[y][x] !== "wall";
+    if (!this.isInBounds(x, y)) return false;
+    return this.getTerrainAt(x, y) !== "wall";
   }
  
   reachableTiles(unit) {
@@ -1618,6 +1769,8 @@ class BattleScene extends Phaser.Scene {
     this.updateSelectedPanel();
  
     if (!this.units.some((u) => u.id === "falan")) {
+      this.stopBattleMusic();
+ 
       this.phaseText.setText("Victory");
       this.phaseText.setColor("#86efac");
       this.helpText.setText("Victory! Falan has been defeated.");
@@ -1878,6 +2031,8 @@ class BattleScene extends Phaser.Scene {
       this.units = this.units.filter((u) => u.id !== defender.id);
  
       if (!this.units.some((u) => u.id === "edwin")) {
+        this.stopBattleMusic();
+ 
         this.phaseText.setText("Defeat");
         this.phaseText.setColor("#f87171");
         this.helpText.setText("Defeat! Edwin has fallen.");
