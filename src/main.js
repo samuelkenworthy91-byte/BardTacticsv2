@@ -41,7 +41,7 @@ const CHAPTER_OPENING = [
   {
     type: "scene",
     sceneName: "Leon's House",
-    background: "/scenes/prologue.jpg",
+    background: "leonsHouseScene",
     lines: [
       { speaker: "Leon", portrait: "leonPortrait", text: "They left already...?" },
       { speaker: "Letter", portrait: null, text: "Leon, happy birthday. There's been a sighting of Edwin near Poole." },
@@ -53,7 +53,7 @@ const CHAPTER_OPENING = [
   {
     type: "scene",
     sceneName: "Walk to School",
-    background: "/scenes/prologue.jpg",
+    background: "walkToSchoolScene",
     lines: [
       { speaker: "Kayley", portrait: "kayleyPortrait", text: "There he is. Birthday boy finally decided to show up." },
       { speaker: "Rich", portrait: "richPortrait", text: "You're late enough that we were about to eat your presents ourselves." },
@@ -65,7 +65,7 @@ const CHAPTER_OPENING = [
   {
     type: "scene",
     sceneName: "Underpass",
-    background: "/scenes/prologue.jpg",
+    background: "underpassScene",
     lines: [
       { speaker: "Rich", portrait: "richPortrait", text: "...Leon." },
       { speaker: "Kayley", portrait: "kayleyPortrait", text: "Those aren't students." },
@@ -104,6 +104,123 @@ const CHAPTER_OPENING = [
       { speaker: "Falan", portrait: "falanPortrait", text: "So the ghost brother finally crawls home." },
       { speaker: "Edwin", portrait: "edwinPortrait", text: "Stay behind me, Leon." },
     ],
+  },
+];
+ 
+const POST_BATTLE_SCENE = [
+  {
+    type: "mapDialogue",
+    speaker: "Falan",
+    portrait: "falanPortrait",
+    text: "I... didn't believe... Caleb... you're good, Bligh... but the others will end you.",
+  },
+  {
+    type: "fadeUnit",
+    unitId: "falan",
+    speaker: "Narration",
+    text: "Falan drops to his knees. A moment later, he fades from the battlefield.",
+  },
+  {
+    type: "mapDialogue",
+    speaker: "Leon",
+    portrait: "leonPortrait",
+    text: "I...",
+  },
+  {
+    type: "mapAction",
+    speaker: "Narration",
+    portrait: "edwinPortrait",
+    text: "Leon passes out. Edwin rushes in and catches him before he hits the ground.",
+  },
+  {
+    type: "mapDialogue",
+    speaker: "Edwin",
+    portrait: "edwinPortrait",
+    text: "Woah there. I got you. Sleep for now.",
+  },
+  {
+    type: "sceneDialogue",
+    sceneName: "Panel Van",
+    scene: "vanInteriorScene",
+    speaker: "Heath",
+    portrait: "heathPortrait",
+    text: "Hey there sleeping beauty!",
+  },
+  {
+    type: "sceneDialogue",
+    sceneName: "Panel Van",
+    scene: "vanInteriorScene",
+    speaker: "Leon",
+    portrait: "leonPortrait",
+    text: "Where... Where's Edwin?",
+  },
+  {
+    type: "sceneDialogue",
+    sceneName: "Panel Van",
+    scene: "vanInteriorScene",
+    speaker: "Heath",
+    portrait: "heathPortrait",
+    text: "The boss man is driving this heap. Name's Heath by the way, and this bundle of cuteness wrapped up is Izzy.",
+  },
+  {
+    type: "sceneDialogue",
+    sceneName: "Panel Van",
+    scene: "vanInteriorScene",
+    speaker: "Izzy",
+    portrait: "izzyPortrait",
+    text: "*Grunt*",
+  },
+  {
+    type: "sceneDialogue",
+    sceneName: "Panel Van",
+    scene: "vanInteriorScene",
+    speaker: "Leon",
+    portrait: "leonPortrait",
+    text: "Kayley? Rich?",
+  },
+  {
+    type: "sceneDialogue",
+    sceneName: "Panel Van",
+    scene: "vanInteriorScene",
+    speaker: "Izzy",
+    portrait: "izzyPortrait",
+    text: "The two you were with? Dead, I'm afraid... Any consolation, it was quick.",
+  },
+  {
+    type: "sceneDialogue",
+    sceneName: "Panel Van",
+    scene: "vanInteriorScene",
+    speaker: "Leon",
+    portrait: "leonPortrait",
+    text: "...",
+  },
+  {
+    type: "sceneDialogue",
+    sceneName: "Panel Van",
+    scene: "vanInteriorScene",
+    speaker: "Heath",
+    portrait: "heathPortrait",
+    text: "It's OK.",
+  },
+  {
+    type: "overlapDialogue",
+    sceneName: "Panel Van",
+    scene: "vanInteriorScene",
+    speaker: "Heath",
+    portrait: "heathPortrait",
+    overlapPortrait: "leonPortrait",
+    text: "Let it all out. We'll be home soon.",
+  },
+  {
+    type: "fullScreenScene",
+    sceneName: "Byron Farm",
+    scene: "byronFarmScene",
+    text: "Byron Farm",
+  },
+  {
+    type: "savePrompt",
+    title: "Chapter 1 Complete",
+    text: "Save game?",
   },
 ];
  
@@ -460,7 +577,14 @@ class BattleScene extends Phaser.Scene {
     this.load.image("richPortrait", "/portraits/rich.jpg");
     this.load.image("falanPortrait", "/portraits/falan.jpg");
     this.load.image("thugPortrait", "/portraits/thug.jpg");
+    this.load.image("heathPortrait", "/portraits/heath.jpg");
+    this.load.image("izzyPortrait", "/portraits/izzy.jpg");
     this.load.image("prologueScene", "/scenes/prologue.jpg");
+    this.load.image("leonsHouseScene", "/scenes/leons_house.jpg");
+    this.load.image("walkToSchoolScene", "/scenes/walk_to_school.jpg");
+    this.load.image("underpassScene", "/scenes/underpass.jpg");
+    this.load.image("vanInteriorScene", "/scenes/van_interior.jpg");
+    this.load.image("byronFarmScene", "/scenes/byron_farm.jpg");
  
     this.preloadBiomeTiles(levelData.biome);
     this.preloadLevelAudio(levelData);
@@ -488,6 +612,9 @@ class BattleScene extends Phaser.Scene {
     this.previewData = null;
     this.battleMusic = null;
     this.battleMusicStarted = false;
+    this.postBattleStep = 0;
+    this.postBattleActionSteps = new Set();
+    this.postBattleStarted = false;
  
     this.openingStep = 0;
     this.openingLine = 0;
@@ -512,6 +639,7 @@ class BattleScene extends Phaser.Scene {
     this.createPreviewUI();
     this.createCombatXpPopup();
     this.createOpeningUI();
+    this.createPostBattleUI();
     this.setupInput();
     this.updateSelectedPanel();
     this.updateOpeningUI();
@@ -1068,6 +1196,407 @@ class BattleScene extends Phaser.Scene {
     return floating;
   }
  
+  createPostBattleUI() {
+    this.postBattleContainer = this.add.container(0, 0);
+    this.postBattleContainer.setVisible(false);
+    this.postBattleContainer.setDepth(9997);
+ 
+    this.postBattleDim = this.add.rectangle(
+      GAME_WIDTH / 2,
+      GAME_HEIGHT / 2,
+      GAME_WIDTH,
+      GAME_HEIGHT,
+      0x000000,
+      0.18
+    );
+ 
+    this.postBattleFullSceneImage = this.add.image(
+      GAME_WIDTH / 2,
+      GAME_HEIGHT / 2,
+      "byronFarmScene"
+    );
+    this.postBattleFullSceneImage.setDisplaySize(GAME_WIDTH, GAME_HEIGHT);
+    this.postBattleFullSceneImage.setVisible(false);
+ 
+    this.postBattleMainPanel = this.add.rectangle(480, 250, 860, 430, 0x020617, 0.78);
+    this.postBattleMainPanel.setStrokeStyle(2, 0x475569);
+ 
+    this.postBattleSceneFrame = this.add.rectangle(240, 175, 320, 200, 0x111827, 1);
+    this.postBattleSceneFrame.setStrokeStyle(2, 0x64748b);
+ 
+    this.postBattleSceneImage = this.add.image(240, 175, "vanInteriorScene");
+    this.postBattleSceneImage.setDisplaySize(312, 192);
+ 
+    this.postBattleSceneName = this.add.text(84, 62, "", {
+      fontSize: "16px",
+      color: "#fcd34d",
+      fontStyle: "bold",
+    });
+ 
+    this.postBattlePortraitPanel = this.add.rectangle(720, 175, 180, 200, 0x111827, 1);
+    this.postBattlePortraitPanel.setStrokeStyle(2, 0x64748b);
+ 
+    this.postBattlePortraitFrame = this.add.rectangle(720, 160, 120, 140, 0x1f2937);
+    this.postBattlePortraitFrame.setStrokeStyle(2, 0x64748b);
+ 
+    this.postBattlePortrait = this.add.image(720, 160, "leonPortrait");
+    this.postBattlePortrait.setDisplaySize(110, 132);
+ 
+    this.postBattleOverlapPortrait = this.add.image(682, 164, "heathPortrait");
+    this.postBattleOverlapPortrait.setDisplaySize(90, 108);
+    this.postBattleOverlapPortrait.setAlpha(0.9);
+    this.postBattleOverlapPortrait.setVisible(false);
+ 
+    this.postBattlePortraitPlaceholder = this.add.text(720, 160, "NO\nART", {
+      fontSize: "20px",
+      color: "#94a3b8",
+      align: "center",
+    }).setOrigin(0.5);
+ 
+    const textBox = this.add.rectangle(480, 395, 800, 120, 0xf8f5ee, 0.98);
+    textBox.setStrokeStyle(2, 0xb8aa8a);
+    this.postBattleTextBox = textBox;
+ 
+    this.postBattleSpeaker = this.add.text(90, 343, "", {
+      fontSize: "24px",
+      fontStyle: "bold",
+      color: "#1e293b",
+    });
+ 
+    this.postBattleText = this.add.text(90, 378, "", {
+      fontSize: "20px",
+      color: "#334155",
+      wordWrap: { width: 660 },
+      lineSpacing: 8,
+    });
+ 
+    this.postBattleNextButton = this.add.rectangle(820, 460, 110, 34, 0x2563eb);
+    this.postBattleNextButton.setStrokeStyle(2, 0x93c5fd);
+    this.postBattleNextButton.setInteractive({ useHandCursor: true });
+    this.postBattleNextButton.on("pointerdown", () => this.advancePostBattle());
+ 
+    this.postBattleNextLabel = this.add.text(785, 449, "Next", {
+      fontSize: "16px",
+      fontStyle: "bold",
+      color: "#ffffff",
+    });
+ 
+    this.savePromptContainer = this.add.container(GAME_WIDTH / 2, GAME_HEIGHT / 2);
+    this.savePromptContainer.setVisible(false);
+ 
+    const saveBg = this.add.rectangle(0, 0, 430, 230, 0x020617, 0.96);
+    saveBg.setStrokeStyle(2, 0xfcd34d);
+ 
+    this.savePromptTitle = this.add.text(0, -72, "Chapter 1 Complete", {
+      fontSize: "30px",
+      fontStyle: "bold",
+      color: "#fcd34d",
+    }).setOrigin(0.5);
+ 
+    this.savePromptText = this.add.text(0, -28, "Save game?", {
+      fontSize: "20px",
+      color: "#f8fafc",
+    }).setOrigin(0.5);
+ 
+    const saveButton = this.add.rectangle(-92, 48, 130, 40, 0x2563eb);
+    saveButton.setStrokeStyle(2, 0x93c5fd);
+    saveButton.setInteractive({ useHandCursor: true });
+    saveButton.on("pointerdown", () => this.saveChapterOne());
+ 
+    const saveButtonText = this.add.text(-92, 48, "Save", {
+      fontSize: "18px",
+      fontStyle: "bold",
+      color: "#ffffff",
+    }).setOrigin(0.5);
+ 
+    const continueButton = this.add.rectangle(92, 48, 130, 40, 0x334155);
+    continueButton.setStrokeStyle(2, 0x94a3b8);
+    continueButton.setInteractive({ useHandCursor: true });
+    continueButton.on("pointerdown", () => this.finishChapterOne());
+ 
+    const continueButtonText = this.add.text(92, 48, "Continue", {
+      fontSize: "18px",
+      fontStyle: "bold",
+      color: "#ffffff",
+    }).setOrigin(0.5);
+ 
+    this.savePromptStatus = this.add.text(0, 92, "", {
+      fontSize: "14px",
+      color: "#86efac",
+    }).setOrigin(0.5);
+ 
+    this.savePromptContainer.add([
+      saveBg,
+      this.savePromptTitle,
+      this.savePromptText,
+      saveButton,
+      saveButtonText,
+      continueButton,
+      continueButtonText,
+      this.savePromptStatus,
+    ]);
+ 
+    this.postBattleContainer.add([
+      this.postBattleDim,
+      this.postBattleFullSceneImage,
+      this.postBattleMainPanel,
+      this.postBattleSceneFrame,
+      this.postBattleSceneImage,
+      this.postBattleSceneName,
+      this.postBattlePortraitPanel,
+      this.postBattlePortraitFrame,
+      this.postBattleOverlapPortrait,
+      this.postBattlePortrait,
+      this.postBattlePortraitPlaceholder,
+      this.postBattleTextBox,
+      this.postBattleSpeaker,
+      this.postBattleText,
+      this.postBattleNextButton,
+      this.postBattleNextLabel,
+      this.savePromptContainer,
+    ]);
+ 
+    this.uiLayer.add(this.postBattleContainer);
+  }
+ 
+  setPostBattlePortrait(portraitKey, overlapPortraitKey = null) {
+    this.postBattleOverlapPortrait.setVisible(false);
+ 
+    if (portraitKey && this.textures.exists(portraitKey)) {
+      this.postBattlePortrait.setTexture(portraitKey);
+      this.postBattlePortrait.setDisplaySize(110, 132);
+      this.postBattlePortrait.setVisible(true);
+      this.postBattlePortraitPlaceholder.setVisible(false);
+    } else {
+      this.postBattlePortrait.setVisible(false);
+      this.postBattlePortraitPlaceholder.setVisible(true);
+    }
+ 
+    if (overlapPortraitKey && this.textures.exists(overlapPortraitKey)) {
+      this.postBattleOverlapPortrait.setTexture(overlapPortraitKey);
+      this.postBattleOverlapPortrait.setDisplaySize(90, 108);
+      this.postBattleOverlapPortrait.setVisible(true);
+      this.postBattleOverlapPortrait.setDepth(this.postBattlePortrait.depth + 1);
+    }
+  }
+ 
+  startPostBattleScene() {
+    if (this.postBattleStarted) return;
+ 
+    this.stopBattleMusic();
+    this.postBattleStarted = true;
+    this.phase = "postbattle";
+    this.busy = true;
+    this.previewOpen = false;
+    this.previewData = null;
+ 
+    if (this.previewContainer) {
+      this.previewContainer.setVisible(false);
+    }
+ 
+    this.selectedUnitId = null;
+    this.moveTiles = [];
+    this.targetTiles = [];
+    this.overlayLayer.removeAll(true);
+    this.updateSelectedPanel();
+    this.setFalanFinalDeathPose();
+ 
+    this.phaseText.setText("Chapter Complete");
+    this.phaseText.setColor("#86efac");
+    this.helpText.setText("The battle is over.");
+ 
+    this.postBattleStep = 0;
+    this.postBattleActionSteps = new Set();
+    this.postBattleContainer.setVisible(true);
+    this.postBattleContainer.setAlpha(0);
+ 
+    this.tweens.add({
+      targets: this.postBattleContainer,
+      alpha: 1,
+      duration: 250,
+      onComplete: () => this.updatePostBattleUI(),
+    });
+  }
+ 
+  setFalanFinalDeathPose() {
+    const falan = this.units.find((unit) => unit.id === "falan");
+    const sprite = this.unitSprites.falan;
+ 
+    if (!falan || !sprite) return;
+ 
+    falan.hp = 0;
+    this.refreshUnitSprite(falan);
+    sprite.hpText.setText("HP 0");
+    sprite.marker.setFillStyle(0x7f1d1d, 1);
+    if (sprite.label) sprite.label.setText("KO");
+    sprite.container.setScale(1, 0.72);
+    sprite.container.y += 6;
+  }
+ 
+  fadeUnitOut(unitId) {
+    const sprite = this.unitSprites[unitId];
+ 
+    if (!sprite) {
+      this.units = this.units.filter((unit) => unit.id !== unitId);
+      return;
+    }
+ 
+    this.tweens.add({
+      targets: sprite.container,
+      alpha: 0,
+      duration: 900,
+      ease: "Quad.Out",
+      onComplete: () => {
+        sprite.container.destroy();
+        delete this.unitSprites[unitId];
+        this.units = this.units.filter((unit) => unit.id !== unitId);
+      },
+    });
+  }
+ 
+  updatePostBattleUI() {
+    const line = POST_BATTLE_SCENE[this.postBattleStep];
+    if (!line) {
+      this.showSavePrompt();
+      return;
+    }
+ 
+    this.savePromptContainer.setVisible(false);
+    this.postBattleNextButton.setVisible(line.type !== "savePrompt");
+    this.postBattleNextLabel.setVisible(line.type !== "savePrompt");
+    this.postBattleFullSceneImage.setVisible(false);
+    this.postBattleMainPanel.setVisible(true);
+    this.postBattleSceneFrame.setVisible(false);
+    this.postBattleSceneImage.setVisible(false);
+    this.postBattleSceneName.setVisible(false);
+    this.postBattlePortraitPanel.setVisible(true);
+    this.postBattlePortraitFrame.setVisible(true);
+    this.postBattlePortrait.setVisible(true);
+    this.postBattlePortraitPlaceholder.setVisible(false);
+    this.postBattleTextBox.setVisible(true);
+    this.postBattleSpeaker.setVisible(true);
+    this.postBattleText.setVisible(true);
+    this.postBattleDim.setAlpha(0.18);
+ 
+    if (line.type === "savePrompt") {
+      this.showSavePrompt(line);
+      return;
+    }
+ 
+    if (line.type === "fullScreenScene") {
+      this.postBattleDim.setAlpha(1);
+      if (line.scene && this.textures.exists(line.scene)) {
+        this.postBattleFullSceneImage.setTexture(line.scene);
+      }
+      this.postBattleFullSceneImage.setVisible(true);
+      this.postBattleMainPanel.setVisible(false);
+      this.postBattleSceneFrame.setVisible(false);
+      this.postBattleSceneImage.setVisible(false);
+      this.postBattleSceneName.setVisible(false);
+      this.postBattlePortraitPanel.setVisible(false);
+      this.postBattlePortraitFrame.setVisible(false);
+      this.postBattlePortrait.setVisible(false);
+      this.postBattleOverlapPortrait.setVisible(false);
+      this.postBattlePortraitPlaceholder.setVisible(false);
+      this.postBattleSpeaker.setText(line.sceneName || "");
+      this.postBattleText.setText(line.text || "");
+      return;
+    }
+ 
+    if (line.type === "sceneDialogue" || line.type === "overlapDialogue") {
+      this.postBattleDim.setAlpha(0.82);
+      this.postBattleSceneFrame.setVisible(true);
+      this.postBattleSceneImage.setVisible(true);
+      this.postBattleSceneName.setVisible(true);
+      this.postBattleSceneName.setText(line.sceneName || "");
+ 
+      if (line.scene && this.textures.exists(line.scene)) {
+        this.postBattleSceneImage.setTexture(line.scene);
+      }
+    }
+ 
+    if (line.type === "mapDialogue" || line.type === "mapAction" || line.type === "fadeUnit") {
+      this.postBattleDim.setAlpha(0.18);
+      this.postBattleSceneFrame.setVisible(false);
+      this.postBattleSceneImage.setVisible(false);
+      this.postBattleSceneName.setVisible(false);
+    }
+ 
+    this.postBattleSpeaker.setText(line.speaker || "");
+    this.postBattleText.setText(line.text || "");
+    this.setPostBattlePortrait(line.portrait, line.overlapPortrait);
+ 
+    if (line.type === "fadeUnit" && !this.postBattleActionSteps.has(this.postBattleStep)) {
+      this.postBattleActionSteps.add(this.postBattleStep);
+      this.fadeUnitOut(line.unitId);
+    }
+  }
+ 
+  advancePostBattle() {
+    if (this.phase !== "postbattle") return;
+ 
+    this.postBattleStep += 1;
+ 
+    if (this.postBattleStep >= POST_BATTLE_SCENE.length) {
+      this.showSavePrompt();
+      return;
+    }
+ 
+    this.updatePostBattleUI();
+  }
+ 
+  showSavePrompt(line = null) {
+    this.postBattleDim.setAlpha(1);
+    this.postBattleFullSceneImage.setVisible(false);
+    if (this.textures.exists("byronFarmScene")) {
+      this.postBattleFullSceneImage.setTexture("byronFarmScene");
+    }
+    this.postBattleFullSceneImage.setVisible(true);
+ 
+    this.postBattleMainPanel.setVisible(false);
+    this.postBattleSceneFrame.setVisible(false);
+    this.postBattleSceneImage.setVisible(false);
+    this.postBattleSceneName.setVisible(false);
+    this.postBattlePortraitPanel.setVisible(false);
+    this.postBattlePortraitFrame.setVisible(false);
+    this.postBattlePortrait.setVisible(false);
+    this.postBattleOverlapPortrait.setVisible(false);
+    this.postBattlePortraitPlaceholder.setVisible(false);
+    this.postBattleTextBox.setVisible(false);
+    this.postBattleSpeaker.setVisible(false);
+    this.postBattleText.setVisible(false);
+    this.postBattleNextButton.setVisible(false);
+    this.postBattleNextLabel.setVisible(false);
+ 
+    this.savePromptTitle.setText(line?.title || "Chapter 1 Complete");
+    this.savePromptText.setText(line?.text || "Save game?");
+    this.savePromptStatus.setText("");
+    this.savePromptContainer.setVisible(true);
+  }
+ 
+  saveChapterOne() {
+    const saveData = {
+      chapter: 1,
+      chapterName: "Prologue - Underpass",
+      completed: true,
+      completedAt: new Date().toISOString(),
+    };
+ 
+    try {
+      window.localStorage.setItem("bardsTacticsSave", JSON.stringify(saveData));
+      this.savePromptStatus.setText("Game saved.");
+    } catch (error) {
+      this.savePromptStatus.setText("Save failed in this browser preview.");
+    }
+  }
+ 
+  finishChapterOne() {
+    this.phaseText.setText("Chapter 1 Complete");
+    this.phaseText.setColor("#fcd34d");
+    this.helpText.setText("Chapter 1 complete. Save data is stored locally in this browser preview.");
+    this.busy = false;
+  }
+ 
   createOpeningUI() {
     this.openingContainer = this.add.container(0, 0);
  
@@ -1428,7 +1957,10 @@ class BattleScene extends Phaser.Scene {
     const isImpact = line.type === "impact";
  
     this.dialogueSceneName.setText(step.sceneName);
-    this.dialogueSceneImage.setTexture("prologueScene");
+    const sceneTextureKey = step.background || "prologueScene";
+    if (this.textures.exists(sceneTextureKey)) {
+      this.dialogueSceneImage.setTexture(sceneTextureKey);
+    }
     this.dialogueSceneImage.setAlpha(isImpact ? 0.3 : 1);
     this.impactContainer.setVisible(isImpact);
     this.dialoguePortraitPanel.setVisible(!isImpact);
@@ -1663,7 +2195,7 @@ class BattleScene extends Phaser.Scene {
  
     const container = this.add.container(0, 0, [marker, label, hpText]);
  
-    return { container, marker, hpText };
+    return { container, marker, label, hpText };
   }
  
   refreshUnitSprite(unit) {
@@ -1939,6 +2471,7 @@ class BattleScene extends Phaser.Scene {
     });
  
     const didKill = defenderWasAlive && defender.hp <= 0;
+    const defeatedFalan = didKill && defender.id === "falan";
     const xpGain = this.calculateXpGain(attacker, defender, didKill);
  
     if (xpGain > 0) {
@@ -1949,15 +2482,22 @@ class BattleScene extends Phaser.Scene {
     this.refreshUnitSprite(attacker);
  
     if (defender.hp <= 0) {
-      const defenderSprite = this.unitSprites[defender.id];
+      if (defeatedFalan) {
+        defender.hp = 0;
+        this.refreshUnitSprite(defender);
+        this.setFalanFinalDeathPose();
+        this.clearSelection(`${attacker.name} defeated ${defender.name}!`);
+      } else {
+        const defenderSprite = this.unitSprites[defender.id];
  
-      if (defenderSprite) {
-        defenderSprite.container.destroy();
-        delete this.unitSprites[defender.id];
+        if (defenderSprite) {
+          defenderSprite.container.destroy();
+          delete this.unitSprites[defender.id];
+        }
+ 
+        this.units = this.units.filter((u) => u.id !== defender.id);
+        this.clearSelection(`${attacker.name} defeated ${defender.name}!`);
       }
- 
-      this.units = this.units.filter((u) => u.id !== defender.id);
-      this.clearSelection(`${attacker.name} defeated ${defender.name}!`);
     } else {
       this.refreshUnitSprite(defender);
       this.clearSelection(`${attacker.name} attacked ${defender.name} with ${weapon.name}.`);
@@ -1965,13 +2505,11 @@ class BattleScene extends Phaser.Scene {
  
     this.updateSelectedPanel();
  
-    if (!this.units.some((u) => u.id === "falan")) {
-      this.stopBattleMusic();
- 
-      this.phaseText.setText("Victory");
-      this.phaseText.setColor("#86efac");
-      this.helpText.setText("Victory! Falan has been defeated.");
-      this.busy = false;
+    if (defeatedFalan) {
+      this.time.delayedCall(650 + sequence.results.length * 140, () => {
+        this.busy = false;
+        this.startPostBattleScene();
+      });
       return;
     }
  
