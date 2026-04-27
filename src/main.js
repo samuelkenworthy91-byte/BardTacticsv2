@@ -13,6 +13,8 @@ const ENEMY_MOVE_DURATION = 1400;
 const ENEMY_ACTION_PAUSE = 750;
 const PLAYER_MOVE_DURATION = 900;
 const PLAYER_ACTION_PAUSE = 250;
+const SKILL_BANNER_DURATION = 1250;
+const SKILL_IMPACT_DELAY = 520;
  
 const CARDINAL_DIRECTIONS = ["down", "up", "left", "right"];
  
@@ -105,69 +107,39 @@ const UNIT_SPRITE_RENDER = {
     hpY: TILE_SIZE * 0.34,
   },
   leon: {
-    height: TILE_SIZE * 0.9,
-    maxWidth: TILE_SIZE * 1.0,
+    height: TILE_SIZE * 0.8,
+    maxWidth: TILE_SIZE * 0.92,
     offsetX: 0,
     offsetY: 0,
-    originX: 0.5,
-    originY: 0.63,
     shadowWidth: TILE_SIZE * 0.4,
-    shadowHeight: TILE_SIZE * 0.12,
-    shadowX: 0,
-    shadowY: TILE_SIZE * 0.16,
-    hpY: TILE_SIZE * 0.34,
   },
   falan: {
-    height: TILE_SIZE * 0.96,
-    maxWidth: TILE_SIZE * 1.05,
+    height: TILE_SIZE * 0.86,
+    maxWidth: TILE_SIZE * 1.02,
     offsetX: 0,
     offsetY: 0,
-    originX: 0.5,
-    originY: 0.63,
     shadowWidth: TILE_SIZE * 0.44,
-    shadowHeight: TILE_SIZE * 0.12,
-    shadowX: 0,
-    shadowY: TILE_SIZE * 0.16,
-    hpY: TILE_SIZE * 0.34,
   },
   sword_thug: {
-    height: TILE_SIZE * 0.92,
-    maxWidth: TILE_SIZE * 1.0,
+    height: TILE_SIZE * 0.82,
+    maxWidth: TILE_SIZE * 0.94,
     offsetX: 0,
     offsetY: 0,
-    originX: 0.5,
-    originY: 0.63,
     shadowWidth: TILE_SIZE * 0.42,
-    shadowHeight: TILE_SIZE * 0.12,
-    shadowX: 0,
-    shadowY: TILE_SIZE * 0.16,
-    hpY: TILE_SIZE * 0.34,
   },
   axe_thug: {
-    height: TILE_SIZE * 0.92,
-    maxWidth: TILE_SIZE * 1.0,
+    height: TILE_SIZE * 0.82,
+    maxWidth: TILE_SIZE * 0.94,
     offsetX: 0,
     offsetY: 0,
-    originX: 0.5,
-    originY: 0.63,
     shadowWidth: TILE_SIZE * 0.42,
-    shadowHeight: TILE_SIZE * 0.12,
-    shadowX: 0,
-    shadowY: TILE_SIZE * 0.16,
-    hpY: TILE_SIZE * 0.34,
   },
   chakram_thug: {
-    height: TILE_SIZE * 0.92,
-    maxWidth: TILE_SIZE * 1.0,
+    height: TILE_SIZE * 0.82,
+    maxWidth: TILE_SIZE * 0.94,
     offsetX: 0,
     offsetY: 0,
-    originX: 0.5,
-    originY: 0.63,
     shadowWidth: TILE_SIZE * 0.42,
-    shadowHeight: TILE_SIZE * 0.12,
-    shadowX: 0,
-    shadowY: TILE_SIZE * 0.16,
-    hpY: TILE_SIZE * 0.34,
   },
   thug_sword: {
     height: TILE_SIZE * 0.82,
@@ -503,6 +475,8 @@ const UNITS = [
     level: 5,
     xp: 0,
     xpRate: 0.65,
+    sigilPoints: 3,
+    maxSigilPoints: 3,
     growths: {
       hp: 50,
       str: 35,
@@ -544,6 +518,16 @@ const UNITS = [
         hitRate: 100,
       },
     ],
+    skills: [
+      {
+        id: "iceOfAges",
+        name: "Ice of Ages",
+        cost: 2,
+        type: "adjacentSquare",
+        damageFormula: "mag",
+        animationState: "magic",
+      },
+    ],
     acted: false,
     color: 0x60a5fa,
   },
@@ -554,6 +538,8 @@ const UNITS = [
     level: 1,
     xp: 0,
     xpRate: 1.5,
+    sigilPoints: 3,
+    maxSigilPoints: 3,
     growths: {
       hp: 70,
       str: 60,
@@ -594,6 +580,8 @@ const UNITS = [
     id: "falan",
     name: "Falan",
     title: "Gang Leader",
+    sigilPoints: 3,
+    maxSigilPoints: 3,
     team: "enemy",
     className: "Leader",
     portraitKey: "falanPortrait",
@@ -620,6 +608,16 @@ const UNITS = [
         speedBonus: 2,
       },
     ],
+    skills: [
+      {
+        id: "manicDervish",
+        name: "Manic Dervish",
+        cost: 3,
+        type: "adjacentSquare",
+        damageFormula: "strPlusSpd",
+        animationState: "attack",
+      },
+    ],
     acted: false,
     color: 0xf87171,
     boss: true,
@@ -630,6 +628,8 @@ const UNITS = [
     title: "White Hood",
     team: "enemy",
     className: "Thug",
+    sigilPoints: 3,
+    maxSigilPoints: 3,
     portraitKey: "thugPortrait",
     spriteSet: "sword_thug",
     facing: "down",
@@ -662,6 +662,8 @@ const UNITS = [
     title: "White Hood",
     team: "enemy",
     className: "Thug",
+    sigilPoints: 3,
+    maxSigilPoints: 3,
     portraitKey: "thugPortrait",
     spriteSet: "axe_thug",
     facing: "down",
@@ -694,6 +696,8 @@ const UNITS = [
     title: "White Hood",
     team: "enemy",
     className: "Thug",
+    sigilPoints: 3,
+    maxSigilPoints: 3,
     portraitKey: "thugPortrait",
     spriteSet: "chakram_thug",
     facing: "down",
@@ -727,6 +731,8 @@ const UNITS = [
     title: "White Hood",
     team: "enemy",
     className: "Thug",
+    sigilPoints: 3,
+    maxSigilPoints: 3,
     portraitKey: "thugPortrait",
     spriteSet: "sword_thug",
     facing: "down",
@@ -1158,6 +1164,9 @@ class BattleScene extends Phaser.Scene {
       ...unit,
       facing: unit.facing || "down",
       spriteState: unit.spriteState || "idle",
+      sigilPoints: unit.sigilPoints ?? 3,
+      maxSigilPoints: unit.maxSigilPoints ?? 3,
+      skills: (unit.skills || []).map((skill) => ({ ...skill })),
       weapons: unit.weapons.map((weapon) => ({ ...weapon })),
     }));
  
@@ -1172,6 +1181,8 @@ class BattleScene extends Phaser.Scene {
     this.actionMenuOpen = false;
     this.actionMenuUnitId = null;
     this.actionMenuContainer = null;
+    this.skillBannerContainer = null;
+    this.skillBannerText = null;
     this.battleMusic = null;
     this.battleMusicStarted = false;
     this.postBattleStep = 0;
@@ -1202,6 +1213,7 @@ class BattleScene extends Phaser.Scene {
     this.createSidePanel();
     this.createPreviewUI();
     this.createCombatXpPopup();
+    this.createSkillBanner();
     this.createOpeningUI();
     this.createPostBattleUI();
     this.setupInput();
@@ -1245,7 +1257,7 @@ class BattleScene extends Phaser.Scene {
     const x = 704;
     const y = 72;
  
-    const bg = this.add.rectangle(x + 120, y + 200, 248, 400, 0x111827, 0.92);
+    const bg = this.add.rectangle(x + 120, y + 220, 248, 440, 0x111827, 0.92);
     bg.setStrokeStyle(2, 0x334155);
  
     const title = this.add.text(x + 16, y + 14, "Selected Unit", {
@@ -1278,28 +1290,52 @@ class BattleScene extends Phaser.Scene {
       color: "#94a3b8",
     });
  
-    this.levelXpText = this.add.text(x + 16, y + 218, "", {
-      fontSize: "14px",
+    this.hpBarText = this.add.text(x + 16, y + 216, "", {
+      fontSize: "13px",
+      color: "#fecaca",
+    });
+ 
+    this.hpBarBg = this.add.rectangle(x + 16, y + 238, 210, 10, 0x1f2937);
+    this.hpBarBg.setOrigin(0, 0.5);
+    this.hpBarBg.setStrokeStyle(1, 0x475569);
+ 
+    this.hpBarFill = this.add.rectangle(x + 16, y + 238, 210, 10, 0xef4444);
+    this.hpBarFill.setOrigin(0, 0.5);
+    this.hpBarFill.displayWidth = 0;
+ 
+    this.levelXpText = this.add.text(x + 16, y + 250, "", {
+      fontSize: "13px",
       color: "#cbd5e1",
     });
  
-    this.xpBarBg = this.add.rectangle(x + 16, y + 244, 210, 12, 0x1f2937);
+    this.xpBarBg = this.add.rectangle(x + 16, y + 272, 210, 10, 0x1f2937);
     this.xpBarBg.setOrigin(0, 0.5);
     this.xpBarBg.setStrokeStyle(1, 0x475569);
  
-    this.xpBarFill = this.add.rectangle(x + 16, y + 244, 210, 12, 0x38bdf8);
+    this.xpBarFill = this.add.rectangle(x + 16, y + 272, 210, 10, 0x8b5cf6);
     this.xpBarFill.setOrigin(0, 0.5);
     this.xpBarFill.displayWidth = 0;
  
-    this.unitStatsText = this.add.text(x + 16, y + 264, "", {
-      fontSize: "13px",
-      color: "#e2e8f0",
-      lineSpacing: 4,
+    this.sigilText = this.add.text(x + 16, y + 286, "Sigil", {
+      fontSize: "12px",
+      color: "#ddd6fe",
     });
  
-    this.weaponText = this.add.text(x + 16, y + 388, "", {
-      fontSize: "13px",
-      color: "#93c5fd",
+    this.sigilOrbs = [0, 1, 2].map((index) => {
+      const orb = this.add.circle(x + 60 + index * 22, y + 292, 7, 0x2e1065, 1);
+      orb.setStrokeStyle(2, 0xc4b5fd);
+      return orb;
+    });
+ 
+    this.unitStatsText = this.add.text(x + 16, y + 306, "", {
+      fontSize: "12px",
+      color: "#e2e8f0",
+      lineSpacing: 2,
+    });
+ 
+    this.weaponText = this.add.text(x + 16, y + 414, "", {
+      fontSize: "12px",
+      color: "#c4b5fd",
       wordWrap: { width: 210 },
     });
  
@@ -1311,9 +1347,14 @@ class BattleScene extends Phaser.Scene {
       this.portraitPlaceholder,
       this.unitNameText,
       this.unitClassText,
+      this.hpBarText,
+      this.hpBarBg,
+      this.hpBarFill,
       this.levelXpText,
       this.xpBarBg,
       this.xpBarFill,
+      this.sigilText,
+      ...this.sigilOrbs,
       this.unitStatsText,
       this.weaponText,
     ];
@@ -1444,6 +1485,61 @@ class BattleScene extends Phaser.Scene {
     ]);
  
     this.uiLayer.add(this.combatXpContainer);
+  }
+ 
+  createSkillBanner() {
+    this.skillBannerContainer = this.add.container(GAME_WIDTH / 2, 46);
+    this.skillBannerContainer.setDepth(10000);
+    this.skillBannerContainer.setVisible(false);
+    this.skillBannerContainer.setAlpha(0);
+ 
+    const shadow = this.add.rectangle(4, 4, 470, 54, 0x000000, 0.45);
+    const bg = this.add.rectangle(0, 0, 470, 54, 0x2e1065, 0.96);
+    bg.setStrokeStyle(3, 0xc4b5fd);
+ 
+    const inner = this.add.rectangle(0, 0, 452, 38, 0x4c1d95, 0.52);
+    inner.setStrokeStyle(1, 0xddd6fe, 0.75);
+ 
+    this.skillBannerText = this.add.text(0, 0, "", {
+      fontSize: "24px",
+      fontStyle: "bold",
+      color: "#f5f3ff",
+      stroke: "#000000",
+      strokeThickness: 3,
+    }).setOrigin(0.5);
+ 
+    this.skillBannerContainer.add([shadow, bg, inner, this.skillBannerText]);
+    this.uiLayer.add(this.skillBannerContainer);
+  }
+ 
+  showSkillBanner(skillName) {
+    if (!this.skillBannerContainer || !this.skillBannerText) return;
+ 
+    this.tweens.killTweensOf(this.skillBannerContainer);
+    this.skillBannerText.setText(skillName);
+    this.skillBannerContainer.setVisible(true);
+    this.skillBannerContainer.setAlpha(0);
+    this.skillBannerContainer.y = 32;
+ 
+    this.tweens.add({
+      targets: this.skillBannerContainer,
+      alpha: 1,
+      y: 46,
+      duration: 180,
+      ease: "Back.Out",
+      onComplete: () => {
+        this.time.delayedCall(SKILL_BANNER_DURATION, () => {
+          if (!this.skillBannerContainer?.visible) return;
+          this.tweens.add({
+            targets: this.skillBannerContainer,
+            alpha: 0,
+            y: 32,
+            duration: 180,
+            onComplete: () => this.skillBannerContainer.setVisible(false),
+          });
+        });
+      },
+    });
   }
  
   showCombatXpPopup(unit, amount, startLevel, startXp) {
@@ -3404,7 +3500,178 @@ class BattleScene extends Phaser.Scene {
     const unit = this.units.find((u) => u.id === unitId);
     if (!unit || unit.team !== "player" || unit.acted) return;
  
-    this.helpText.setText("Skills will be added later. Choose another action.");
+    const skill = (unit.skills || [])[0];
+    if (!skill) {
+      this.helpText.setText(`${unit.name} has no skills yet. Choose another action.`);
+      return;
+    }
+ 
+    if (!this.canUseSkill(unit, skill)) {
+      this.helpText.setText(`${skill.name} needs ${skill.cost} Sigil Points.`);
+      return;
+    }
+ 
+    const targets = this.getSkillTargetsAt(unit, skill, unit.x, unit.y);
+    if (targets.length === 0) {
+      this.helpText.setText(`No units are in range for ${skill.name}. Choose another action.`);
+      return;
+    }
+ 
+    this.useSkill(unit.id, skill.id, { endTurn: true });
+  }
+ 
+  getSkillById(unit, skillId) {
+    return (unit?.skills || []).find((skill) => skill.id === skillId) || null;
+  }
+ 
+  canUseSkill(unit, skill) {
+    if (!unit || !skill) return false;
+    return (unit.sigilPoints ?? 0) >= (skill.cost ?? 0);
+  }
+ 
+  getSkillTargetsAt(unit, skill, x = unit.x, y = unit.y) {
+    if (!unit || !skill) return [];
+ 
+    if (skill.type === "adjacentSquare") {
+      return this.units.filter((other) => {
+        if (!other || other.id === unit.id || other.hp <= 0) return false;
+ 
+        const dx = Math.abs(other.x - x);
+        const dy = Math.abs(other.y - y);
+        return dx <= 1 && dy <= 1;
+      });
+    }
+ 
+    return [];
+  }
+ 
+  calculateSkillDamage(unit, target, skill) {
+    if (!unit || !skill) return 0;
+ 
+    if (skill.damageFormula === "mag") {
+      return Math.max(0, unit.mag || 0);
+    }
+ 
+    if (skill.damageFormula === "strPlusSpd") {
+      return Math.max(0, (unit.str || 0) + (unit.spd || 0));
+    }
+ 
+    return Math.max(0, skill.baseDamage || 0);
+  }
+ 
+  useSkill(unitId, skillId, options = {}) {
+    const unit = this.units.find((u) => u.id === unitId);
+    const skill = this.getSkillById(unit, skillId);
+ 
+    if (!unit || !skill || unit.hp <= 0 || !this.canUseSkill(unit, skill)) return false;
+ 
+    const targets = this.getSkillTargetsAt(unit, skill, unit.x, unit.y);
+    if (targets.length === 0) return false;
+ 
+    this.closeActionMenu();
+    this.busy = true;
+    this.selectedUnitId = unit.id;
+    this.moveTiles = [];
+    this.targetTiles = [];
+    this.redrawSelection();
+    this.updateSelectedPanel();
+ 
+    unit.sigilPoints = Math.max(0, (unit.sigilPoints ?? 0) - (skill.cost ?? 0));
+    this.refreshUnitSprite(unit);
+    this.updateSelectedPanel();
+ 
+    this.showSkillBanner(skill.name);
+    this.helpText.setText(`${unit.name} uses ${skill.name}!`);
+    this.playUnitState(unit, skill.animationState || "attack", SKILL_IMPACT_DELAY + 450);
+ 
+    const targetResults = targets.map((target) => ({
+      target,
+      wasAlive: target.hp > 0,
+      damage: this.calculateSkillDamage(unit, target, skill),
+    }));
+ 
+    this.time.delayedCall(SKILL_IMPACT_DELAY, () => {
+      let totalXp = 0;
+      let defeatedFalan = false;
+      let defeatedEdwin = false;
+ 
+      targetResults.forEach((entry, index) => {
+        const target = entry.target;
+        if (!target || target.hp <= 0) return;
+ 
+        target.hp = Math.max(0, target.hp - entry.damage);
+        this.showCombatResultText(target, { hit: true, damage: entry.damage }, index);
+        this.time.delayedCall(index * 120, () => this.playUnitHurt(target, 360));
+ 
+        const didKill = entry.wasAlive && target.hp <= 0;
+        if (didKill) {
+          if (target.id === "falan") defeatedFalan = true;
+          if (target.id === "edwin") defeatedEdwin = true;
+ 
+          if (unit.team === "player" && target.team === "enemy") {
+            totalXp += this.calculateXpGain(unit, target, true);
+          }
+        }
+      });
+ 
+      if (totalXp > 0) {
+        this.awardXp(unit, totalXp);
+      }
+ 
+      targetResults.forEach((entry) => {
+        const target = entry.target;
+        if (!target) return;
+ 
+        if (target.hp <= 0) {
+          if (target.id === "falan") {
+            target.hp = 0;
+            this.refreshUnitSprite(target);
+          } else {
+            this.playUnitDeath(target, () => this.removeUnitSpriteAndData(target.id));
+          }
+        } else {
+          this.refreshUnitSprite(target);
+          this.setUnitSpriteFrame(target, "idle", target.facing || "down");
+        }
+      });
+ 
+      if (options.endTurn !== false) {
+        unit.acted = true;
+        this.refreshUnitSprite(unit);
+      }
+ 
+      this.updateSelectedPanel();
+ 
+      const finishDelay = 760 + targetResults.length * 120;
+      this.time.delayedCall(finishDelay, () => {
+        if (defeatedEdwin) {
+          this.stopBattleMusic();
+          this.phaseText.setText("Defeat");
+          this.phaseText.setColor("#f87171");
+          this.helpText.setText("Defeat! Edwin has fallen.");
+          this.busy = false;
+          return;
+        }
+ 
+        if (defeatedFalan) {
+          this.busy = false;
+          this.startPostBattleScene();
+          return;
+        }
+ 
+        this.busy = false;
+ 
+        if (typeof options.onComplete === "function") {
+          options.onComplete();
+          return;
+        }
+ 
+        this.clearSelection(`${unit.name} used ${skill.name}.`);
+        this.checkEndOfPlayerPhase();
+      });
+    });
+ 
+    return true;
   }
  
   chooseActionItem(unitId) {
@@ -3835,8 +4102,12 @@ class BattleScene extends Phaser.Scene {
       this.portraitPlaceholder.setVisible(true);
       this.unitNameText.setText("None");
       this.unitClassText.setText("");
+      this.hpBarText.setText("");
+      this.hpBarFill.displayWidth = 0;
       this.levelXpText.setText("");
       this.xpBarFill.displayWidth = 0;
+      this.sigilText.setText("Sigil");
+      this.sigilOrbs.forEach((orb) => orb.setFillStyle(0x2e1065, 0.35));
       this.unitStatsText.setText("");
       this.weaponText.setText("Select Edwin or Leon.");
       return;
@@ -3873,8 +4144,22 @@ class BattleScene extends Phaser.Scene {
     this.unitClassText.setText(
       `${unit.team === "enemy" ? "Enemy" : "Player"} • ${unit.title} • ${unit.className}`
     );
+    const currentHp = Math.max(0, unit.hp || 0);
+    const maxHp = Math.max(1, unit.maxHp || 1);
+    this.hpBarText.setText(`HP ${currentHp}/${maxHp}`);
+    this.hpBarFill.displayWidth = 210 * Phaser.Math.Clamp(currentHp / maxHp, 0, 1);
+ 
     this.levelXpText.setText(`Lv ${level} XP ${xp}/100`);
     this.xpBarFill.displayWidth = 210 * Phaser.Math.Clamp(xp / 100, 0, 1);
+ 
+    const sigilPoints = Phaser.Math.Clamp(unit.sigilPoints ?? 0, 0, unit.maxSigilPoints ?? 3);
+    const maxSigilPoints = unit.maxSigilPoints ?? 3;
+    this.sigilText.setText(`Sigil ${sigilPoints}/${maxSigilPoints}`);
+    this.sigilOrbs.forEach((orb, index) => {
+      const active = index < sigilPoints;
+      orb.setFillStyle(active ? 0x8b5cf6 : 0x2e1065, active ? 1 : 0.35);
+      orb.setStrokeStyle(2, active ? 0xddd6fe : 0x6d28d9);
+    });
  
     this.unitStatsText.setText(
       `HP ${unit.hp}/${unit.maxHp}\nSTR ${unit.str}\nMAG ${unit.mag}\n${defLine}\nRES ${unit.res}\n${spdLine}\nMOV ${unit.move}`
@@ -3914,7 +4199,7 @@ class BattleScene extends Phaser.Scene {
     const enemyRef = this.enemyTurnOrder[this.enemyIndex];
     const enemy = this.units.find((u) => u.id === enemyRef.id);
  
-    if (!enemy) {
+    if (!enemy || enemy.hp <= 0) {
       this.enemyIndex += 1;
       this.runNextEnemy();
       return;
@@ -3924,27 +4209,66 @@ class BattleScene extends Phaser.Scene {
     this.updateSelectedPanel();
     this.helpText.setText(`${enemy.name} is acting...`);
  
-    const targetsNow = this.attackablePlayers(enemy);
-    if (targetsNow.length > 0) {
-      this.time.delayedCall(ENEMY_ACTION_PAUSE, () => this.enemyAttack(enemy, targetsNow[0]));
-      return;
-    }
+    const plan = this.chooseEnemyPlan(enemy);
  
-    const nearest = this.getNearestPlayer(enemy);
-    if (!nearest) {
+    if (!plan) {
       this.enemyIndex += 1;
-      this.runNextEnemy();
+      this.time.delayedCall(ENEMY_ACTION_PAUSE, () => this.runNextEnemy());
       return;
     }
  
-    const moveTarget = this.chooseEnemyMove(enemy, nearest);
-    if (!moveTarget || (moveTarget.x === enemy.x && moveTarget.y === enemy.y)) {
+    const afterMove = () => {
+      if (plan.action) {
+        this.time.delayedCall(ENEMY_ACTION_PAUSE, () => this.executeEnemyAction(enemy, plan.action));
+      } else {
+        this.enemyIndex += 1;
+        this.time.delayedCall(ENEMY_ACTION_PAUSE, () => this.runNextEnemy());
+      }
+    };
+ 
+    if (!plan.move || (plan.move.x === enemy.x && plan.move.y === enemy.y)) {
+      afterMove();
+      return;
+    }
+ 
+    this.moveEnemyTo(enemy, plan.move, afterMove);
+  }
+ 
+  executeEnemyAction(enemy, action) {
+    if (!enemy || enemy.hp <= 0 || !action) {
       this.enemyIndex += 1;
-      this.runNextEnemy();
+      this.time.delayedCall(ENEMY_ACTION_PAUSE, () => this.runNextEnemy());
       return;
     }
  
+    if (action.type === "skill") {
+      this.useSkill(enemy.id, action.skill.id, {
+        endTurn: false,
+        onComplete: () => {
+          this.enemyIndex += 1;
+          this.time.delayedCall(ENEMY_ACTION_PAUSE, () => this.runNextEnemy());
+        },
+      });
+      return;
+    }
+ 
+    if (action.type === "attack" && action.target) {
+      this.enemyAttack(enemy, action.target);
+      return;
+    }
+ 
+    this.enemyIndex += 1;
+    this.time.delayedCall(ENEMY_ACTION_PAUSE, () => this.runNextEnemy());
+  }
+ 
+  moveEnemyTo(enemy, moveTarget, onComplete) {
     const sprite = this.unitSprites[enemy.id];
+ 
+    if (!enemy || !sprite || !moveTarget) {
+      if (typeof onComplete === "function") onComplete();
+      return;
+    }
+ 
     const oldX = enemy.x;
     const oldY = enemy.y;
     enemy.facing = this.getDirectionFromDelta(moveTarget.x - oldX, moveTarget.y - oldY, enemy.facing || "down");
@@ -3962,37 +4286,144 @@ class BattleScene extends Phaser.Scene {
       onComplete: () => {
         this.refreshUnitSprite(enemy);
         this.setUnitSpriteFrame(enemy, "idle", enemy.facing || "down");
-        const targetsAfterMove = this.attackablePlayers(enemy);
- 
-        if (targetsAfterMove.length > 0) {
-          this.time.delayedCall(ENEMY_ACTION_PAUSE, () => this.enemyAttack(enemy, targetsAfterMove[0]));
-        } else {
-          this.enemyIndex += 1;
-          this.time.delayedCall(ENEMY_ACTION_PAUSE, () => this.runNextEnemy());
-        }
+        if (typeof onComplete === "function") onComplete();
       },
     });
   }
  
-  getNearestPlayer(enemy) {
-    const players = this.units.filter((u) => u.team === "player");
-    if (!players.length) return null;
- 
-    let nearest = players[0];
-    let best = distance(enemy, players[0]);
- 
-    for (const player of players) {
-      const d = distance(enemy, player);
-      if (d < best) {
-        best = d;
-        nearest = player;
-      }
-    }
- 
-    return nearest;
+  getLivingOpponents(unit) {
+    return this.units.filter((other) => other.team !== unit.team && other.hp > 0);
   }
  
-  chooseEnemyMove(enemy, target) {
+  getNearestOpponent(unit) {
+    const opponents = this.getLivingOpponents(unit);
+    if (!opponents.length) return null;
+ 
+    return opponents.reduce((best, opponent) => {
+      const bestDistance = distance(unit, best);
+      const opponentDistance = distance(unit, opponent);
+      return opponentDistance < bestDistance ? opponent : best;
+    }, opponents[0]);
+  }
+ 
+  getWeaponForPosition(attacker, defender, x, y) {
+    if (!attacker || !defender || !attacker.weapons) return null;
+ 
+    const dist = Math.abs(x - defender.x) + Math.abs(y - defender.y);
+ 
+    return attacker.weapons.find((weapon) => {
+      const minRange = weapon.minRange ?? weapon.range;
+      const maxRange = weapon.maxRange ?? weapon.range;
+      return dist >= minRange && dist <= maxRange;
+    }) || null;
+  }
+ 
+  calculateAttackScoreAt(attacker, defender, weapon) {
+    if (!attacker || !defender || !weapon) return null;
+ 
+    const damagePerHit = this.calculateDamage(attacker, defender, weapon);
+    const attackCount = this.calculateAttackCount(attacker, defender, weapon);
+    const totalDamage = damagePerHit * attackCount;
+    const expectedDamage = totalDamage * ((weapon.hitRate ?? 100) / 100);
+    const canKill = totalDamage >= defender.hp;
+ 
+    return {
+      canKill,
+      totalDamage,
+      expectedDamage,
+      score: (canKill ? 100000 : 0) + expectedDamage * 100 + totalDamage,
+    };
+  }
+ 
+  evaluateEnemyActionAt(enemy, x, y) {
+    const opponents = this.getLivingOpponents(enemy);
+    const actions = [];
+ 
+    (enemy.skills || []).forEach((skill) => {
+      if (!this.canUseSkill(enemy, skill)) return;
+ 
+      const allTargets = this.getSkillTargetsAt(enemy, skill, x, y);
+      const opponentTargets = allTargets.filter((target) => target.team !== enemy.team);
+      if (opponentTargets.length === 0) return;
+ 
+      let totalDamage = 0;
+      let canKill = false;
+ 
+      opponentTargets.forEach((target) => {
+        const damage = this.calculateSkillDamage(enemy, target, skill);
+        totalDamage += damage;
+        if (damage >= target.hp) canKill = true;
+      });
+ 
+      actions.push({
+        type: "skill",
+        skill,
+        targets: opponentTargets,
+        canKill,
+        totalDamage,
+        expectedDamage: totalDamage,
+        score: (canKill ? 120000 : 0) + totalDamage * 115 + opponentTargets.length * 10,
+      });
+    });
+ 
+    opponents.forEach((target) => {
+      const weapon = this.getWeaponForPosition(enemy, target, x, y);
+      if (!weapon) return;
+ 
+      const attackScore = this.calculateAttackScoreAt(enemy, target, weapon);
+      if (!attackScore || attackScore.totalDamage <= 0) return;
+ 
+      actions.push({
+        type: "attack",
+        target,
+        weapon,
+        ...attackScore,
+      });
+    });
+ 
+    if (actions.length === 0) return null;
+ 
+    actions.sort((a, b) => {
+      if (a.canKill !== b.canKill) return a.canKill ? -1 : 1;
+      if (b.score !== a.score) return b.score - a.score;
+      const aDistance = a.target ? distance(enemy, a.target) : 0;
+      const bDistance = b.target ? distance(enemy, b.target) : 0;
+      return aDistance - bDistance;
+    });
+ 
+    return actions[0];
+  }
+ 
+  chooseEnemyPlan(enemy) {
+    const options = [{ x: enemy.x, y: enemy.y }, ...this.reachableTiles(enemy)];
+    const nearest = this.getNearestOpponent(enemy);
+ 
+    let bestPlan = null;
+ 
+    options.forEach((option) => {
+      const action = this.evaluateEnemyActionAt(enemy, option.x, option.y);
+      const moveDistance = Math.abs(option.x - enemy.x) + Math.abs(option.y - enemy.y);
+      const approachScore = nearest ? -1 * (Math.abs(option.x - nearest.x) + Math.abs(option.y - nearest.y)) : 0;
+      const actionScore = action ? action.score : -100000;
+      const score = actionScore + approachScore - moveDistance * 3;
+ 
+      if (!bestPlan || score > bestPlan.score) {
+        bestPlan = { move: option, action, score };
+      }
+    });
+ 
+    if (bestPlan?.action) return bestPlan;
+ 
+    if (!nearest) return null;
+ 
+    const move = this.chooseEnemyMoveToward(enemy, nearest);
+    if (!move) return null;
+ 
+    const enRouteAction = this.evaluateEnemyActionAt(enemy, move.x, move.y);
+    return { move, action: enRouteAction, score: bestPlan?.score || 0 };
+  }
+ 
+  chooseEnemyMoveToward(enemy, target) {
     const options = this.reachableTiles(enemy);
     if (!options.length) return null;
  
@@ -4010,8 +4441,16 @@ class BattleScene extends Phaser.Scene {
     return best;
   }
  
+  getNearestPlayer(enemy) {
+    return this.getNearestOpponent(enemy);
+  }
+ 
+  chooseEnemyMove(enemy, target) {
+    return this.chooseEnemyMoveToward(enemy, target);
+  }
+ 
   enemyAttack(attacker, defender) {
-    const weapon = getWeaponForTarget(attacker, defender) || getDefaultWeapon(attacker);
+    const weapon = getWeaponForTarget(attacker, defender);
     if (!weapon) {
       this.enemyIndex += 1;
       this.time.delayedCall(250, () => this.runNextEnemy());
