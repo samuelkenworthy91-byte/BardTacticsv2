@@ -3,14 +3,37 @@ import Phaser from "phaser";
 const GAME_WIDTH = 960;
 const GAME_HEIGHT = 540;
  
-const TILE_SIZE = 48;
+const TILE_SIZE = 56;
 const MAP_COLS = 8;
 const MAP_ROWS = 8;
  
-const UNIT_SPRITE_TARGET_SIZE = TILE_SIZE * 1.04;
-const UNIT_SPRITE_BACKGROUND_CLEANUP = true;
-const ENEMY_MOVE_DURATION = 1150;
-const ENEMY_ACTION_PAUSE = 650;
+const UNIT_SPRITE_TARGET_SIZE = TILE_SIZE * 1.42;
+const UNIT_SPRITE_BACKGROUND_CLEANUP = false;
+const ENEMY_MOVE_DURATION = 1250;
+const ENEMY_ACTION_PAUSE = 750;
+ 
+const UNIT_SPRITE_RENDER = {
+  default: {
+    height: TILE_SIZE * 1.42,
+    offsetX: 0,
+    offsetY: -7,
+    originX: 0.5,
+    originY: 0.5,
+    shadowWidth: TILE_SIZE * 0.56,
+    shadowHeight: TILE_SIZE * 0.18,
+    shadowX: 0,
+    shadowY: TILE_SIZE * 0.26,
+  },
+  edwin: { height: TILE_SIZE * 1.48, offsetX: 0, offsetY: -8, shadowWidth: TILE_SIZE * 0.58 },
+  leon: { height: TILE_SIZE * 1.38, offsetX: 0, offsetY: -6, shadowWidth: TILE_SIZE * 0.52 },
+  falan: { height: TILE_SIZE * 1.48, offsetX: 0, offsetY: -8, shadowWidth: TILE_SIZE * 0.58 },
+  sword_thug: { height: TILE_SIZE * 1.42, offsetX: 0, offsetY: -7, shadowWidth: TILE_SIZE * 0.54 },
+  axe_thug: { height: TILE_SIZE * 1.42, offsetX: 0, offsetY: -7, shadowWidth: TILE_SIZE * 0.54 },
+  chakram_thug: { height: TILE_SIZE * 1.42, offsetX: 0, offsetY: -7, shadowWidth: TILE_SIZE * 0.54 },
+  thug_sword: { height: TILE_SIZE * 1.42, offsetX: 0, offsetY: -7, shadowWidth: TILE_SIZE * 0.54 },
+  thug_axe: { height: TILE_SIZE * 1.42, offsetX: 0, offsetY: -7, shadowWidth: TILE_SIZE * 0.54 },
+  thug_chakram: { height: TILE_SIZE * 1.42, offsetX: 0, offsetY: -7, shadowWidth: TILE_SIZE * 0.54 },
+};
  
 const MAP = [
   ["street", "cover", "street", "street", "street", "street", "gate", "street"],
@@ -895,8 +918,8 @@ class BattleScene extends Phaser.Scene {
  
     this.boardWidth = this.mapCols * TILE_SIZE;
     this.boardHeight = this.mapRows * TILE_SIZE;
-    this.boardX = 240;
-    this.boardY = 96;
+    this.boardX = 215;
+    this.boardY = 78;
  
     this.tileLayer = this.add.layer();
     this.overlayLayer = this.add.layer();
@@ -1733,7 +1756,6 @@ class BattleScene extends Phaser.Scene {
       sprite.marker.setFillStyle(0x7f1d1d, 1);
       if (sprite.label) sprite.label.setText("KO");
       sprite.container.setScale(1, 0.72);
-      sprite.container.y += 6;
     }
   }
  
@@ -2550,16 +2572,27 @@ class BattleScene extends Phaser.Scene {
       }
     ).setOrigin(0.5);
  
-    const hpText = this.add.text(0, 20, "", {
+    const render = this.getUnitSpriteRenderConfig(unit);
+    const shadow = this.add.ellipse(
+      render.shadowX || 0,
+      render.shadowY ?? TILE_SIZE * 0.26,
+      render.shadowWidth || TILE_SIZE * 0.56,
+      render.shadowHeight || TILE_SIZE * 0.18,
+      0x000000,
+      0.34
+    );
+    shadow.setVisible(false);
+ 
+    const hpText = this.add.text(0, TILE_SIZE * 0.42, "", {
       fontSize: "10px",
       color: "#e5e7eb",
       stroke: "#000000",
       strokeThickness: 3,
     }).setOrigin(0.5, 0);
  
-    const container = this.add.container(0, 0, [marker, label, hpText]);
+    const container = this.add.container(0, 0, [marker, label, shadow, hpText]);
  
-    return { container, marker, label, hpText, image: null };
+    return { container, marker, label, shadow, hpText, image: null };
   }
  
   refreshUnitSprite(unit) {
@@ -2570,6 +2603,16 @@ class BattleScene extends Phaser.Scene {
     sprite.container.y = this.boardY + unit.y * TILE_SIZE + TILE_SIZE / 2;
     sprite.hpText.setText(`HP ${unit.hp}`);
     sprite.container.alpha = unit.team === "player" && unit.acted ? 0.55 : 1;
+  }
+ 
+  getUnitSpriteRenderConfig(unit) {
+    const base = UNIT_SPRITE_RENDER.default || {};
+    const specific = unit ? UNIT_SPRITE_RENDER[unit.spriteSet] || UNIT_SPRITE_RENDER[unit.id] || {} : {};
+ 
+    return {
+      ...base,
+      ...specific,
+    };
   }
  
   getUnitSpriteSet(unit) {
@@ -2609,11 +2652,9 @@ class BattleScene extends Phaser.Scene {
     if (!sprite.image) {
       sprite.image = this.add.image(0, 0, textureKey);
       sprite.image.setOrigin(0.5, 0.5);
-      sprite.container.addAt(sprite.image, 1);
+      const insertIndex = sprite.container.getIndex(sprite.hpText);
+      sprite.container.addAt(sprite.image, insertIndex >= 0 ? insertIndex : sprite.container.list.length);
     }
- 
-    sprite.image.setPosition(0, 0);
-    sprite.image.setOrigin(0.5, 0.5);
  
     return sprite.image;
   }
@@ -2710,21 +2751,27 @@ class BattleScene extends Phaser.Scene {
     const cellHeight = Math.floor(source.height / 2);
     const cropX = frame.col * cellWidth;
     const cropY = frame.row * cellHeight;
-    const bounds = this.getUnitSpriteContentBounds(textureKey, cropX, cropY, cellWidth, cellHeight);
-    const targetSize = UNIT_SPRITE_TARGET_SIZE;
-    const scale = Math.min(targetSize / bounds.width, targetSize / bounds.height);
+    const render = this.getUnitSpriteRenderConfig(unit);
+    const height = render.height || UNIT_SPRITE_TARGET_SIZE;
+    const scale = render.scale || height / cellHeight;
  
     image.setTexture(textureKey);
-    image.setCrop(cropX + bounds.x, cropY + bounds.y, bounds.width, bounds.height);
+    image.setCrop(cropX, cropY, cellWidth, cellHeight);
     image.setScale(scale);
-    image.setPosition(0, 0);
-    image.setOrigin(0.5, 0.5);
+    image.setPosition(render.offsetX || 0, render.offsetY || 0);
+    image.setOrigin(render.originX ?? 0.5, render.originY ?? 0.5);
     image.setVisible(true);
     image.clearTint();
  
+    if (sprite.shadow) {
+      sprite.shadow.setPosition(render.shadowX || 0, render.shadowY ?? TILE_SIZE * 0.26);
+      sprite.shadow.setSize(render.shadowWidth || TILE_SIZE * 0.56, render.shadowHeight || TILE_SIZE * 0.18);
+      sprite.shadow.setVisible(true);
+    }
+ 
     sprite.marker.setVisible(false);
     sprite.label.setVisible(false);
-    sprite.hpText.setPosition(0, TILE_SIZE * 0.34);
+    sprite.hpText.setPosition(0, TILE_SIZE * 0.42);
  
     return true;
   }
@@ -2734,6 +2781,7 @@ class BattleScene extends Phaser.Scene {
     if (!sprite) return;
  
     if (sprite.image) sprite.image.setVisible(false);
+    if (sprite.shadow) sprite.shadow.setVisible(false);
     sprite.marker.setVisible(true);
     sprite.marker.setFillStyle(unit.color, 1);
     sprite.marker.setAlpha(1);
