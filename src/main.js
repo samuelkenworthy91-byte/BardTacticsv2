@@ -7,89 +7,88 @@ const TILE_SIZE = 64;
 const MAP_COLS = 8;
 const MAP_ROWS = 8;
  
-const UNIT_SPRITE_TARGET_SIZE = TILE_SIZE * 0.9;
+const UNIT_SPRITE_TARGET_SIZE = TILE_SIZE * 0.82;
 const UNIT_SPRITE_BACKGROUND_CLEANUP = true;
 const ENEMY_MOVE_DURATION = 1250;
 const ENEMY_ACTION_PAUSE = 750;
  
 const UNIT_SPRITE_RENDER = {
   default: {
-    height: TILE_SIZE * 0.92,
-    maxWidth: TILE_SIZE * 1.08,
+    height: TILE_SIZE * 0.82,
+    maxWidth: TILE_SIZE * 0.96,
     offsetX: 0,
-    offsetY: TILE_SIZE * 0.2,
-    originX: 0.5,
-    originY: 1,
-    shadowWidth: TILE_SIZE * 0.46,
-    shadowHeight: TILE_SIZE * 0.13,
+    offsetY: 0,
+    deathOffsetY: 0,
+    shadowWidth: TILE_SIZE * 0.42,
+    shadowHeight: TILE_SIZE * 0.12,
     shadowX: 0,
-    shadowY: TILE_SIZE * 0.22,
+    shadowY: 2,
+    hpY: TILE_SIZE * 0.22,
   },
   edwin: {
-    height: TILE_SIZE * 0.96,
-    maxWidth: TILE_SIZE * 1.14,
-    offsetX: 0,
-    offsetY: TILE_SIZE * 0.22,
-    shadowWidth: TILE_SIZE * 0.48,
-  },
-  leon: {
-    height: TILE_SIZE * 0.9,
+    height: TILE_SIZE * 0.84,
     maxWidth: TILE_SIZE * 1.02,
     offsetX: 0,
-    offsetY: TILE_SIZE * 0.22,
+    offsetY: 0,
     shadowWidth: TILE_SIZE * 0.44,
   },
-  falan: {
-    height: TILE_SIZE * 0.98,
-    maxWidth: TILE_SIZE * 1.14,
+  leon: {
+    height: TILE_SIZE * 0.8,
+    maxWidth: TILE_SIZE * 0.92,
     offsetX: 0,
-    offsetY: TILE_SIZE * 0.22,
-    shadowWidth: TILE_SIZE * 0.48,
+    offsetY: 0,
+    shadowWidth: TILE_SIZE * 0.4,
+  },
+  falan: {
+    height: TILE_SIZE * 0.86,
+    maxWidth: TILE_SIZE * 1.02,
+    offsetX: 0,
+    offsetY: 0,
+    shadowWidth: TILE_SIZE * 0.44,
   },
   sword_thug: {
-    height: TILE_SIZE * 0.96,
-    maxWidth: TILE_SIZE * 1.08,
+    height: TILE_SIZE * 0.82,
+    maxWidth: TILE_SIZE * 0.94,
     offsetX: 0,
-    offsetY: TILE_SIZE * 0.22,
-    shadowWidth: TILE_SIZE * 0.46,
+    offsetY: 0,
+    shadowWidth: TILE_SIZE * 0.42,
   },
   axe_thug: {
-    height: TILE_SIZE * 0.96,
-    maxWidth: TILE_SIZE * 1.08,
+    height: TILE_SIZE * 0.82,
+    maxWidth: TILE_SIZE * 0.94,
     offsetX: 0,
-    offsetY: TILE_SIZE * 0.22,
-    shadowWidth: TILE_SIZE * 0.46,
+    offsetY: 0,
+    shadowWidth: TILE_SIZE * 0.42,
   },
   chakram_thug: {
-    height: TILE_SIZE * 0.96,
-    maxWidth: TILE_SIZE * 1.08,
+    height: TILE_SIZE * 0.82,
+    maxWidth: TILE_SIZE * 0.94,
     offsetX: 0,
-    offsetY: TILE_SIZE * 0.22,
-    shadowWidth: TILE_SIZE * 0.46,
+    offsetY: 0,
+    shadowWidth: TILE_SIZE * 0.42,
   },
   thug_sword: {
-    height: TILE_SIZE * 0.96,
-    maxWidth: TILE_SIZE * 1.08,
+    height: TILE_SIZE * 0.82,
+    maxWidth: TILE_SIZE * 0.94,
     offsetX: 0,
-    offsetY: TILE_SIZE * 0.22,
-    shadowWidth: TILE_SIZE * 0.46,
+    offsetY: 0,
+    shadowWidth: TILE_SIZE * 0.42,
   },
   thug_axe: {
-    height: TILE_SIZE * 0.96,
-    maxWidth: TILE_SIZE * 1.08,
+    height: TILE_SIZE * 0.82,
+    maxWidth: TILE_SIZE * 0.94,
     offsetX: 0,
-    offsetY: TILE_SIZE * 0.22,
-    shadowWidth: TILE_SIZE * 0.46,
+    offsetY: 0,
+    shadowWidth: TILE_SIZE * 0.42,
   },
   thug_chakram: {
-    height: TILE_SIZE * 0.96,
-    maxWidth: TILE_SIZE * 1.08,
+    height: TILE_SIZE * 0.82,
+    maxWidth: TILE_SIZE * 0.94,
     offsetX: 0,
-    offsetY: TILE_SIZE * 0.22,
-    shadowWidth: TILE_SIZE * 0.46,
+    offsetY: 0,
+    shadowWidth: TILE_SIZE * 0.42,
   },
-};
- 
+}; 
 const MAP = [
   ["street", "cover", "street", "street", "street", "street", "gate", "street"],
   ["street", "street", "cover", "street", "street", "cover", "street", "street"],
@@ -2630,15 +2629,15 @@ class BattleScene extends Phaser.Scene {
     const render = this.getUnitSpriteRenderConfig(unit);
     const shadow = this.add.ellipse(
       render.shadowX || 0,
-      render.shadowY ?? TILE_SIZE * 0.26,
-      render.shadowWidth || TILE_SIZE * 0.56,
-      render.shadowHeight || TILE_SIZE * 0.18,
+      render.shadowY ?? 2,
+      render.shadowWidth || TILE_SIZE * 0.42,
+      render.shadowHeight || TILE_SIZE * 0.12,
       0x000000,
       0.34
     );
     shadow.setVisible(false);
  
-    const hpText = this.add.text(0, TILE_SIZE * 0.39, "", {
+    const hpText = this.add.text(0, render.hpY ?? TILE_SIZE * 0.22, "", {
       fontSize: "10px",
       color: "#e5e7eb",
       stroke: "#000000",
@@ -2723,6 +2722,61 @@ class BattleScene extends Phaser.Scene {
     return r >= 175 && g >= 175 && b >= 175 && max - min <= 55;
   }
  
+  isLikelyWeaponOrMagicPixel(r, g, b, a) {
+    if (a < 24) return false;
+ 
+    const blueIce = b > r + 35 && b > g + 20;
+    const brightMetal = r > 185 && g > 185 && b > 185;
+ 
+    return blueIce || brightMetal;
+  }
+ 
+  getSpriteFootAnchorFromPixels(data, cellWidth, cellHeight, bounds) {
+    const bottomBandHeight = Math.max(8, Math.floor(bounds.height * 0.26));
+    const startY = Math.max(bounds.y, bounds.y + bounds.height - bottomBandHeight);
+    const endY = Math.min(cellHeight - 1, bounds.y + bounds.height - 1);
+    const startX = Math.max(0, bounds.x);
+    const endX = Math.min(cellWidth - 1, bounds.x + bounds.width - 1);
+ 
+    let totalX = 0;
+    let totalY = 0;
+    let totalWeight = 0;
+ 
+    for (let y = startY; y <= endY; y += 1) {
+      for (let x = startX; x <= endX; x += 1) {
+        const index = (y * cellWidth + x) * 4;
+        const r = data[index];
+        const g = data[index + 1];
+        const b = data[index + 2];
+        const a = data[index + 3];
+ 
+        if (this.isSpriteBackgroundPixel(r, g, b, a)) continue;
+        if (this.isLikelyWeaponOrMagicPixel(r, g, b, a)) continue;
+ 
+        const darkness = 255 - Math.max(r, g, b);
+        const lowerWeight = 1 + ((y - startY) / Math.max(1, endY - startY)) * 3;
+        const darkWeight = 1 + Math.max(0, darkness) / 96;
+        const weight = lowerWeight * darkWeight;
+ 
+        totalX += x * weight;
+        totalY += y * weight;
+        totalWeight += weight;
+      }
+    }
+ 
+    if (totalWeight > 0) {
+      return {
+        x: totalX / totalWeight,
+        y: totalY / totalWeight,
+      };
+    }
+ 
+    return {
+      x: bounds.x + bounds.width / 2,
+      y: bounds.y + bounds.height - 1,
+    };
+  }
+ 
   getUnitSpriteContentBounds(textureKey, cropX, cropY, cellWidth, cellHeight) {
     const cacheKey = `${textureKey}:${cropX}:${cropY}:${cellWidth}:${cellHeight}`;
  
@@ -2730,7 +2784,14 @@ class BattleScene extends Phaser.Scene {
       return this.unitSpriteBoundsCache.get(cacheKey);
     }
  
-    const fullBounds = { x: 0, y: 0, width: cellWidth, height: cellHeight };
+    const fullBounds = {
+      x: 0,
+      y: 0,
+      width: cellWidth,
+      height: cellHeight,
+      footX: cellWidth / 2,
+      footY: cellHeight * 0.82,
+    };
  
     if (!this.textures.exists(textureKey)) return fullBounds;
  
@@ -2787,6 +2848,10 @@ class BattleScene extends Phaser.Scene {
       height: Math.min(cellHeight - Math.max(0, minY - padding), maxY - minY + 1 + padding * 2),
     };
  
+    const footAnchor = this.getSpriteFootAnchorFromPixels(data, cellWidth, cellHeight, bounds);
+    bounds.footX = footAnchor.x;
+    bounds.footY = footAnchor.y;
+ 
     this.unitSpriteBoundsCache?.set(cacheKey, bounds);
     return bounds;
   }
@@ -2818,23 +2883,34 @@ class BattleScene extends Phaser.Scene {
       scale = desiredMaxWidth / Math.max(1, bounds.width);
     }
  
+    const isDeathFrame = unit.spriteState === "death";
+    const anchorX = Phaser.Math.Clamp((bounds.footX - bounds.x) / Math.max(1, bounds.width), 0.06, 0.94);
+    const anchorY = Phaser.Math.Clamp((bounds.footY - bounds.y) / Math.max(1, bounds.height), 0.12, 0.98);
+ 
     image.setTexture(textureKey);
     image.setCrop(cropX + bounds.x, cropY + bounds.y, bounds.width, bounds.height);
     image.setScale(scale);
-    image.setPosition(render.offsetX || 0, render.offsetY ?? TILE_SIZE * 0.2);
-    image.setOrigin(render.originX ?? 0.5, render.originY ?? 1);
+ 
+    if (isDeathFrame) {
+      image.setOrigin(0.5, 0.5);
+      image.setPosition(render.offsetX || 0, render.deathOffsetY ?? 0);
+    } else {
+      image.setOrigin(anchorX, anchorY);
+      image.setPosition(render.offsetX || 0, render.offsetY ?? 0);
+    }
+ 
     image.setVisible(true);
     image.clearTint();
  
     if (sprite.shadow) {
-      sprite.shadow.setPosition(render.shadowX || 0, render.shadowY ?? TILE_SIZE * 0.22);
-      sprite.shadow.setSize(render.shadowWidth || TILE_SIZE * 0.46, render.shadowHeight || TILE_SIZE * 0.13);
-      sprite.shadow.setVisible(true);
+      sprite.shadow.setPosition(render.shadowX || 0, render.shadowY ?? 2);
+      sprite.shadow.setSize(render.shadowWidth || TILE_SIZE * 0.42, render.shadowHeight || TILE_SIZE * 0.12);
+      sprite.shadow.setVisible(!isDeathFrame);
     }
  
     sprite.marker.setVisible(false);
     sprite.label.setVisible(false);
-    sprite.hpText.setPosition(0, TILE_SIZE * 0.39);
+    sprite.hpText.setPosition(0, render.hpY ?? TILE_SIZE * 0.22);
  
     return true;
   }
