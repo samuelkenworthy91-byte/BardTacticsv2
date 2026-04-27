@@ -3,14 +3,43 @@ import Phaser from "phaser";
 const GAME_WIDTH = 960;
 const GAME_HEIGHT = 540;
  
-const TILE_SIZE = 64;
+const TILE_SIZE = 72;
 const MAP_COLS = 8;
 const MAP_ROWS = 8;
  
-const UNIT_SPRITE_TARGET_SIZE = TILE_SIZE * 0.82;
+const UNIT_SPRITE_TARGET_SIZE = TILE_SIZE * 0.9;
 const UNIT_SPRITE_BACKGROUND_CLEANUP = true;
-const ENEMY_MOVE_DURATION = 1250;
+const ENEMY_MOVE_DURATION = 1400;
 const ENEMY_ACTION_PAUSE = 750;
+ 
+const CARDINAL_DIRECTIONS = ["down", "up", "left", "right"];
+
+function createDirectionalStateEntries(unitKey, state) {
+  return {
+    down: { key: `${unitKey}_${state}_down`, path: `/sprites/${unitKey}/${state}_down.png` },
+    up: { key: `${unitKey}_${state}_up`, path: `/sprites/${unitKey}/${state}_up.png` },
+    left: { key: `${unitKey}_${state}_left`, path: `/sprites/${unitKey}/${state}_left.png` },
+    right: { key: `${unitKey}_${state}_right`, path: `/sprites/${unitKey}/${state}_right.png` },
+  };
+}
+
+function createDeathEntries(unitKey) {
+  return [1, 2, 3, 4].map((index) => ({
+    key: `${unitKey}_death_${index}`,
+    path: `/sprites/${unitKey}/death_${index}.png`,
+  }));
+}
+
+const INDIVIDUAL_UNIT_SPRITE_SETS = {
+  edwin: {
+    idle: createDirectionalStateEntries("edwin", "idle"),
+    move: createDirectionalStateEntries("edwin", "move"),
+    attack: createDirectionalStateEntries("edwin", "attack"),
+    magic: createDirectionalStateEntries("edwin", "magic"),
+    hurt: createDirectionalStateEntries("edwin", "hurt"),
+    death: createDeathEntries("edwin"),
+  },
+};
  
 const UNIT_SPRITE_RENDER = {
   default: {
@@ -26,11 +55,16 @@ const UNIT_SPRITE_RENDER = {
     hpY: TILE_SIZE * 0.22,
   },
   edwin: {
-    height: TILE_SIZE * 0.84,
-    maxWidth: TILE_SIZE * 1.02,
+    height: TILE_SIZE * 1.14,
+    maxWidth: TILE_SIZE * 0.86,
     offsetX: 0,
     offsetY: 0,
-    shadowWidth: TILE_SIZE * 0.44,
+    originX: 0.5,
+    originY: 1,
+    shadowWidth: TILE_SIZE * 0.28,
+    shadowHeight: TILE_SIZE * 0.08,
+    shadowY: TILE_SIZE * 0.18,
+    hpY: TILE_SIZE * 0.58,
   },
   leon: {
     height: TILE_SIZE * 0.8,
@@ -809,6 +843,115 @@ class BattleScene extends Phaser.Scene {
       });
     });
   }
+
+  preloadIndividualDirectionalSprites() {
+    const loadedKeys = new Set();
+
+    Object.values(INDIVIDUAL_UNIT_SPRITE_SETS).forEach((spriteSet) => {
+      Object.values(spriteSet).forEach((entry) => {
+        if (Array.isArray(entry)) {
+          entry.forEach((frameEntry) => {
+            if (!frameEntry?.key || !frameEntry?.path || loadedKeys.has(frameEntry.key)) return;
+            this.load.image(frameEntry.key, frameEntry.path);
+            loadedKeys.add(frameEntry.key);
+          });
+          return;
+        }
+
+        Object.values(entry || {}).forEach((directionEntry) => {
+          if (!directionEntry?.key || !directionEntry?.path || loadedKeys.has(directionEntry.key)) return;
+          this.load.image(directionEntry.key, directionEntry.path);
+          loadedKeys.add(directionEntry.key);
+        });
+      });
+    });
+  }
+
+  getIndividualSpriteSet(unit) {
+    if (!unit) return null;
+    return INDIVIDUAL_UNIT_SPRITE_SETS[unit.spriteSet] || INDIVIDUAL_UNIT_SPRITE_SETS[unit.id] || null;
+  }
+
+  getIndividualSpriteEntry(unit, state = "idle", direction = "down", frameIndex = 0) {
+    const spriteSet = this.getIndividualSpriteSet(unit);
+    if (!spriteSet) return null;
+
+    const resolvedState = spriteSet[state] ? state : "idle";
+
+    if (resolvedState === "death") {
+      const deathFrames = spriteSet.death || [];
+      return deathFrames[Phaser.Math.Clamp(frameIndex, 0, Math.max(0, deathFrames.length - 1))] || null;
+    }
+
+    const directionEntries = spriteSet[resolvedState] || spriteSet.idle;
+    const resolvedDirection = CARDINAL_DIRECTIONS.includes(direction) ? direction : "down";
+    return directionEntries?.[resolvedDirection] || directionEntries?.down || null;
+  }
+
+  applyIndividualUnitSprite(unit, textureKey, state = "idle") {
+    const sprite = this.unitSprites[unit.id];
+    const image = this.ensureUnitSpriteImage(unit, textureKey);
+
+    if (!sprite || !image || !textureKey || !this.textures.exists(textureKey)) {
+      this.showUnitFallbackSprite(unit);
+      return false;
+    }
+
+    const texture = this.textures.get(textureKey);
+    const source = texture.getSourceImage();
+    if (!source?.width || !source?.height) {
+      this.showUnitFallbackSprite(unit);
+      return false;
+    }
+
+    const render = this.getUnitSpriteRenderConfig(unit);
+    const desiredHeight = render.height || UNIT_SPRITE_TARGET_SIZE;
+    const desiredMaxWidth = render.maxWidth || TILE_SIZE * 0.9;
+
+    let scale = desiredHeight / Math.max(1, source.height);
+    if (source.width * scale > desiredMaxWidth) {
+      scale = desiredMaxWidth / Math.max(1, source.width);
+    }
+
+    image.setTexture(textureKey);
+    if (typeof image.setCrop === "function") {
+      image.setCrop();
+      image.isCropped = false;
+    }
+    image.setScale(scale);
+
+    const isDeathFrame = state === "death";
+    image.setOrigin(render.originX ?? 0.5, isDeathFrame ? 0.5 : (render.originY ?? 1));
+    image.setPosition(render.offsetX || 0, isDeathFrame ? (render.deathOffsetY ?? 0) : (render.offsetY ?? 0));
+    image.setVisible(true);
+    image.clearTint();
+
+    if (sprite.shadow) {
+      sprite.shadow.setPosition(render.shadowX || 0, render.shadowY ?? 2);
+      sprite.shadow.setSize(render.shadowWidth || TILE_SIZE * 0.42, render.shadowHeight || TILE_SIZE * 0.12);
+      sprite.shadow.setVisible(!isDeathFrame);
+    }
+
+    sprite.marker.setVisible(false);
+    sprite.label.setVisible(false);
+    sprite.hpText.setPosition(0, render.hpY ?? TILE_SIZE * 0.22);
+
+    return true;
+  }
+
+  getAttackAnimationState(unit, weapon = null) {
+    if (!unit) return "attack";
+
+    if (weapon?.damageType === "magical") {
+      const magicEntry = this.getIndividualSpriteEntry(unit, "magic", unit.facing || "down", 0);
+      if (magicEntry?.key) return "magic";
+
+      const spriteSet = this.getUnitSpriteSet(unit);
+      if (spriteSet?.magic) return "magic";
+    }
+
+    return "attack";
+  }
  
   createTransparentUnitTextures() {
     if (!UNIT_SPRITE_BACKGROUND_CLEANUP) return;
@@ -932,6 +1075,7 @@ class BattleScene extends Phaser.Scene {
  
     this.preloadBiomeTiles(levelData.biome);
     this.preloadUnitSpriteAtlases();
+    this.preloadIndividualDirectionalSprites();
     this.preloadLevelAudio(levelData);
   }
  
@@ -2930,23 +3074,35 @@ class BattleScene extends Phaser.Scene {
  
   setUnitSpriteFrame(unit, state = "idle", direction = null) {
     if (!unit) return false;
- 
-    const textureKey = this.getUnitSpriteTextureKey(unit, state);
-    const frame = this.getDirectionFrame(direction || unit.facing || "down");
- 
+
+    const resolvedDirection = direction || unit.facing || "down";
+    const individualEntry = this.getIndividualSpriteEntry(unit, state, resolvedDirection, 0);
+
     unit.spriteState = state;
- 
+
+    if (individualEntry?.key && this.textures.exists(individualEntry.key)) {
+      return this.applyIndividualUnitSprite(unit, individualEntry.key, state);
+    }
+
+    const textureKey = this.getUnitSpriteTextureKey(unit, state);
+    const frame = this.getDirectionFrame(resolvedDirection);
+
     return this.applyUnitSpriteCrop(unit, textureKey, frame);
   }
- 
+
   setUnitDeathFrame(unit, frameIndex = 0) {
     if (!unit) return false;
- 
+
+    unit.spriteState = "death";
+
+    const individualEntry = this.getIndividualSpriteEntry(unit, "death", unit.facing || "down", frameIndex);
+    if (individualEntry?.key && this.textures.exists(individualEntry.key)) {
+      return this.applyIndividualUnitSprite(unit, individualEntry.key, "death");
+    }
+
     const textureKey = this.getUnitSpriteTextureKey(unit, "death");
     const frame = this.getDeathFrame(frameIndex);
- 
-    unit.spriteState = "death";
- 
+
     return this.applyUnitSpriteCrop(unit, textureKey, frame);
   }
  
@@ -3326,7 +3482,7 @@ class BattleScene extends Phaser.Scene {
     this.busy = true;
     this.faceUnitToward(attacker, defender);
     this.faceUnitToward(defender, attacker);
-    this.playUnitState(attacker, "attack", 420);
+    this.playUnitState(attacker, this.getAttackAnimationState(attacker, weapon), 420);
  
     const defenderWasAlive = defender.hp > 0;
     const sequence = this.resolveAttackSequence(attacker, defender, weapon);
@@ -3635,7 +3791,7 @@ class BattleScene extends Phaser.Scene {
     this.helpText.setText(`${attacker.name} attacks ${defender.name}.`);
     this.faceUnitToward(attacker, defender);
     this.faceUnitToward(defender, attacker);
-    this.playUnitState(attacker, "attack", 620);
+    this.playUnitState(attacker, this.getAttackAnimationState(attacker, weapon), 620);
  
     const sequence = this.resolveAttackSequence(attacker, defender, weapon);
  
