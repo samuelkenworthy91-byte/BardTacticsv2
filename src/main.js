@@ -11,10 +11,14 @@ const UNIT_SPRITE_TARGET_SIZE = TILE_SIZE * 0.9;
 const UNIT_SPRITE_BACKGROUND_CLEANUP = true;
 const ENEMY_MOVE_DURATION = 1400;
 const ENEMY_ACTION_PAUSE = 750;
-const PLAYER_MOVE_DURATION = 900;
-const PLAYER_ACTION_PAUSE = 250;
+const PLAYER_MOVE_DURATION = 1350;
+const PLAYER_ACTION_PAUSE = 450;
 const SKILL_BANNER_DURATION = 1250;
 const SKILL_IMPACT_DELAY = 520;
+
+const SAVE_KEY = "bardsTacticsSave";
+const TITLE_SCREEN_KEY = "bardsTitleScreen";
+const TITLE_SCREEN_PATH = "/ui/title_screen.png";
  
 const CARDINAL_DIRECTIONS = ["down", "up", "left", "right"];
  
@@ -270,9 +274,9 @@ const DEATH_FRAMES = [
 const CHAPTER_OPENING = [
   {
     type: "title",
-    chapter: "Prologue",
-    subtitle: "Underpass",
-    tag: "Four Years Gone",
+    chapter: "Chapter 1",
+    subtitle: "4 Years Gone",
+    tag: "The Underpass",
   },
   {
     type: "scene",
@@ -771,6 +775,7 @@ const LEVELS = {
       path: "/audio/chapter1_battle.mp3",
       volume: 0.45,
     },
+    objective: "Defeat Falan, the gang leader.",
   },
 };
  
@@ -830,13 +835,227 @@ function canAttack(attacker, defender) {
   return !!getWeaponForTarget(attacker, defender);
 }
  
+function fitImageToBounds(scene, image, textureKey, maxWidth, maxHeight, cover = false) {
+  if (!scene?.textures?.exists(textureKey) || !image) return;
+
+  const source = scene.textures.get(textureKey)?.getSourceImage();
+  if (!source?.width || !source?.height) return;
+
+  const scale = cover
+    ? Math.max(maxWidth / source.width, maxHeight / source.height)
+    : Math.min(maxWidth / source.width, maxHeight / source.height);
+
+  image.setDisplaySize(source.width * scale, source.height * scale);
+}
+
+function createBannerPanel(scene, x, y, width, height, options = {}) {
+  const container = scene.add.container(x, y);
+  const shadowOffset = options.shadowOffset ?? 5;
+  const shadow = scene.add.rectangle(shadowOffset, shadowOffset, width, height, 0x000000, options.shadowAlpha ?? 0.34).setOrigin(0.5);
+  const outer = scene.add.rectangle(0, 0, width, height, options.outerColor ?? 0x14091f, options.outerAlpha ?? 0.97).setOrigin(0.5);
+  outer.setStrokeStyle(options.outerStrokeWidth ?? 3, options.outerStrokeColor ?? 0xb6925f, 1);
+  const inner = scene.add.rectangle(0, 0, width - (options.innerInset ?? 14), height - (options.innerInset ?? 14), options.innerColor ?? 0x29133f, options.innerAlpha ?? 0.98).setOrigin(0.5);
+  inner.setStrokeStyle(options.innerStrokeWidth ?? 1, options.innerStrokeColor ?? 0xe4d0a8, options.innerStrokeAlpha ?? 0.82);
+  container.add([shadow, outer, inner]);
+  return { container, shadow, outer, inner };
+}
+
+function createBannerButton(scene, x, y, width, height, label, onClick, fontSize = "22px") {
+  const container = scene.add.container(x, y);
+  const shadow = scene.add.rectangle(4, 4, width, height, 0x000000, 0.34).setOrigin(0.5);
+  const outer = scene.add.rectangle(0, 0, width, height, 0x1a0d2a, 0.98).setOrigin(0.5);
+  outer.setStrokeStyle(2, 0xb6925f, 1);
+  const inner = scene.add.rectangle(0, 0, width - 10, height - 10, 0x412164, 0.98).setOrigin(0.5);
+  inner.setStrokeStyle(1, 0xe4d0a8, 0.78);
+  const text = scene.add.text(0, 0, label, {
+    fontSize,
+    fontStyle: "bold",
+    color: "#f7ecd3",
+    stroke: "#0b0811",
+    strokeThickness: 3,
+  }).setOrigin(0.5);
+  const hit = scene.add.rectangle(0, 0, width, height, 0xffffff, 0).setOrigin(0.5);
+  hit.setInteractive({ useHandCursor: true });
+  hit.on("pointerover", () => {
+    inner.setFillStyle(0x573487, 0.99);
+    outer.setStrokeStyle(2, 0xe0c186, 1);
+    container.y = y - 1;
+  });
+  hit.on("pointerout", () => {
+    inner.setFillStyle(0x412164, 0.98);
+    outer.setStrokeStyle(2, 0xb6925f, 1);
+    container.y = y;
+  });
+  hit.on("pointerdown", (pointer, localX, localY, event) => {
+    if (event?.stopPropagation) event.stopPropagation();
+    if (typeof onClick === "function") onClick();
+  });
+  container.add([shadow, outer, inner, text, hit]);
+  return { container, shadow, outer, inner, text, hit };
+}
+
+class TitleScene extends Phaser.Scene {
+  constructor() {
+    super("TitleScene");
+  }
+
+  preload() {
+    if (!this.textures.exists(TITLE_SCREEN_KEY)) {
+      this.load.image(TITLE_SCREEN_KEY, TITLE_SCREEN_PATH);
+    }
+  }
+
+  create() {
+    this.cameras.main.setBackgroundColor("#06030b");
+
+    if (this.textures.exists(TITLE_SCREEN_KEY)) {
+      const splash = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, TITLE_SCREEN_KEY);
+      fitImageToBounds(this, splash, TITLE_SCREEN_KEY, GAME_WIDTH, GAME_HEIGHT, true);
+    } else {
+      this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x09050f, 1);
+      this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 10, "The Bards: Tactics", {
+        fontSize: "46px",
+        fontStyle: "bold",
+        color: "#f7ecd3",
+        stroke: "#0b0811",
+        strokeThickness: 6,
+      }).setOrigin(0.5);
+    }
+
+    this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.12);
+
+    const promptPanel = createBannerPanel(this, GAME_WIDTH / 2, GAME_HEIGHT - 42, 300, 48, { innerInset: 12 });
+    const promptText = this.add.text(0, 0, "Click to Start", {
+      fontSize: "24px",
+      fontStyle: "bold",
+      color: "#f7ecd3",
+      stroke: "#0b0811",
+      strokeThickness: 4,
+    }).setOrigin(0.5);
+    promptPanel.container.add(promptText);
+
+    this.tweens.add({
+      targets: promptPanel.container,
+      alpha: 0.45,
+      duration: 800,
+      yoyo: true,
+      repeat: -1,
+    });
+
+    this.input.once("pointerdown", () => {
+      this.scene.start("MainMenuScene");
+    });
+  }
+}
+
+class MainMenuScene extends Phaser.Scene {
+  constructor() {
+    super("MainMenuScene");
+  }
+
+  preload() {
+    if (!this.textures.exists(TITLE_SCREEN_KEY)) {
+      this.load.image(TITLE_SCREEN_KEY, TITLE_SCREEN_PATH);
+    }
+  }
+
+  getSaveData() {
+    try {
+      const raw = window.localStorage.getItem(SAVE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  create() {
+    this.cameras.main.setBackgroundColor("#06030b");
+
+    if (this.textures.exists(TITLE_SCREEN_KEY)) {
+      const bg = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, TITLE_SCREEN_KEY);
+      fitImageToBounds(this, bg, TITLE_SCREEN_KEY, GAME_WIDTH, GAME_HEIGHT, true);
+      bg.setAlpha(0.45);
+    }
+
+    this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x06030b, 0.58);
+
+    const panel = createBannerPanel(this, GAME_WIDTH / 2, GAME_HEIGHT / 2, 390, 250, { innerInset: 16 });
+    const heading = this.add.text(0, -82, "Main Menu", {
+      fontSize: "34px",
+      fontStyle: "bold",
+      color: "#f7ecd3",
+      stroke: "#0b0811",
+      strokeThickness: 4,
+    }).setOrigin(0.5);
+    const subtitle = this.add.text(0, -48, "Choose your path.", {
+      fontSize: "16px",
+      color: "#d8c4f0",
+    }).setOrigin(0.5);
+
+    const newGameButton = createBannerButton(this, 0, 12, 220, 48, "New Game", () => {
+      this.scene.start("BattleScene", { loadFromSave: false });
+    }, "24px");
+
+    const loadGameButton = createBannerButton(this, 0, 72, 220, 48, "Load Game", () => {
+      const saveData = this.getSaveData();
+      if (!saveData) {
+        this.statusText.setText("No local save data found.");
+        return;
+      }
+      this.scene.start("BattleScene", { loadFromSave: true, saveData });
+    }, "24px");
+
+    this.statusText = this.add.text(0, 118, "", {
+      fontSize: "14px",
+      color: "#f4d7d7",
+      align: "center",
+      wordWrap: { width: 280 },
+    }).setOrigin(0.5, 0);
+
+    panel.container.add([
+      heading,
+      subtitle,
+      newGameButton.container,
+      loadGameButton.container,
+      this.statusText,
+    ]);
+  }
+}
+
 class BattleScene extends Phaser.Scene {
   constructor() {
     super("BattleScene");
   }
+
+  init(data = {}) {
+    this.loadFromSave = !!data.loadFromSave;
+    this.loadedSaveData = data.saveData || null;
+  }
  
   getCurrentLevel() {
     return LEVELS.chapter1;
+  }
+
+  getSavedGameData() {
+    if (this.loadedSaveData) return this.loadedSaveData;
+
+    try {
+      const raw = window.localStorage.getItem(SAVE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  startLoadedBattle() {
+    this.openingContainer.setVisible(false);
+    this.startPlayerPhase();
+    this.selectedUnitId = "edwin";
+    this.updateSelectedPanel();
+
+    if (this.getSavedGameData()) {
+      this.helpText.setText("Loaded game. Player Phase. Click Edwin or Leon.");
+    }
   }
  
   preloadBiomeTiles(biomeKey) {
@@ -1218,41 +1437,65 @@ class BattleScene extends Phaser.Scene {
     this.createPostBattleUI();
     this.setupInput();
     this.updateSelectedPanel();
-    this.updateOpeningUI();
+    this.setObjectiveDisplayVisible(false);
+
+    if (this.loadFromSave) {
+      this.startLoadedBattle();
+    } else {
+      this.updateOpeningUI();
+    }
   }
  
   createTopUI() {
-    this.add.text(24, 20, "Chapter 1", {
-      fontSize: "26px",
-      fontStyle: "bold",
-      color: "#ffffff",
-    });
- 
-    this.phaseText = this.add.text(24, 56, "Opening", {
+    const panel = createBannerPanel(this, 88, 83, 152, 134, { innerInset: 14 });
+    this.topInfoPanel = panel.container;
+
+    this.phaseText = this.add.text(-58, -50, "Opening", {
       fontSize: "18px",
       fontStyle: "bold",
-      color: "#fcd34d",
+      color: "#f7ecd3",
+      stroke: "#0b0811",
+      strokeThickness: 3,
     });
- 
-    this.helpText = this.add.text(24, 88, "Watch the chapter opening.", {
-      fontSize: "14px",
-      color: "#cbd5e1",
-      wordWrap: { width: 190 },
+
+    this.helpText = this.add.text(-58, -24, "Watch the chapter opening.", {
+      fontSize: "11px",
+      color: "#d8c4f0",
+      wordWrap: { width: 118 },
+      lineSpacing: 2,
     });
- 
-    this.add.text(24, 470, "Objective", {
-      fontSize: "18px",
+
+    this.objectiveHeader = this.add.text(-58, 30, "Objective", {
+      fontSize: "12px",
       fontStyle: "bold",
-      color: "#f8fafc",
+      color: "#e8c98b",
+      stroke: "#0b0811",
+      strokeThickness: 2,
     });
- 
-    this.objectiveText = this.add.text(24, 498, "Defeat Falan, the gang leader.", {
-      fontSize: "14px",
-      color: "#fcd34d",
-      wordWrap: { width: 190 },
+
+    this.objectiveText = this.add.text(-58, 48, this.levelData?.objective || "Defeat Falan, the gang leader.", {
+      fontSize: "11px",
+      color: "#f7ecd3",
+      wordWrap: { width: 118 },
+      lineSpacing: 2,
     });
+
+    panel.container.add([
+      this.phaseText,
+      this.helpText,
+      this.objectiveHeader,
+      this.objectiveText,
+    ]);
+
+    this.uiLayer.add(panel.container);
   }
- 
+
+  setObjectiveDisplayVisible(visible) {
+    const shouldShow = !!visible;
+    if (this.objectiveHeader) this.objectiveHeader.setVisible(shouldShow);
+    if (this.objectiveText) this.objectiveText.setVisible(shouldShow);
+  }
+
   createSidePanel() {
     const x = 704;
     const y = 72;
@@ -1263,7 +1506,7 @@ class BattleScene extends Phaser.Scene {
     const title = this.add.text(x + 16, y + 14, "Selected Unit", {
       fontSize: "20px",
       fontStyle: "bold",
-      color: "#ffffff",
+      color: "#f7ecd3",
     });
  
     this.portraitFrame = this.add.rectangle(x + 64, y + 88, 96, 120, 0x1f2937);
@@ -1282,7 +1525,7 @@ class BattleScene extends Phaser.Scene {
     this.unitNameText = this.add.text(x + 16, y + 156, "None", {
       fontSize: "22px",
       fontStyle: "bold",
-      color: "#ffffff",
+      color: "#f7ecd3",
     });
  
     this.unitClassText = this.add.text(x + 16, y + 190, "", {
@@ -1305,7 +1548,7 @@ class BattleScene extends Phaser.Scene {
  
     this.levelXpText = this.add.text(x + 16, y + 250, "", {
       fontSize: "13px",
-      color: "#cbd5e1",
+      color: "#d8c4f0",
     });
  
     this.xpBarBg = this.add.rectangle(x + 16, y + 272, 210, 10, 0x1f2937);
@@ -1372,7 +1615,7 @@ class BattleScene extends Phaser.Scene {
     const title = this.add.text(-292, -58, "Combat Preview", {
       fontSize: "22px",
       fontStyle: "bold",
-      color: "#ffffff",
+      color: "#f7ecd3",
     });
  
     this.previewLeftName = this.add.text(-292, -18, "", {
@@ -1409,7 +1652,7 @@ class BattleScene extends Phaser.Scene {
     const confirmText = this.add.text(-132, 39, "Confirm", {
       fontSize: "16px",
       fontStyle: "bold",
-      color: "#ffffff",
+      color: "#f7ecd3",
     });
  
     const cancelButton = this.add.rectangle(90, 50, 140, 34, 0x334155);
@@ -1422,7 +1665,7 @@ class BattleScene extends Phaser.Scene {
     const cancelText = this.add.text(52, 39, "Cancel", {
       fontSize: "16px",
       fontStyle: "bold",
-      color: "#ffffff",
+      color: "#f7ecd3",
     });
  
     this.previewContainer.add([
@@ -1453,7 +1696,7 @@ class BattleScene extends Phaser.Scene {
     this.combatXpNameText = this.add.text(-140, -28, "", {
       fontSize: "18px",
       fontStyle: "bold",
-      color: "#ffffff",
+      color: "#f7ecd3",
     });
  
     this.combatXpGainText = this.add.text(140, -28, "", {
@@ -1464,7 +1707,7 @@ class BattleScene extends Phaser.Scene {
  
     this.combatXpValueText = this.add.text(-140, -2, "", {
       fontSize: "14px",
-      color: "#cbd5e1",
+      color: "#d8c4f0",
     });
  
     this.combatXpBarBg = this.add.rectangle(-140, 26, 280, 14, 0x1f2937);
@@ -1492,35 +1735,31 @@ class BattleScene extends Phaser.Scene {
     this.skillBannerContainer.setDepth(10000);
     this.skillBannerContainer.setVisible(false);
     this.skillBannerContainer.setAlpha(0);
- 
-    const shadow = this.add.rectangle(4, 4, 470, 54, 0x000000, 0.45);
-    const bg = this.add.rectangle(0, 0, 470, 54, 0x2e1065, 0.96);
-    bg.setStrokeStyle(3, 0xc4b5fd);
- 
-    const inner = this.add.rectangle(0, 0, 452, 38, 0x4c1d95, 0.52);
-    inner.setStrokeStyle(1, 0xddd6fe, 0.75);
- 
+
+    const panel = createBannerPanel(this, 0, 0, 490, 60, { innerInset: 14 });
+
     this.skillBannerText = this.add.text(0, 0, "", {
       fontSize: "24px",
       fontStyle: "bold",
-      color: "#f5f3ff",
-      stroke: "#000000",
-      strokeThickness: 3,
+      color: "#f7ecd3",
+      stroke: "#0b0811",
+      strokeThickness: 4,
     }).setOrigin(0.5);
- 
-    this.skillBannerContainer.add([shadow, bg, inner, this.skillBannerText]);
+
+    panel.container.add(this.skillBannerText);
+    this.skillBannerContainer.add(panel.container);
     this.uiLayer.add(this.skillBannerContainer);
   }
- 
+
   showSkillBanner(skillName) {
     if (!this.skillBannerContainer || !this.skillBannerText) return;
- 
+
     this.tweens.killTweensOf(this.skillBannerContainer);
     this.skillBannerText.setText(skillName);
     this.skillBannerContainer.setVisible(true);
     this.skillBannerContainer.setAlpha(0);
-    this.skillBannerContainer.y = 32;
- 
+    this.skillBannerContainer.y = 28;
+
     this.tweens.add({
       targets: this.skillBannerContainer,
       alpha: 1,
@@ -1533,15 +1772,16 @@ class BattleScene extends Phaser.Scene {
           this.tweens.add({
             targets: this.skillBannerContainer,
             alpha: 0,
-            y: 32,
+            y: 28,
             duration: 180,
+            ease: "Quad.Out",
             onComplete: () => this.skillBannerContainer.setVisible(false),
           });
         });
       },
     });
   }
- 
+
   showCombatXpPopup(unit, amount, startLevel, startXp) {
     if (!this.combatXpContainer || !unit || amount <= 0) return;
  
@@ -1794,13 +2034,13 @@ class BattleScene extends Phaser.Scene {
     const title = this.add.text(0, -82, "LEVEL UP!", {
       fontSize: "26px",
       fontStyle: "bold",
-      color: "#fcd34d",
+      color: "#e8c98b",
     }).setOrigin(0.5);
  
     const name = this.add.text(0, -46, `${unit.name} reached Lv ${unit.level}`, {
       fontSize: "18px",
       fontStyle: "bold",
-      color: "#ffffff",
+      color: "#f7ecd3",
     }).setOrigin(0.5);
  
     const stats = this.add.text(0, -10, text, {
@@ -1907,7 +2147,7 @@ class BattleScene extends Phaser.Scene {
  
     this.postBattleSceneName = this.add.text(54, 30, "", {
       fontSize: "16px",
-      color: "#fcd34d",
+      color: "#e8c98b",
       fontStyle: "bold",
     });
  
@@ -1931,19 +2171,19 @@ class BattleScene extends Phaser.Scene {
       align: "center",
     }).setOrigin(0.5);
  
-    const textBox = this.add.rectangle(480, 395, 800, 120, 0xf8f5ee, 0.98);
-    textBox.setStrokeStyle(2, 0xb8aa8a);
+    const textBox = this.add.rectangle(480, 395, 800, 120, 0x1a0d2a, 0.98);
+    textBox.setStrokeStyle(2, 0xb6925f);
     this.postBattleTextBox = textBox;
  
     this.postBattleSpeaker = this.add.text(90, 343, "", {
       fontSize: "24px",
       fontStyle: "bold",
-      color: "#1e293b",
+      color: "#f7ecd3",
     });
  
     this.postBattleText = this.add.text(90, 378, "", {
       fontSize: "20px",
-      color: "#334155",
+      color: "#eadff7",
       wordWrap: { width: 660 },
       lineSpacing: 8,
     });
@@ -1956,7 +2196,7 @@ class BattleScene extends Phaser.Scene {
     this.postBattleNextLabel = this.add.text(785, 449, "Next", {
       fontSize: "16px",
       fontStyle: "bold",
-      color: "#ffffff",
+      color: "#f7ecd3",
     });
  
     this.savePromptContainer = this.add.container(GAME_WIDTH / 2, GAME_HEIGHT / 2);
@@ -1968,7 +2208,7 @@ class BattleScene extends Phaser.Scene {
     this.savePromptTitle = this.add.text(0, -72, "Chapter 1 Complete", {
       fontSize: "30px",
       fontStyle: "bold",
-      color: "#fcd34d",
+      color: "#e8c98b",
     }).setOrigin(0.5);
  
     this.savePromptText = this.add.text(0, -28, "Save game?", {
@@ -1984,7 +2224,7 @@ class BattleScene extends Phaser.Scene {
     const saveButtonText = this.add.text(-92, 48, "Save", {
       fontSize: "18px",
       fontStyle: "bold",
-      color: "#ffffff",
+      color: "#f7ecd3",
     }).setOrigin(0.5);
  
     const continueButton = this.add.rectangle(92, 48, 130, 40, 0x334155);
@@ -1995,7 +2235,7 @@ class BattleScene extends Phaser.Scene {
     const continueButtonText = this.add.text(92, 48, "Continue", {
       fontSize: "18px",
       fontStyle: "bold",
-      color: "#ffffff",
+      color: "#f7ecd3",
     }).setOrigin(0.5);
  
     this.savePromptStatus = this.add.text(0, 92, "", {
@@ -2333,7 +2573,7 @@ class BattleScene extends Phaser.Scene {
     };
  
     try {
-      window.localStorage.setItem("bardsTacticsSave", JSON.stringify(saveData));
+      window.localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
       this.savePromptStatus.setText("Game saved.");
     } catch (error) {
       this.savePromptStatus.setText("Save failed in this browser preview.");
@@ -2366,36 +2606,36 @@ class BattleScene extends Phaser.Scene {
       GAME_HEIGHT / 2,
       520,
       220,
-      0x0f172a,
-      0.94
+      0x14091f,
+      0.97
     );
-    titleBg.setStrokeStyle(2, 0x475569);
+    titleBg.setStrokeStyle(3, 0xb6925f);
  
     this.titleChapter = this.add.text(GAME_WIDTH / 2, 215, "", {
       fontSize: "42px",
       fontStyle: "bold",
-      color: "#ffffff",
+      color: "#f7ecd3",
     }).setOrigin(0.5);
  
     this.titleSubtitle = this.add.text(GAME_WIDTH / 2, 270, "", {
       fontSize: "28px",
-      color: "#fcd34d",
+      color: "#e8c98b",
     }).setOrigin(0.5);
  
     this.titleTag = this.add.text(GAME_WIDTH / 2, 315, "", {
       fontSize: "18px",
-      color: "#cbd5e1",
+      color: "#d8c4f0",
     }).setOrigin(0.5);
  
-    const titleContinueButton = this.add.rectangle(GAME_WIDTH / 2, 370, 170, 38, 0x2563eb);
-    titleContinueButton.setStrokeStyle(2, 0x93c5fd);
+    const titleContinueButton = this.add.rectangle(GAME_WIDTH / 2, 370, 190, 42, 0x1a0d2a);
+    titleContinueButton.setStrokeStyle(2, 0xb6925f);
     titleContinueButton.setInteractive({ useHandCursor: true });
     titleContinueButton.on("pointerdown", () => this.advanceOpening());
  
     const titleContinueText = this.add.text(GAME_WIDTH / 2, 370, "Continue", {
       fontSize: "18px",
       fontStyle: "bold",
-      color: "#ffffff",
+      color: "#f7ecd3",
     }).setOrigin(0.5);
  
     this.titleCard.add([
@@ -2409,26 +2649,26 @@ class BattleScene extends Phaser.Scene {
  
     this.dialogueCard = this.add.container(0, 0);
  
-    const mainPanel = this.add.rectangle(480, 250, 860, 430, 0x020617, 0.92);
-    mainPanel.setStrokeStyle(2, 0x475569);
+    const mainPanel = this.add.rectangle(480, 250, 860, 430, 0x12081d, 0.95);
+    mainPanel.setStrokeStyle(3, 0xb6925f);
  
-    const sceneFrame = this.add.rectangle(315, 175, 560, 315, 0x111827, 1);
-    sceneFrame.setStrokeStyle(2, 0x64748b);
+    const sceneFrame = this.add.rectangle(315, 175, 560, 315, 0x1e1030, 1);
+    sceneFrame.setStrokeStyle(2, 0xe4d0a8);
  
     this.dialogueSceneImage = this.add.image(315, 175, "prologueScene");
     this.fitImageInBox(this.dialogueSceneImage, "prologueScene", 548, 308);
  
     this.dialogueSceneName = this.add.text(54, 30, "", {
       fontSize: "16px",
-      color: "#fcd34d",
+      color: "#e8c98b",
       fontStyle: "bold",
     });
  
-    this.dialoguePortraitPanel = this.add.rectangle(720, 175, 180, 200, 0x111827, 1);
-    this.dialoguePortraitPanel.setStrokeStyle(2, 0x64748b);
+    this.dialoguePortraitPanel = this.add.rectangle(720, 175, 180, 200, 0x1e1030, 1);
+    this.dialoguePortraitPanel.setStrokeStyle(2, 0xe4d0a8);
  
-    this.dialoguePortraitFrame = this.add.rectangle(720, 160, 120, 140, 0x1f2937);
-    this.dialoguePortraitFrame.setStrokeStyle(2, 0x64748b);
+    this.dialoguePortraitFrame = this.add.rectangle(720, 160, 120, 140, 0x24123a);
+    this.dialoguePortraitFrame.setStrokeStyle(2, 0xe4d0a8);
  
     this.dialoguePortrait = this.add.image(720, 160, "edwinPortrait");
     this.dialoguePortrait.setDisplaySize(110, 132);
@@ -2458,7 +2698,7 @@ class BattleScene extends Phaser.Scene {
     this.impactAttackerName = this.add.text(0, 86, "", {
       fontSize: "16px",
       fontStyle: "bold",
-      color: "#ffffff",
+      color: "#f7ecd3",
     }).setOrigin(0.5);
     this.impactAttackerSlot.add([
       this.impactAttackerFrame,
@@ -2480,7 +2720,7 @@ class BattleScene extends Phaser.Scene {
     this.impactDefenderName = this.add.text(0, 86, "", {
       fontSize: "16px",
       fontStyle: "bold",
-      color: "#ffffff",
+      color: "#f7ecd3",
     }).setOrigin(0.5);
     this.impactDefenderSlot.add([
       this.impactDefenderFrame,
@@ -2504,53 +2744,53 @@ class BattleScene extends Phaser.Scene {
       this.impactText,
     ]);
  
-    const textBox = this.add.rectangle(480, 395, 800, 120, 0xf8f5ee, 0.98);
-    textBox.setStrokeStyle(2, 0xb8aa8a);
+    const textBox = this.add.rectangle(480, 395, 800, 120, 0x1a0d2a, 0.98);
+    textBox.setStrokeStyle(2, 0xb6925f);
  
     this.dialogueSpeaker = this.add.text(90, 343, "", {
       fontSize: "24px",
       fontStyle: "bold",
-      color: "#1e293b",
+      color: "#f7ecd3",
     });
  
     this.dialogueText = this.add.text(90, 378, "", {
       fontSize: "20px",
-      color: "#334155",
+      color: "#eadff7",
       wordWrap: { width: 660 },
       lineSpacing: 8,
     });
  
-    this.openingBackButton = this.add.rectangle(700, 460, 110, 34, 0x334155);
-    this.openingBackButton.setStrokeStyle(2, 0x94a3b8);
+    this.openingBackButton = this.add.rectangle(700, 460, 118, 36, 0x1a0d2a);
+    this.openingBackButton.setStrokeStyle(2, 0xb6925f);
     this.openingBackButton.setInteractive({ useHandCursor: true });
     this.openingBackButton.on("pointerdown", () => this.goOpeningBack());
  
     const backText = this.add.text(668, 449, "Back", {
       fontSize: "16px",
       fontStyle: "bold",
-      color: "#ffffff",
+      color: "#f7ecd3",
     });
  
-    this.openingNextButton = this.add.rectangle(820, 460, 110, 34, 0x2563eb);
-    this.openingNextButton.setStrokeStyle(2, 0x93c5fd);
+    this.openingNextButton = this.add.rectangle(820, 460, 118, 36, 0x1a0d2a);
+    this.openingNextButton.setStrokeStyle(2, 0xb6925f);
     this.openingNextButton.setInteractive({ useHandCursor: true });
     this.openingNextButton.on("pointerdown", () => this.advanceOpening());
  
     this.openingNextLabel = this.add.text(785, 449, "Next", {
       fontSize: "16px",
       fontStyle: "bold",
-      color: "#ffffff",
+      color: "#f7ecd3",
     });
  
-    this.openingSkipButton = this.add.rectangle(810, 50, 110, 30, 0x3f3f46);
-    this.openingSkipButton.setStrokeStyle(2, 0xa1a1aa);
+    this.openingSkipButton = this.add.rectangle(810, 50, 118, 32, 0x1a0d2a);
+    this.openingSkipButton.setStrokeStyle(2, 0xb6925f);
     this.openingSkipButton.setInteractive({ useHandCursor: true });
     this.openingSkipButton.on("pointerdown", () => this.skipOpening());
  
     const skipText = this.add.text(777, 40, "Skip", {
       fontSize: "14px",
       fontStyle: "bold",
-      color: "#ffffff",
+      color: "#f7ecd3",
     });
  
     this.dialogueCard.add([
@@ -2794,10 +3034,7 @@ class BattleScene extends Phaser.Scene {
  
   finishOpening() {
     this.openingContainer.setVisible(false);
-    this.phase = "player";
-    this.phaseText.setText("Player Phase");
-    this.phaseText.setColor("#93c5fd");
-    this.helpText.setText("Player Phase. Click Edwin or Leon.");
+    this.startPlayerPhase();
   }
  
   startBattleMusic() {
@@ -2935,7 +3172,7 @@ class BattleScene extends Phaser.Scene {
       {
         fontSize: "16px",
         fontStyle: "bold",
-        color: "#ffffff",
+        color: "#f7ecd3",
       }
     ).setOrigin(0.5);
  
@@ -3400,82 +3637,56 @@ class BattleScene extends Phaser.Scene {
  
   showActionMenu(unit, message = null) {
     if (!unit || unit.team !== "player" || unit.acted || unit.hp <= 0) return;
- 
+
     this.closeActionMenu();
- 
+
     this.selectedUnitId = unit.id;
     this.moveTiles = [];
     this.targetTiles = [];
     this.redrawSelection();
     this.updateSelectedPanel();
- 
+
     const centerX = this.boardX + unit.x * TILE_SIZE + TILE_SIZE / 2;
     const centerY = this.boardY + unit.y * TILE_SIZE + TILE_SIZE / 2;
-    const menuWidth = 132;
-    const rowHeight = 34;
-    const menuHeight = 174;
-    const x = Phaser.Math.Clamp(centerX + TILE_SIZE * 0.85, menuWidth / 2 + 8, GAME_WIDTH - menuWidth / 2 - 8);
-    const y = Phaser.Math.Clamp(centerY - 10, menuHeight / 2 + 8, GAME_HEIGHT - menuHeight / 2 - 8);
- 
+    const menuWidth = 152;
+    const menuHeight = 208;
+    const x = Phaser.Math.Clamp(centerX + TILE_SIZE * 0.95, menuWidth / 2 + 8, GAME_WIDTH - menuWidth / 2 - 8);
+    const y = Phaser.Math.Clamp(centerY - 8, menuHeight / 2 + 8, GAME_HEIGHT - menuHeight / 2 - 8);
+
     const container = this.add.container(x, y);
     container.setDepth(9998);
- 
-    const bg = this.add.rectangle(0, 0, menuWidth, menuHeight, 0x020617, 0.96);
-    bg.setStrokeStyle(2, 0x7dd3fc);
- 
-    const title = this.add.text(0, -menuHeight / 2 + 15, unit.name, {
-      fontSize: "15px",
+
+    const panel = createBannerPanel(this, 0, 0, menuWidth, menuHeight, { innerInset: 12 });
+    const title = this.add.text(0, -78, unit.name, {
+      fontSize: "16px",
       fontStyle: "bold",
-      color: "#ffffff",
+      color: "#f7ecd3",
+      stroke: "#0b0811",
+      strokeThickness: 3,
     }).setOrigin(0.5);
- 
-    container.add([bg, title]);
- 
+
+    container.add([panel.container, title]);
+
     const actions = [
       { label: "Attack", handler: () => this.chooseActionAttack(unit.id) },
       { label: "Skill", handler: () => this.chooseActionSkill(unit.id) },
       { label: "Item", handler: () => this.chooseActionItem(unit.id) },
       { label: "Wait", handler: () => this.waitUnit(unit.id) },
     ];
- 
+
     actions.forEach((action, index) => {
-      const buttonY = -44 + index * rowHeight;
-      const button = this.add.rectangle(0, buttonY, menuWidth - 18, 28, 0x1e293b, 0.98);
-      button.setStrokeStyle(1, 0x475569);
-      button.setInteractive({ useHandCursor: true });
- 
-      const label = this.add.text(0, buttonY, action.label, {
-        fontSize: "15px",
-        fontStyle: "bold",
-        color: "#e2e8f0",
-      }).setOrigin(0.5);
- 
-      button.on("pointerover", () => {
-        button.setFillStyle(0x2563eb, 0.98);
-        button.setStrokeStyle(1, 0x93c5fd);
-      });
- 
-      button.on("pointerout", () => {
-        button.setFillStyle(0x1e293b, 0.98);
-        button.setStrokeStyle(1, 0x475569);
-      });
- 
-      button.on("pointerdown", (pointer, localX, localY, event) => {
-        if (event?.stopPropagation) event.stopPropagation();
-        action.handler();
-      });
- 
-      container.add([button, label]);
+      const button = createBannerButton(this, 0, -38 + index * 40, menuWidth - 20, 32, action.label, () => action.handler(), "16px");
+      container.add(button.container);
     });
- 
+
     this.actionMenuContainer = container;
     this.actionMenuOpen = true;
     this.actionMenuUnitId = unit.id;
     this.uiLayer.add(container);
- 
+
     this.helpText.setText(message || `${unit.name} is ready. Choose an action.`);
   }
- 
+
   chooseActionAttack(unitId) {
     const unit = this.units.find((u) => u.id === unitId);
     if (!unit || unit.team !== "player" || unit.acted) return;
@@ -4503,7 +4714,8 @@ class BattleScene extends Phaser.Scene {
   startPlayerPhase() {
     this.phase = "player";
     this.phaseText.setText("Player Phase");
-    this.phaseText.setColor("#93c5fd");
+    this.phaseText.setColor("#c4b5fd");
+    this.setObjectiveDisplayVisible(true);
  
     for (const unit of this.units) {
       if (unit.team === "player") {
@@ -4528,7 +4740,7 @@ const config = {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [BattleScene],
+  scene: [TitleScene, MainMenuScene, BattleScene],
 };
  
 new Phaser.Game(config);
