@@ -11,9 +11,11 @@ const UNIT_SPRITE_TARGET_SIZE = TILE_SIZE * 0.9;
 const UNIT_SPRITE_BACKGROUND_CLEANUP = true;
 const ENEMY_MOVE_DURATION = 1400;
 const ENEMY_ACTION_PAUSE = 750;
+const PLAYER_MOVE_DURATION = 900;
+const PLAYER_ACTION_PAUSE = 250;
  
 const CARDINAL_DIRECTIONS = ["down", "up", "left", "right"];
-
+ 
 function createDirectionalStateEntries(unitKey, state) {
   return {
     down: { key: `${unitKey}_${state}_down`, path: `/sprites/${unitKey}/${state}_down.png` },
@@ -22,14 +24,14 @@ function createDirectionalStateEntries(unitKey, state) {
     right: { key: `${unitKey}_${state}_right`, path: `/sprites/${unitKey}/${state}_right.png` },
   };
 }
-
+ 
 function createDeathEntries(unitKey) {
   return [1, 2, 3, 4].map((index) => ({
     key: `${unitKey}_death_${index}`,
     path: `/sprites/${unitKey}/death_${index}.png`,
   }));
 }
-
+ 
 const INDIVIDUAL_UNIT_SPRITE_SETS = {
   edwin: {
     idle: createDirectionalStateEntries("edwin", "idle"),
@@ -55,16 +57,17 @@ const UNIT_SPRITE_RENDER = {
     hpY: TILE_SIZE * 0.22,
   },
   edwin: {
-    height: TILE_SIZE * 1.14,
-    maxWidth: TILE_SIZE * 0.86,
+    height: TILE_SIZE * 0.96,
+    maxWidth: TILE_SIZE * 1.05,
     offsetX: 0,
     offsetY: 0,
     originX: 0.5,
-    originY: 1,
-    shadowWidth: TILE_SIZE * 0.28,
-    shadowHeight: TILE_SIZE * 0.08,
-    shadowY: TILE_SIZE * 0.18,
-    hpY: TILE_SIZE * 0.58,
+    originY: 0.63,
+    shadowWidth: TILE_SIZE * 0.42,
+    shadowHeight: TILE_SIZE * 0.12,
+    shadowX: 0,
+    shadowY: TILE_SIZE * 0.16,
+    hpY: TILE_SIZE * 0.34,
   },
   leon: {
     height: TILE_SIZE * 0.8,
@@ -843,10 +846,10 @@ class BattleScene extends Phaser.Scene {
       });
     });
   }
-
+ 
   preloadIndividualDirectionalSprites() {
     const loadedKeys = new Set();
-
+ 
     Object.values(INDIVIDUAL_UNIT_SPRITE_SETS).forEach((spriteSet) => {
       Object.values(spriteSet).forEach((entry) => {
         if (Array.isArray(entry)) {
@@ -857,7 +860,7 @@ class BattleScene extends Phaser.Scene {
           });
           return;
         }
-
+ 
         Object.values(entry || {}).forEach((directionEntry) => {
           if (!directionEntry?.key || !directionEntry?.path || loadedKeys.has(directionEntry.key)) return;
           this.load.image(directionEntry.key, directionEntry.path);
@@ -866,90 +869,90 @@ class BattleScene extends Phaser.Scene {
       });
     });
   }
-
+ 
   getIndividualSpriteSet(unit) {
     if (!unit) return null;
     return INDIVIDUAL_UNIT_SPRITE_SETS[unit.spriteSet] || INDIVIDUAL_UNIT_SPRITE_SETS[unit.id] || null;
   }
-
+ 
   getIndividualSpriteEntry(unit, state = "idle", direction = "down", frameIndex = 0) {
     const spriteSet = this.getIndividualSpriteSet(unit);
     if (!spriteSet) return null;
-
+ 
     const resolvedState = spriteSet[state] ? state : "idle";
-
+ 
     if (resolvedState === "death") {
       const deathFrames = spriteSet.death || [];
       return deathFrames[Phaser.Math.Clamp(frameIndex, 0, Math.max(0, deathFrames.length - 1))] || null;
     }
-
+ 
     const directionEntries = spriteSet[resolvedState] || spriteSet.idle;
     const resolvedDirection = CARDINAL_DIRECTIONS.includes(direction) ? direction : "down";
     return directionEntries?.[resolvedDirection] || directionEntries?.down || null;
   }
-
+ 
   applyIndividualUnitSprite(unit, textureKey, state = "idle") {
     const sprite = this.unitSprites[unit.id];
     const image = this.ensureUnitSpriteImage(unit, textureKey);
-
+ 
     if (!sprite || !image || !textureKey || !this.textures.exists(textureKey)) {
       this.showUnitFallbackSprite(unit);
       return false;
     }
-
+ 
     const texture = this.textures.get(textureKey);
     const source = texture.getSourceImage();
     if (!source?.width || !source?.height) {
       this.showUnitFallbackSprite(unit);
       return false;
     }
-
+ 
     const render = this.getUnitSpriteRenderConfig(unit);
     const desiredHeight = render.height || UNIT_SPRITE_TARGET_SIZE;
     const desiredMaxWidth = render.maxWidth || TILE_SIZE * 0.9;
-
+ 
     let scale = desiredHeight / Math.max(1, source.height);
     if (source.width * scale > desiredMaxWidth) {
       scale = desiredMaxWidth / Math.max(1, source.width);
     }
-
+ 
     image.setTexture(textureKey);
     if (typeof image.setCrop === "function") {
       image.setCrop();
       image.isCropped = false;
     }
     image.setScale(scale);
-
+ 
     const isDeathFrame = state === "death";
     image.setOrigin(render.originX ?? 0.5, isDeathFrame ? 0.5 : (render.originY ?? 1));
     image.setPosition(render.offsetX || 0, isDeathFrame ? (render.deathOffsetY ?? 0) : (render.offsetY ?? 0));
     image.setVisible(true);
     image.clearTint();
-
+ 
     if (sprite.shadow) {
       sprite.shadow.setPosition(render.shadowX || 0, render.shadowY ?? 2);
       sprite.shadow.setSize(render.shadowWidth || TILE_SIZE * 0.42, render.shadowHeight || TILE_SIZE * 0.12);
       sprite.shadow.setVisible(!isDeathFrame);
     }
-
+ 
     sprite.marker.setVisible(false);
     sprite.label.setVisible(false);
     sprite.hpText.setPosition(0, render.hpY ?? TILE_SIZE * 0.22);
-
+ 
     return true;
   }
-
+ 
   getAttackAnimationState(unit, weapon = null) {
     if (!unit) return "attack";
-
+ 
     if (weapon?.damageType === "magical") {
       const magicEntry = this.getIndividualSpriteEntry(unit, "magic", unit.facing || "down", 0);
       if (magicEntry?.key) return "magic";
-
+ 
       const spriteSet = this.getUnitSpriteSet(unit);
       if (spriteSet?.magic) return "magic";
     }
-
+ 
     return "attack";
   }
  
@@ -1101,6 +1104,9 @@ class BattleScene extends Phaser.Scene {
     this.busy = false;
     this.previewOpen = false;
     this.previewData = null;
+    this.actionMenuOpen = false;
+    this.actionMenuUnitId = null;
+    this.actionMenuContainer = null;
     this.battleMusic = null;
     this.battleMusicStarted = false;
     this.postBattleStep = 0;
@@ -1904,6 +1910,8 @@ class BattleScene extends Phaser.Scene {
  
   startPostBattleScene() {
     if (this.postBattleStarted) return;
+ 
+    this.closeActionMenu();
  
     this.stopBattleMusic();
     this.postBattleStarted = true;
@@ -3074,35 +3082,35 @@ class BattleScene extends Phaser.Scene {
  
   setUnitSpriteFrame(unit, state = "idle", direction = null) {
     if (!unit) return false;
-
+ 
     const resolvedDirection = direction || unit.facing || "down";
     const individualEntry = this.getIndividualSpriteEntry(unit, state, resolvedDirection, 0);
-
+ 
     unit.spriteState = state;
-
+ 
     if (individualEntry?.key && this.textures.exists(individualEntry.key)) {
       return this.applyIndividualUnitSprite(unit, individualEntry.key, state);
     }
-
+ 
     const textureKey = this.getUnitSpriteTextureKey(unit, state);
     const frame = this.getDirectionFrame(resolvedDirection);
-
+ 
     return this.applyUnitSpriteCrop(unit, textureKey, frame);
   }
-
+ 
   setUnitDeathFrame(unit, frameIndex = 0) {
     if (!unit) return false;
-
+ 
     unit.spriteState = "death";
-
+ 
     const individualEntry = this.getIndividualSpriteEntry(unit, "death", unit.facing || "down", frameIndex);
     if (individualEntry?.key && this.textures.exists(individualEntry.key)) {
       return this.applyIndividualUnitSprite(unit, individualEntry.key, "death");
     }
-
+ 
     const textureKey = this.getUnitSpriteTextureKey(unit, "death");
     const frame = this.getDeathFrame(frameIndex);
-
+ 
     return this.applyUnitSpriteCrop(unit, textureKey, frame);
   }
  
@@ -3219,9 +3227,142 @@ class BattleScene extends Phaser.Scene {
     this.units = this.units.filter((unit) => unit.id !== unitId);
   }
  
+  closeActionMenu() {
+    if (this.actionMenuContainer) {
+      this.actionMenuContainer.destroy();
+    }
+ 
+    this.actionMenuContainer = null;
+    this.actionMenuOpen = false;
+    this.actionMenuUnitId = null;
+  }
+ 
+  showActionMenu(unit, message = null) {
+    if (!unit || unit.team !== "player" || unit.acted || unit.hp <= 0) return;
+ 
+    this.closeActionMenu();
+ 
+    this.selectedUnitId = unit.id;
+    this.moveTiles = [];
+    this.targetTiles = [];
+    this.redrawSelection();
+    this.updateSelectedPanel();
+ 
+    const centerX = this.boardX + unit.x * TILE_SIZE + TILE_SIZE / 2;
+    const centerY = this.boardY + unit.y * TILE_SIZE + TILE_SIZE / 2;
+    const menuWidth = 132;
+    const rowHeight = 34;
+    const menuHeight = 174;
+    const x = Phaser.Math.Clamp(centerX + TILE_SIZE * 0.85, menuWidth / 2 + 8, GAME_WIDTH - menuWidth / 2 - 8);
+    const y = Phaser.Math.Clamp(centerY - 10, menuHeight / 2 + 8, GAME_HEIGHT - menuHeight / 2 - 8);
+ 
+    const container = this.add.container(x, y);
+    container.setDepth(9998);
+ 
+    const bg = this.add.rectangle(0, 0, menuWidth, menuHeight, 0x020617, 0.96);
+    bg.setStrokeStyle(2, 0x7dd3fc);
+ 
+    const title = this.add.text(0, -menuHeight / 2 + 15, unit.name, {
+      fontSize: "15px",
+      fontStyle: "bold",
+      color: "#ffffff",
+    }).setOrigin(0.5);
+ 
+    container.add([bg, title]);
+ 
+    const actions = [
+      { label: "Attack", handler: () => this.chooseActionAttack(unit.id) },
+      { label: "Skill", handler: () => this.chooseActionSkill(unit.id) },
+      { label: "Item", handler: () => this.chooseActionItem(unit.id) },
+      { label: "Wait", handler: () => this.waitUnit(unit.id) },
+    ];
+ 
+    actions.forEach((action, index) => {
+      const buttonY = -44 + index * rowHeight;
+      const button = this.add.rectangle(0, buttonY, menuWidth - 18, 28, 0x1e293b, 0.98);
+      button.setStrokeStyle(1, 0x475569);
+      button.setInteractive({ useHandCursor: true });
+ 
+      const label = this.add.text(0, buttonY, action.label, {
+        fontSize: "15px",
+        fontStyle: "bold",
+        color: "#e2e8f0",
+      }).setOrigin(0.5);
+ 
+      button.on("pointerover", () => {
+        button.setFillStyle(0x2563eb, 0.98);
+        button.setStrokeStyle(1, 0x93c5fd);
+      });
+ 
+      button.on("pointerout", () => {
+        button.setFillStyle(0x1e293b, 0.98);
+        button.setStrokeStyle(1, 0x475569);
+      });
+ 
+      button.on("pointerdown", (pointer, localX, localY, event) => {
+        if (event?.stopPropagation) event.stopPropagation();
+        action.handler();
+      });
+ 
+      container.add([button, label]);
+    });
+ 
+    this.actionMenuContainer = container;
+    this.actionMenuOpen = true;
+    this.actionMenuUnitId = unit.id;
+    this.uiLayer.add(container);
+ 
+    this.helpText.setText(message || `${unit.name} is ready. Choose an action.`);
+  }
+ 
+  chooseActionAttack(unitId) {
+    const unit = this.units.find((u) => u.id === unitId);
+    if (!unit || unit.team !== "player" || unit.acted) return;
+ 
+    const targets = this.attackableEnemies(unit);
+ 
+    if (targets.length === 0) {
+      this.helpText.setText("No enemies in range. Choose another action.");
+      return;
+    }
+ 
+    this.closeActionMenu();
+    this.selectedUnitId = unit.id;
+    this.moveTiles = [];
+    this.targetTiles = targets;
+    this.redrawSelection();
+    this.updateSelectedPanel();
+    this.helpText.setText(`Choose an enemy for ${unit.name} to attack.`);
+  }
+ 
+  chooseActionSkill(unitId) {
+    const unit = this.units.find((u) => u.id === unitId);
+    if (!unit || unit.team !== "player" || unit.acted) return;
+ 
+    this.helpText.setText("Skills will be added later. Choose another action.");
+  }
+ 
+  chooseActionItem(unitId) {
+    const unit = this.units.find((u) => u.id === unitId);
+    if (!unit || unit.team !== "player" || unit.acted) return;
+ 
+    this.helpText.setText("Items will be added later. Choose another action.");
+  }
+ 
+  waitUnit(unitId) {
+    const unit = this.units.find((u) => u.id === unitId);
+    if (!unit || unit.team !== "player" || unit.acted) return;
+ 
+    this.closeActionMenu();
+    unit.acted = true;
+    this.refreshUnitSprite(unit);
+    this.clearSelection(`${unit.name} waits.`);
+    this.checkEndOfPlayerPhase();
+  }
+ 
   setupInput() {
     this.input.on("pointerdown", (pointer) => {
-      if (this.phase !== "player" || this.busy || this.previewOpen) return;
+      if (this.phase !== "player" || this.busy || this.previewOpen || this.actionMenuOpen) return;
  
       const tile = this.pointerToTile(pointer.x, pointer.y);
       if (!tile) return;
@@ -3229,13 +3370,25 @@ class BattleScene extends Phaser.Scene {
       const clickedUnit = this.getUnitAt(tile.x, tile.y);
       const selectedUnit = this.getSelectedUnit();
  
+      if (
+        clickedUnit &&
+        selectedUnit &&
+        clickedUnit.id === selectedUnit.id &&
+        selectedUnit.team === "player" &&
+        !selectedUnit.acted
+      ) {
+        this.showActionMenu(selectedUnit, `${selectedUnit.name} holds position. Choose an action.`);
+        return;
+      }
+ 
       if (clickedUnit && clickedUnit.team === "player" && !clickedUnit.acted) {
+        this.closeActionMenu();
         this.selectedUnitId = clickedUnit.id;
         this.moveTiles = this.reachableTiles(clickedUnit);
-        this.targetTiles = this.attackableEnemies(clickedUnit);
+        this.targetTiles = [];
         this.redrawSelection();
         this.updateSelectedPanel();
-        this.helpText.setText(`Selected ${clickedUnit.name}. Move or attack.`);
+        this.helpText.setText(`Selected ${clickedUnit.name}. Choose a tile to move to, or click them again to act here.`);
         return;
       }
  
@@ -3367,6 +3520,8 @@ class BattleScene extends Phaser.Scene {
   }
  
   openPreview(attacker, defender) {
+    this.closeActionMenu();
+ 
     const attackerWeapon = getWeaponForTarget(attacker, defender);
     const defenderWeapon = getWeaponForTarget(defender, attacker) || getDefaultWeapon(defender);
  
@@ -3412,11 +3567,23 @@ class BattleScene extends Phaser.Scene {
     this.previewOpen = false;
     this.previewData = null;
     this.previewContainer.setVisible(false);
+ 
+    const unit = this.getSelectedUnit();
+ 
+    if (unit && unit.team === "player" && !unit.acted) {
+      this.targetTiles = [];
+      this.redrawSelection();
+      this.showActionMenu(unit, "Attack cancelled. Choose another action.");
+      return;
+    }
+ 
     this.helpText.setText("Attack cancelled.");
   }
  
   confirmPreviewAttack() {
     if (!this.previewData) return;
+ 
+    this.closeActionMenu();
  
     const { attackerId, defenderId } = this.previewData;
     this.previewOpen = false;
@@ -3429,14 +3596,15 @@ class BattleScene extends Phaser.Scene {
     const unit = this.units.find((u) => u.id === unitId);
     const sprite = this.unitSprites[unitId];
  
-    if (!unit || !sprite) return;
+    if (!unit || !sprite || unit.team !== "player" || unit.acted) return;
  
+    this.closeActionMenu();
     this.busy = true;
  
     const oldX = unit.x;
     const oldY = unit.y;
     unit.facing = this.getDirectionFromDelta(x - oldX, y - oldY, unit.facing || "down");
-    this.playUnitState(unit, "move", 260);
+    this.playUnitState(unit, "move", PLAYER_MOVE_DURATION + PLAYER_ACTION_PAUSE);
  
     unit.x = x;
     unit.y = y;
@@ -3448,24 +3616,19 @@ class BattleScene extends Phaser.Scene {
       targets: sprite.container,
       x: targetX,
       y: targetY,
-      duration: 180,
+      duration: PLAYER_MOVE_DURATION,
+      ease: "Sine.easeInOut",
       onComplete: () => {
         this.setUnitSpriteFrame(unit, "idle", unit.facing || "down");
         this.moveTiles = [];
-        this.targetTiles = this.attackableEnemies(unit);
+        this.targetTiles = [];
         this.redrawSelection();
         this.updateSelectedPanel();
  
-        if (this.targetTiles.length > 0) {
-          this.helpText.setText(`${unit.name} moved. Click a red enemy to attack.`);
+        this.time.delayedCall(PLAYER_ACTION_PAUSE, () => {
           this.busy = false;
-        } else {
-          unit.acted = true;
-          this.refreshUnitSprite(unit);
-          this.clearSelection(`${unit.name} moved and waits.`);
-          this.busy = false;
-          this.checkEndOfPlayerPhase();
-        }
+          this.showActionMenu(unit);
+        });
       },
     });
   }
@@ -3478,6 +3641,8 @@ class BattleScene extends Phaser.Scene {
  
     const weapon = getWeaponForTarget(attacker, defender);
     if (!weapon) return;
+ 
+    this.closeActionMenu();
  
     this.busy = true;
     this.faceUnitToward(attacker, defender);
@@ -3539,6 +3704,7 @@ class BattleScene extends Phaser.Scene {
   }
  
   clearSelection(message = "Click Edwin or Leon to select a unit.") {
+    this.closeActionMenu();
     this.selectedUnitId = null;
     this.moveTiles = [];
     this.targetTiles = [];
@@ -3662,6 +3828,7 @@ class BattleScene extends Phaser.Scene {
   }
  
   startEnemyPhase() {
+    this.closeActionMenu();
     this.phase = "enemy";
     this.phaseText.setText("Enemy Phase");
     this.phaseText.setColor("#fca5a5");
