@@ -3,36 +3,91 @@ import Phaser from "phaser";
 const GAME_WIDTH = 960;
 const GAME_HEIGHT = 540;
  
-const TILE_SIZE = 56;
+const TILE_SIZE = 64;
 const MAP_COLS = 8;
 const MAP_ROWS = 8;
  
-const UNIT_SPRITE_TARGET_SIZE = TILE_SIZE * 1.42;
-const UNIT_SPRITE_BACKGROUND_CLEANUP = false;
+const UNIT_SPRITE_TARGET_SIZE = TILE_SIZE * 0.9;
+const UNIT_SPRITE_BACKGROUND_CLEANUP = true;
 const ENEMY_MOVE_DURATION = 1250;
 const ENEMY_ACTION_PAUSE = 750;
  
 const UNIT_SPRITE_RENDER = {
   default: {
-    height: TILE_SIZE * 1.42,
+    height: TILE_SIZE * 0.92,
+    maxWidth: TILE_SIZE * 1.08,
     offsetX: 0,
-    offsetY: -7,
+    offsetY: TILE_SIZE * 0.2,
     originX: 0.5,
-    originY: 0.5,
-    shadowWidth: TILE_SIZE * 0.56,
-    shadowHeight: TILE_SIZE * 0.18,
+    originY: 1,
+    shadowWidth: TILE_SIZE * 0.46,
+    shadowHeight: TILE_SIZE * 0.13,
     shadowX: 0,
-    shadowY: TILE_SIZE * 0.26,
+    shadowY: TILE_SIZE * 0.22,
   },
-  edwin: { height: TILE_SIZE * 1.48, offsetX: 0, offsetY: -8, shadowWidth: TILE_SIZE * 0.58 },
-  leon: { height: TILE_SIZE * 1.38, offsetX: 0, offsetY: -6, shadowWidth: TILE_SIZE * 0.52 },
-  falan: { height: TILE_SIZE * 1.48, offsetX: 0, offsetY: -8, shadowWidth: TILE_SIZE * 0.58 },
-  sword_thug: { height: TILE_SIZE * 1.42, offsetX: 0, offsetY: -7, shadowWidth: TILE_SIZE * 0.54 },
-  axe_thug: { height: TILE_SIZE * 1.42, offsetX: 0, offsetY: -7, shadowWidth: TILE_SIZE * 0.54 },
-  chakram_thug: { height: TILE_SIZE * 1.42, offsetX: 0, offsetY: -7, shadowWidth: TILE_SIZE * 0.54 },
-  thug_sword: { height: TILE_SIZE * 1.42, offsetX: 0, offsetY: -7, shadowWidth: TILE_SIZE * 0.54 },
-  thug_axe: { height: TILE_SIZE * 1.42, offsetX: 0, offsetY: -7, shadowWidth: TILE_SIZE * 0.54 },
-  thug_chakram: { height: TILE_SIZE * 1.42, offsetX: 0, offsetY: -7, shadowWidth: TILE_SIZE * 0.54 },
+  edwin: {
+    height: TILE_SIZE * 0.96,
+    maxWidth: TILE_SIZE * 1.14,
+    offsetX: 0,
+    offsetY: TILE_SIZE * 0.22,
+    shadowWidth: TILE_SIZE * 0.48,
+  },
+  leon: {
+    height: TILE_SIZE * 0.9,
+    maxWidth: TILE_SIZE * 1.02,
+    offsetX: 0,
+    offsetY: TILE_SIZE * 0.22,
+    shadowWidth: TILE_SIZE * 0.44,
+  },
+  falan: {
+    height: TILE_SIZE * 0.98,
+    maxWidth: TILE_SIZE * 1.14,
+    offsetX: 0,
+    offsetY: TILE_SIZE * 0.22,
+    shadowWidth: TILE_SIZE * 0.48,
+  },
+  sword_thug: {
+    height: TILE_SIZE * 0.96,
+    maxWidth: TILE_SIZE * 1.08,
+    offsetX: 0,
+    offsetY: TILE_SIZE * 0.22,
+    shadowWidth: TILE_SIZE * 0.46,
+  },
+  axe_thug: {
+    height: TILE_SIZE * 0.96,
+    maxWidth: TILE_SIZE * 1.08,
+    offsetX: 0,
+    offsetY: TILE_SIZE * 0.22,
+    shadowWidth: TILE_SIZE * 0.46,
+  },
+  chakram_thug: {
+    height: TILE_SIZE * 0.96,
+    maxWidth: TILE_SIZE * 1.08,
+    offsetX: 0,
+    offsetY: TILE_SIZE * 0.22,
+    shadowWidth: TILE_SIZE * 0.46,
+  },
+  thug_sword: {
+    height: TILE_SIZE * 0.96,
+    maxWidth: TILE_SIZE * 1.08,
+    offsetX: 0,
+    offsetY: TILE_SIZE * 0.22,
+    shadowWidth: TILE_SIZE * 0.46,
+  },
+  thug_axe: {
+    height: TILE_SIZE * 0.96,
+    maxWidth: TILE_SIZE * 1.08,
+    offsetX: 0,
+    offsetY: TILE_SIZE * 0.22,
+    shadowWidth: TILE_SIZE * 0.46,
+  },
+  thug_chakram: {
+    height: TILE_SIZE * 0.96,
+    maxWidth: TILE_SIZE * 1.08,
+    offsetX: 0,
+    offsetY: TILE_SIZE * 0.22,
+    shadowWidth: TILE_SIZE * 0.46,
+  },
 };
  
 const MAP = [
@@ -809,7 +864,7 @@ class BattleScene extends Phaser.Scene {
  
       // Removes white or pale grey checker/image backgrounds connected to the sheet edge.
       // It avoids coloured highlights such as Edwin's blue ice effects.
-      return r >= 185 && g >= 185 && b >= 185 && max - min <= 42;
+      return r >= 175 && g >= 175 && b >= 175 && max - min <= 55;
     };
  
     const tryAdd = (x, y) => {
@@ -918,8 +973,8 @@ class BattleScene extends Phaser.Scene {
  
     this.boardWidth = this.mapCols * TILE_SIZE;
     this.boardHeight = this.mapRows * TILE_SIZE;
-    this.boardX = 215;
-    this.boardY = 78;
+    this.boardX = 184;
+    this.boardY = 18;
  
     this.tileLayer = this.add.layer();
     this.overlayLayer = this.add.layer();
@@ -973,7 +1028,7 @@ class BattleScene extends Phaser.Scene {
   }
  
   createSidePanel() {
-    const x = 672;
+    const x = 704;
     const y = 72;
  
     const bg = this.add.rectangle(x + 120, y + 200, 248, 400, 0x111827, 0.92);
@@ -2583,7 +2638,7 @@ class BattleScene extends Phaser.Scene {
     );
     shadow.setVisible(false);
  
-    const hpText = this.add.text(0, TILE_SIZE * 0.42, "", {
+    const hpText = this.add.text(0, TILE_SIZE * 0.39, "", {
       fontSize: "10px",
       color: "#e5e7eb",
       stroke: "#000000",
@@ -2665,7 +2720,7 @@ class BattleScene extends Phaser.Scene {
     const max = Math.max(r, g, b);
     const min = Math.min(r, g, b);
  
-    return r >= 185 && g >= 185 && b >= 185 && max - min <= 42;
+    return r >= 175 && g >= 175 && b >= 175 && max - min <= 55;
   }
  
   getUnitSpriteContentBounds(textureKey, cropX, cropY, cellWidth, cellHeight) {
@@ -2751,27 +2806,35 @@ class BattleScene extends Phaser.Scene {
     const cellHeight = Math.floor(source.height / 2);
     const cropX = frame.col * cellWidth;
     const cropY = frame.row * cellHeight;
+    const bounds = this.getUnitSpriteContentBounds(textureKey, cropX, cropY, cellWidth, cellHeight);
     const render = this.getUnitSpriteRenderConfig(unit);
-    const height = render.height || UNIT_SPRITE_TARGET_SIZE;
-    const scale = render.scale || height / cellHeight;
+    const desiredHeight = render.height || UNIT_SPRITE_TARGET_SIZE;
+    const desiredMaxWidth = render.maxWidth || TILE_SIZE * 1.08;
+ 
+    let scale = render.scale || desiredHeight / Math.max(1, bounds.height);
+    const scaledWidth = bounds.width * scale;
+ 
+    if (scaledWidth > desiredMaxWidth) {
+      scale = desiredMaxWidth / Math.max(1, bounds.width);
+    }
  
     image.setTexture(textureKey);
-    image.setCrop(cropX, cropY, cellWidth, cellHeight);
+    image.setCrop(cropX + bounds.x, cropY + bounds.y, bounds.width, bounds.height);
     image.setScale(scale);
-    image.setPosition(render.offsetX || 0, render.offsetY || 0);
-    image.setOrigin(render.originX ?? 0.5, render.originY ?? 0.5);
+    image.setPosition(render.offsetX || 0, render.offsetY ?? TILE_SIZE * 0.2);
+    image.setOrigin(render.originX ?? 0.5, render.originY ?? 1);
     image.setVisible(true);
     image.clearTint();
  
     if (sprite.shadow) {
-      sprite.shadow.setPosition(render.shadowX || 0, render.shadowY ?? TILE_SIZE * 0.26);
-      sprite.shadow.setSize(render.shadowWidth || TILE_SIZE * 0.56, render.shadowHeight || TILE_SIZE * 0.18);
+      sprite.shadow.setPosition(render.shadowX || 0, render.shadowY ?? TILE_SIZE * 0.22);
+      sprite.shadow.setSize(render.shadowWidth || TILE_SIZE * 0.46, render.shadowHeight || TILE_SIZE * 0.13);
       sprite.shadow.setVisible(true);
     }
  
     sprite.marker.setVisible(false);
     sprite.label.setVisible(false);
-    sprite.hpText.setPosition(0, TILE_SIZE * 0.42);
+    sprite.hpText.setPosition(0, TILE_SIZE * 0.39);
  
     return true;
   }
