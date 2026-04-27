@@ -19,6 +19,8 @@ const SKILL_IMPACT_DELAY = 520;
 const SAVE_KEY = "bardsTacticsSave";
 const TITLE_SCREEN_KEY = "bardsTitleScreen";
 const TITLE_SCREEN_PATH = "/ui/title_screen.png";
+const LOADING_RUNNER_KEY = "edwin_move_left";
+const LOADING_RUNNER_PATH = "/sprites/edwin/move_left.png";
  
 const CARDINAL_DIRECTIONS = ["down", "up", "left", "right"];
  
@@ -894,15 +896,210 @@ function createBannerButton(scene, x, y, width, height, label, onClick, fontSize
   return { container, shadow, outer, inner, text, hit };
 }
 
+function queueImage(scene, key, path) {
+  if (!scene || !key || !path) return;
+  if (scene.textures.exists(key)) return;
+  scene.load.image(key, path);
+}
+
+function queueAudio(scene, key, path) {
+  if (!scene || !key || !path) return;
+  if (scene.cache?.audio?.exists(key)) return;
+  scene.load.audio(key, [path]);
+}
+
+function queueBiomeTileAssets(scene, biomeKey) {
+  const biome = BIOMES[biomeKey];
+  if (!biome) return;
+
+  const queuedKeys = new Set();
+  Object.values(biome.terrainTextures).forEach((entry) => {
+    if (!entry?.key || !entry?.path || queuedKeys.has(entry.key)) return;
+    queueImage(scene, entry.key, entry.path);
+    queuedKeys.add(entry.key);
+  });
+}
+
+function queueIndividualDirectionalSpriteAssets(scene) {
+  const queuedKeys = new Set();
+
+  Object.values(INDIVIDUAL_UNIT_SPRITE_SETS).forEach((spriteSet) => {
+    Object.values(spriteSet).forEach((entry) => {
+      if (Array.isArray(entry)) {
+        entry.forEach((frameEntry) => {
+          if (!frameEntry?.key || !frameEntry?.path || queuedKeys.has(frameEntry.key)) return;
+          queueImage(scene, frameEntry.key, frameEntry.path);
+          queuedKeys.add(frameEntry.key);
+        });
+        return;
+      }
+
+      Object.values(entry || {}).forEach((directionEntry) => {
+        if (!directionEntry?.key || !directionEntry?.path || queuedKeys.has(directionEntry.key)) return;
+        queueImage(scene, directionEntry.key, directionEntry.path);
+        queuedKeys.add(directionEntry.key);
+      });
+    });
+  });
+}
+
+function queueChapterOneAssets(scene, levelData = LEVELS.chapter1) {
+  queueImage(scene, "edwinPortrait", "/portraits/edwin.jpg");
+  queueImage(scene, "leonPortrait", "/portraits/leon.jpg");
+  queueImage(scene, "kayleyPortrait", "/portraits/kayley.jpg");
+  queueImage(scene, "richPortrait", "/portraits/rich.jpg");
+  queueImage(scene, "falanPortrait", "/portraits/falan.jpg");
+  queueImage(scene, "thugPortrait", "/portraits/thug.jpg");
+  queueImage(scene, "heathPortrait", "/portraits/heath.jpg");
+  queueImage(scene, "izzyPortrait", "/portraits/izzy.jpg");
+
+  queueImage(scene, "prologueScene", "/scenes/prologue.jpg");
+  queueImage(scene, "leonsHouseScene", "/scenes/leons_house.jpg");
+  queueImage(scene, "walkToSchoolScene", "/scenes/walk_to_school.jpg");
+  queueImage(scene, "underpassScene", "/scenes/underpass.jpg");
+  queueImage(scene, "vanInteriorScene", "/scenes/van_interior.jpg");
+  queueImage(scene, "byronFarmScene", "/scenes/byron_farm.jpg");
+
+  queueBiomeTileAssets(scene, levelData?.biome);
+  queueIndividualDirectionalSpriteAssets(scene);
+
+  if (levelData?.battleMusic?.key && levelData?.battleMusic?.path) {
+    queueAudio(scene, levelData.battleMusic.key, levelData.battleMusic.path);
+  }
+}
+
+class LoadingScene extends Phaser.Scene {
+  constructor() {
+    super("LoadingScene");
+  }
+
+  init(data = {}) {
+    this.nextSceneData = data || {};
+  }
+
+  preload() {
+    this.cameras.main.setBackgroundColor("#06030b");
+
+    const centerX = GAME_WIDTH / 2;
+    const centerY = GAME_HEIGHT / 2;
+    const barX = 180;
+    const barY = 318;
+    const barWidth = 600;
+    const barHeight = 8;
+
+    this.add.rectangle(centerX, centerY, GAME_WIDTH, GAME_HEIGHT, 0x06030b, 1);
+
+    const panel = createBannerPanel(this, centerX, centerY, 700, 250, { innerInset: 18 });
+
+    const loadingText = this.add.text(0, -82, "Loading", {
+      fontSize: "42px",
+      fontStyle: "bold",
+      color: "#f7ecd3",
+      stroke: "#0b0811",
+      strokeThickness: 5,
+    }).setOrigin(0.5);
+
+    const hintText = this.add.text(0, -42, "Preparing Chapter 1: 4 Years Gone", {
+      fontSize: "16px",
+      color: "#d8c4f0",
+    }).setOrigin(0.5);
+
+    panel.container.add([loadingText, hintText]);
+
+    this.add.rectangle(barX + barWidth / 2, barY, barWidth, barHeight, 0x101828, 1).setStrokeStyle(2, 0xb6925f, 0.9);
+    this.loadingTrail = this.add.rectangle(barX, barY, 1, barHeight, 0x38bdf8, 0.95).setOrigin(0, 0.5);
+
+    this.loadingRunnerShadow = this.add.ellipse(barX, barY + 22, 42, 12, 0x000000, 0.38);
+
+    if (this.textures.exists(LOADING_RUNNER_KEY)) {
+      this.loadingRunner = this.add.image(barX, barY - 8, LOADING_RUNNER_KEY);
+      this.loadingRunner.setOrigin(0.5, 0.92);
+      this.loadingRunner.setDisplaySize(54, 54);
+    } else {
+      this.loadingRunner = this.add.circle(barX, barY - 8, 14, 0x38bdf8, 1);
+      this.loadingRunner.setStrokeStyle(2, 0xf7ecd3);
+    }
+
+    this.loadingPercentText = this.add.text(barX, barY - 66, "0%", {
+      fontSize: "18px",
+      fontStyle: "bold",
+      color: "#f7ecd3",
+      stroke: "#0b0811",
+      strokeThickness: 4,
+    }).setOrigin(0.5);
+
+    this.loadingRunnerGlow = this.add.circle(barX, barY - 10, 23, 0x38bdf8, 0.12);
+
+    this.updateLoadingDisplay(0, barX, barY, barWidth);
+
+    this.load.on("filecomplete-image-" + LOADING_RUNNER_KEY, () => {
+      if (this.loadingRunner?.destroy) this.loadingRunner.destroy();
+      this.loadingRunner = this.add.image(barX, barY - 8, LOADING_RUNNER_KEY);
+      this.loadingRunner.setOrigin(0.5, 0.92);
+      this.loadingRunner.setDisplaySize(54, 54);
+      this.updateLoadingDisplay(this.currentLoadingProgress || 0, barX, barY, barWidth);
+    });
+
+    this.load.on("progress", (value) => {
+      this.updateLoadingDisplay(value, barX, barY, barWidth);
+    });
+
+    this.load.once("complete", () => {
+      this.updateLoadingDisplay(1, barX, barY, barWidth);
+    });
+
+    queueImage(this, LOADING_RUNNER_KEY, LOADING_RUNNER_PATH);
+    queueChapterOneAssets(this, LEVELS.chapter1);
+  }
+
+  updateLoadingDisplay(value, barX, barY, barWidth) {
+    const progress = Phaser.Math.Clamp(value || 0, 0, 1);
+    this.currentLoadingProgress = progress;
+
+    const runnerX = barX + barWidth * progress;
+    const percent = Math.round(progress * 100);
+
+    if (this.loadingTrail) {
+      this.loadingTrail.displayWidth = Math.max(1, barWidth * progress);
+    }
+
+    if (this.loadingRunner) {
+      this.loadingRunner.x = runnerX;
+      this.loadingRunner.y = barY - 8;
+    }
+
+    if (this.loadingRunnerShadow) {
+      this.loadingRunnerShadow.x = runnerX;
+      this.loadingRunnerShadow.y = barY + 22;
+    }
+
+    if (this.loadingRunnerGlow) {
+      this.loadingRunnerGlow.x = runnerX;
+      this.loadingRunnerGlow.y = barY - 10;
+    }
+
+    if (this.loadingPercentText) {
+      this.loadingPercentText.x = runnerX;
+      this.loadingPercentText.y = barY - 66;
+      this.loadingPercentText.setText(`${percent}%`);
+    }
+  }
+
+  create() {
+    this.time.delayedCall(350, () => {
+      this.scene.start("BattleScene", this.nextSceneData || {});
+    });
+  }
+}
+
 class TitleScene extends Phaser.Scene {
   constructor() {
     super("TitleScene");
   }
 
   preload() {
-    if (!this.textures.exists(TITLE_SCREEN_KEY)) {
-      this.load.image(TITLE_SCREEN_KEY, TITLE_SCREEN_PATH);
-    }
+    queueImage(this, TITLE_SCREEN_KEY, TITLE_SCREEN_PATH);
+    queueImage(this, LOADING_RUNNER_KEY, LOADING_RUNNER_PATH);
   }
 
   create() {
@@ -954,9 +1151,8 @@ class MainMenuScene extends Phaser.Scene {
   }
 
   preload() {
-    if (!this.textures.exists(TITLE_SCREEN_KEY)) {
-      this.load.image(TITLE_SCREEN_KEY, TITLE_SCREEN_PATH);
-    }
+    queueImage(this, TITLE_SCREEN_KEY, TITLE_SCREEN_PATH);
+    queueImage(this, LOADING_RUNNER_KEY, LOADING_RUNNER_PATH);
   }
 
   getSaveData() {
@@ -993,7 +1189,7 @@ class MainMenuScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     const newGameButton = createBannerButton(this, 0, 12, 220, 48, "New Game", () => {
-      this.scene.start("BattleScene", { loadFromSave: false });
+      this.scene.start("LoadingScene", { loadFromSave: false });
     }, "24px");
 
     const loadGameButton = createBannerButton(this, 0, 72, 220, 48, "Load Game", () => {
@@ -1002,7 +1198,7 @@ class MainMenuScene extends Phaser.Scene {
         this.statusText.setText("No local save data found.");
         return;
       }
-      this.scene.start("BattleScene", { loadFromSave: true, saveData });
+      this.scene.start("LoadingScene", { loadFromSave: true, saveData });
     }, "24px");
 
     this.statusText = this.add.text(0, 118, "", {
@@ -1028,7 +1224,8 @@ class BattleScene extends Phaser.Scene {
   }
 
   init(data = {}) {
-    this.loadFromSave = !!data.loadFromSave;
+    data = data || {};
+    this.loadFromSave = data.loadFromSave === true;
     this.loadedSaveData = data.saveData || null;
   }
  
@@ -1349,27 +1546,7 @@ class BattleScene extends Phaser.Scene {
   }
  
   preload() {
-    const levelData = this.getCurrentLevel();
- 
-    this.load.image("edwinPortrait", "/portraits/edwin.jpg");
-    this.load.image("leonPortrait", "/portraits/leon.jpg");
-    this.load.image("kayleyPortrait", "/portraits/kayley.jpg");
-    this.load.image("richPortrait", "/portraits/rich.jpg");
-    this.load.image("falanPortrait", "/portraits/falan.jpg");
-    this.load.image("thugPortrait", "/portraits/thug.jpg");
-    this.load.image("heathPortrait", "/portraits/heath.jpg");
-    this.load.image("izzyPortrait", "/portraits/izzy.jpg");
-    this.load.image("prologueScene", "/scenes/prologue.jpg");
-    this.load.image("leonsHouseScene", "/scenes/leons_house.jpg");
-    this.load.image("walkToSchoolScene", "/scenes/walk_to_school.jpg");
-    this.load.image("underpassScene", "/scenes/underpass.jpg");
-    this.load.image("vanInteriorScene", "/scenes/van_interior.jpg");
-    this.load.image("byronFarmScene", "/scenes/byron_farm.jpg");
- 
-    this.preloadBiomeTiles(levelData.biome);
-    this.preloadUnitSpriteAtlases();
-    this.preloadIndividualDirectionalSprites();
-    this.preloadLevelAudio(levelData);
+    queueChapterOneAssets(this, this.getCurrentLevel());
   }
  
   create() {
@@ -4740,7 +4917,7 @@ const config = {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [TitleScene, MainMenuScene, BattleScene],
+  scene: [TitleScene, MainMenuScene, LoadingScene, BattleScene],
 };
  
 new Phaser.Game(config);
