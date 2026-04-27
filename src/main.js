@@ -7,6 +7,11 @@ const TILE_SIZE = 48;
 const MAP_COLS = 8;
 const MAP_ROWS = 8;
  
+const UNIT_SPRITE_TARGET_SIZE = TILE_SIZE * 1.04;
+const UNIT_SPRITE_BACKGROUND_CLEANUP = true;
+const ENEMY_MOVE_DURATION = 1150;
+const ENEMY_ACTION_PAUSE = 650;
+ 
 const MAP = [
   ["street", "cover", "street", "street", "street", "street", "gate", "street"],
   ["street", "street", "cover", "street", "street", "cover", "street", "street"],
@@ -52,6 +57,27 @@ const UNIT_SPRITE_SETS = {
     attack: { key: "falanAttackSprite", path: "/sprites/falan/falan_attack.png" },
     hurt: { key: "falanHurtSprite", path: "/sprites/falan/falan_hurt.png" },
     death: { key: "falanDeathSprite", path: "/sprites/falan/falan_death.png" },
+  },
+  sword_thug: {
+    idle: { key: "swordThugIdleSprite", path: "/sprites/sword_thug/sword_thug_idle.png" },
+    move: { key: "swordThugMoveSprite", path: "/sprites/sword_thug/sword_thug_move.png" },
+    attack: { key: "swordThugAttackSprite", path: "/sprites/sword_thug/sword_thug_attack.png" },
+    hurt: { key: "swordThugHurtSprite", path: "/sprites/sword_thug/sword_thug_hurt.png" },
+    death: { key: "swordThugDeathSprite", path: "/sprites/sword_thug/sword_thug_death.png" },
+  },
+  axe_thug: {
+    idle: { key: "axeThugIdleSprite", path: "/sprites/axe_thug/axe_thug_idle.png" },
+    move: { key: "axeThugMoveSprite", path: "/sprites/axe_thug/axe_thug_move.png" },
+    attack: { key: "axeThugAttackSprite", path: "/sprites/axe_thug/axe_thug_attack.png" },
+    hurt: { key: "axeThugHurtSprite", path: "/sprites/axe_thug/axe_thug_hurt.png" },
+    death: { key: "axeThugDeathSprite", path: "/sprites/axe_thug/axe_thug_death.png" },
+  },
+  chakram_thug: {
+    idle: { key: "chakramThugIdleSprite", path: "/sprites/chakram_thug/chakram_thug_idle.png" },
+    move: { key: "chakramThugMoveSprite", path: "/sprites/chakram_thug/chakram_thug_move.png" },
+    attack: { key: "chakramThugAttackSprite", path: "/sprites/chakram_thug/chakram_thug_attack.png" },
+    hurt: { key: "chakramThugHurtSprite", path: "/sprites/chakram_thug/chakram_thug_hurt.png" },
+    death: { key: "chakramThugDeathSprite", path: "/sprites/chakram_thug/chakram_thug_death.png" },
   },
   thug_sword: {
     idle: { key: "thugSwordIdleSprite", path: "/sprites/thug_sword/thug_sword_idle.png" },
@@ -426,7 +452,7 @@ const UNITS = [
     team: "enemy",
     className: "Thug",
     portraitKey: "thugPortrait",
-    spriteSet: "thug_sword",
+    spriteSet: "sword_thug",
     facing: "down",
     x: 2,
     y: 1,
@@ -458,7 +484,7 @@ const UNITS = [
     team: "enemy",
     className: "Thug",
     portraitKey: "thugPortrait",
-    spriteSet: "thug_axe",
+    spriteSet: "axe_thug",
     facing: "down",
     x: 3,
     y: 0,
@@ -490,7 +516,7 @@ const UNITS = [
     team: "enemy",
     className: "Thug",
     portraitKey: "thugPortrait",
-    spriteSet: "thug_chakram",
+    spriteSet: "chakram_thug",
     facing: "down",
     x: 5,
     y: 0,
@@ -523,7 +549,7 @@ const UNITS = [
     team: "enemy",
     className: "Thug",
     portraitKey: "thugPortrait",
-    spriteSet: "thug_sword",
+    spriteSet: "sword_thug",
     facing: "down",
     x: 6,
     y: 1,
@@ -653,15 +679,20 @@ class BattleScene extends Phaser.Scene {
   getUnitSpriteCandidatePaths(spriteSetKey, state, entry) {
     if (!entry) return [];
  
-    const folder = `/sprites/${spriteSetKey}`;
     const aliases = new Set([spriteSetKey]);
+ 
+    if (spriteSetKey.endsWith("_thug")) {
+      const weaponName = spriteSetKey.replace("_thug", "");
+      aliases.add(`${weaponName}_thug`);
+      aliases.add(`thug_${weaponName}`);
+      aliases.add("thug");
+    }
  
     if (spriteSetKey.startsWith("thug_")) {
       const weaponName = spriteSetKey.replace("thug_", "");
-      aliases.add("thug");
       aliases.add(`thug_${weaponName}`);
       aliases.add(`${weaponName}_thug`);
-      aliases.add(`thug_${weaponName}_sheet`);
+      aliases.add("thug");
     }
  
     aliases.add(spriteSetKey.replace(/_/g, ""));
@@ -669,11 +700,12 @@ class BattleScene extends Phaser.Scene {
     const paths = [entry.path];
  
     aliases.forEach((alias) => {
-      paths.push(`${folder}/${alias}_${state}.png`);
-      paths.push(`${folder}/${state}.png`);
+      paths.push(`/sprites/${spriteSetKey}/${alias}_${state}.png`);
+      paths.push(`/sprites/${spriteSetKey}/${state}.png`);
+      paths.push(`/sprites/${alias}/${alias}_${state}.png`);
+      paths.push(`/sprites/${alias}/${state}.png`);
+      paths.push(`/sprites/${alias}_${state}.png`);
     });
- 
-    paths.push(`/sprites/${spriteSetKey}_${state}.png`);
  
     return [...new Set(paths.filter(Boolean))];
   }
@@ -702,6 +734,8 @@ class BattleScene extends Phaser.Scene {
   }
  
   createTransparentUnitTextures() {
+    if (!UNIT_SPRITE_BACKGROUND_CLEANUP) return;
+ 
     Object.values(UNIT_SPRITE_SETS).forEach((spriteSet) => {
       Object.values(spriteSet).forEach((entry) => {
         const keys = entry?.candidateKeys || (entry?.key ? [entry.key] : []);
@@ -750,7 +784,9 @@ class BattleScene extends Phaser.Scene {
       const max = Math.max(r, g, b);
       const min = Math.min(r, g, b);
  
-      return r >= 218 && g >= 218 && b >= 218 && max - min <= 28;
+      // Removes white or pale grey checker/image backgrounds connected to the sheet edge.
+      // It avoids coloured highlights such as Edwin's blue ice effects.
+      return r >= 185 && g >= 185 && b >= 185 && max - min <= 42;
     };
  
     const tryAdd = (x, y) => {
@@ -849,6 +885,7 @@ class BattleScene extends Phaser.Scene {
     this.postBattleStep = 0;
     this.postBattleActionSteps = new Set();
     this.postBattleStarted = false;
+    this.unitSpriteBoundsCache = new Map();
  
     this.openingStep = 0;
     this.openingLine = 0;
@@ -2550,7 +2587,7 @@ class BattleScene extends Phaser.Scene {
     for (const key of candidateKeys) {
       const cleanKey = `${key}Clean`;
  
-      if (this.textures.exists(cleanKey)) return cleanKey;
+      if (UNIT_SPRITE_BACKGROUND_CLEANUP && this.textures.exists(cleanKey)) return cleanKey;
       if (this.textures.exists(key)) return key;
     }
  
@@ -2581,6 +2618,83 @@ class BattleScene extends Phaser.Scene {
     return sprite.image;
   }
  
+  isSpriteBackgroundPixel(r, g, b, a) {
+    if (a < 24) return true;
+ 
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+ 
+    return r >= 185 && g >= 185 && b >= 185 && max - min <= 42;
+  }
+ 
+  getUnitSpriteContentBounds(textureKey, cropX, cropY, cellWidth, cellHeight) {
+    const cacheKey = `${textureKey}:${cropX}:${cropY}:${cellWidth}:${cellHeight}`;
+ 
+    if (this.unitSpriteBoundsCache?.has(cacheKey)) {
+      return this.unitSpriteBoundsCache.get(cacheKey);
+    }
+ 
+    const fullBounds = { x: 0, y: 0, width: cellWidth, height: cellHeight };
+ 
+    if (!this.textures.exists(textureKey)) return fullBounds;
+ 
+    const texture = this.textures.get(textureKey);
+    const source = texture.getSourceImage();
+ 
+    if (!source?.width || !source?.height) return fullBounds;
+ 
+    const canvas = document.createElement("canvas");
+    canvas.width = cellWidth;
+    canvas.height = cellHeight;
+ 
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return fullBounds;
+ 
+    ctx.clearRect(0, 0, cellWidth, cellHeight);
+    ctx.drawImage(source, cropX, cropY, cellWidth, cellHeight, 0, 0, cellWidth, cellHeight);
+ 
+    const imageData = ctx.getImageData(0, 0, cellWidth, cellHeight);
+    const data = imageData.data;
+ 
+    let minX = cellWidth;
+    let minY = cellHeight;
+    let maxX = -1;
+    let maxY = -1;
+ 
+    for (let y = 0; y < cellHeight; y += 1) {
+      for (let x = 0; x < cellWidth; x += 1) {
+        const index = (y * cellWidth + x) * 4;
+        const r = data[index];
+        const g = data[index + 1];
+        const b = data[index + 2];
+        const a = data[index + 3];
+ 
+        if (this.isSpriteBackgroundPixel(r, g, b, a)) continue;
+ 
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+      }
+    }
+ 
+    if (maxX < minX || maxY < minY) {
+      this.unitSpriteBoundsCache?.set(cacheKey, fullBounds);
+      return fullBounds;
+    }
+ 
+    const padding = 2;
+    const bounds = {
+      x: Math.max(0, minX - padding),
+      y: Math.max(0, minY - padding),
+      width: Math.min(cellWidth - Math.max(0, minX - padding), maxX - minX + 1 + padding * 2),
+      height: Math.min(cellHeight - Math.max(0, minY - padding), maxY - minY + 1 + padding * 2),
+    };
+ 
+    this.unitSpriteBoundsCache?.set(cacheKey, bounds);
+    return bounds;
+  }
+ 
   applyUnitSpriteCrop(unit, textureKey, frame) {
     const sprite = this.unitSprites[unit.id];
     const image = this.ensureUnitSpriteImage(unit, textureKey);
@@ -2596,10 +2710,12 @@ class BattleScene extends Phaser.Scene {
     const cellHeight = Math.floor(source.height / 2);
     const cropX = frame.col * cellWidth;
     const cropY = frame.row * cellHeight;
-    const scale = Math.min((TILE_SIZE * 0.96) / cellWidth, (TILE_SIZE * 0.96) / cellHeight);
+    const bounds = this.getUnitSpriteContentBounds(textureKey, cropX, cropY, cellWidth, cellHeight);
+    const targetSize = UNIT_SPRITE_TARGET_SIZE;
+    const scale = Math.min(targetSize / bounds.width, targetSize / bounds.height);
  
     image.setTexture(textureKey);
-    image.setCrop(cropX, cropY, cellWidth, cellHeight);
+    image.setCrop(cropX + bounds.x, cropY + bounds.y, bounds.width, bounds.height);
     image.setScale(scale);
     image.setPosition(0, 0);
     image.setOrigin(0.5, 0.5);
@@ -2608,7 +2724,7 @@ class BattleScene extends Phaser.Scene {
  
     sprite.marker.setVisible(false);
     sprite.label.setVisible(false);
-    sprite.hpText.setPosition(0, 20);
+    sprite.hpText.setPosition(0, TILE_SIZE * 0.34);
  
     return true;
   }
@@ -3211,7 +3327,7 @@ class BattleScene extends Phaser.Scene {
     this.busy = true;
     this.enemyIndex = 0;
     this.enemyTurnOrder = this.units.filter((u) => u.team === "enemy");
-    this.time.delayedCall(700, () => this.runNextEnemy());
+    this.time.delayedCall(ENEMY_ACTION_PAUSE, () => this.runNextEnemy());
   }
  
   runNextEnemy() {
@@ -3235,7 +3351,7 @@ class BattleScene extends Phaser.Scene {
  
     const targetsNow = this.attackablePlayers(enemy);
     if (targetsNow.length > 0) {
-      this.time.delayedCall(350, () => this.enemyAttack(enemy, targetsNow[0]));
+      this.time.delayedCall(ENEMY_ACTION_PAUSE, () => this.enemyAttack(enemy, targetsNow[0]));
       return;
     }
  
@@ -3257,7 +3373,7 @@ class BattleScene extends Phaser.Scene {
     const oldX = enemy.x;
     const oldY = enemy.y;
     enemy.facing = this.getDirectionFromDelta(moveTarget.x - oldX, moveTarget.y - oldY, enemy.facing || "down");
-    this.playUnitState(enemy, "move", 720);
+    this.playUnitState(enemy, "move", ENEMY_MOVE_DURATION + 150);
     enemy.x = moveTarget.x;
     enemy.y = moveTarget.y;
     this.helpText.setText(`${enemy.name} moves.`);
@@ -3266,7 +3382,7 @@ class BattleScene extends Phaser.Scene {
       targets: sprite.container,
       x: this.boardX + enemy.x * TILE_SIZE + TILE_SIZE / 2,
       y: this.boardY + enemy.y * TILE_SIZE + TILE_SIZE / 2,
-      duration: 650,
+      duration: ENEMY_MOVE_DURATION,
       ease: "Sine.easeInOut",
       onComplete: () => {
         this.refreshUnitSprite(enemy);
@@ -3274,10 +3390,10 @@ class BattleScene extends Phaser.Scene {
         const targetsAfterMove = this.attackablePlayers(enemy);
  
         if (targetsAfterMove.length > 0) {
-          this.time.delayedCall(350, () => this.enemyAttack(enemy, targetsAfterMove[0]));
+          this.time.delayedCall(ENEMY_ACTION_PAUSE, () => this.enemyAttack(enemy, targetsAfterMove[0]));
         } else {
           this.enemyIndex += 1;
-          this.time.delayedCall(450, () => this.runNextEnemy());
+          this.time.delayedCall(ENEMY_ACTION_PAUSE, () => this.runNextEnemy());
         }
       },
     });
