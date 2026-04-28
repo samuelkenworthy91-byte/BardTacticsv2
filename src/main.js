@@ -1,3 +1,8 @@
+Dupe.com
+Dupe.com
+
+
+
 import Phaser from "phaser";
 
 const GAME_WIDTH = 960;
@@ -57,6 +62,18 @@ const CHAPTER_ONE_GAME_OVER_UNIT_IDS = ["edwin", "leon"];
 const CHAPTER_ONE_ESCAPE_TILE = { x: 6, y: 0 };
 const OPPORTUNITY_ATTACK_HIT_RATE = 50;
 const OPPORTUNITY_ATTACK_PAUSE = 650;
+const SKILL_TILE_EFFECT_STAGGER = 180;
+const SKILL_TILE_EFFECT_APPEAR_DURATION = 220;
+const SKILL_TILE_EFFECT_HOLD_DURATION = 1000;
+const SKILL_TILE_EFFECT_FADE_DURATION = 700;
+const SKILL_TILE_EFFECT_END_SCALE = 1.18;
+const BROTHERS_BLIGH_HIT_APPEAR_DURATION = 100;
+const BROTHERS_BLIGH_HIT_HOLD_DURATION = 1000;
+const BROTHERS_BLIGH_HIT_FADE_DURATION = 380;
+const BROTHERS_BLIGH_CUTIN_HOLD_DURATION = 1500;
+const BROTHERS_BLIGH_CUTIN_FADE_DURATION = 360;
+const SMACK_SFX_KEY = "smackSfx";
+const SMACK_SFX_PATH = "/audio/smack.mp3";
 
 const CARDINAL_DIRECTIONS = ["down", "up", "left", "right"];
 const CLOCKWISE_DIRECTIONS = ["up", "right", "down", "left"];
@@ -213,6 +230,15 @@ const BIOMES = {
       default: { key: "cityStreetTile", path: "/tiles/city/street.png" },
     },
   },
+  farm: {
+    terrainTextures: {
+      field: { key: "farmFieldTile", path: "/tiles/farm/field.png" },
+      cover: { key: "farmCoverTile", path: "/tiles/farm/cover.png" },
+      fort: { key: "farmFortTile", path: "/tiles/farm/fort.png" },
+      fence: { key: "farmFenceTile", path: "/tiles/farm/fence.png" },
+      default: { key: "farmFieldTile", path: "/tiles/farm/field.png" },
+    },
+  },
 };
 
 const CHAPTER_OPENING = [
@@ -287,6 +313,42 @@ const CHAPTER_OPENING = [
       { speaker: "Leon", portrait: "leonPortrait", text: "...Edwin?" },
       { speaker: "Falan", portrait: "falanPortrait", text: "So the ghost brother finally crawls home." },
       { speaker: "Edwin", portrait: "edwinPortrait", text: "Stay behind me, Leon." },
+    ],
+  },
+];
+
+const CHAPTER_TWO_OPENING = [
+  {
+    type: "scene",
+    sceneName: "Byron Farm Bedroom",
+    background: "chapter2BedroomScene",
+    lines: [
+      { speaker: "Leon", portrait: "leonPortrait", text: "*scratching head and yawning* I’d forgotten where I was for a second." },
+      { type: "fullScreenScene", scene: "chapter2EdwinDoorScene", speaker: "Edwin", text: "Safe is where you are… I’m sorry." },
+      {
+        type: "impact",
+        attacker: "Leon",
+        attackerPortrait: "leonPortrait",
+        defender: "Edwin",
+        defenderPortrait: "edwinPortrait",
+        impactText: "SMACK!",
+        soundKey: SMACK_SFX_KEY,
+        text: "*sobbing* You don’t get to swan back into my life and act cool about it. We thought you were dead. We had a funeral for you! Mum and dad gave up years looking for you! I…I was alone Edwin.",
+      },
+      { type: "fullScreenScene", scene: "chapter2FuneralSplitScene", speaker: "Edwin", text: "I know… I’m sorry." },
+      { speaker: "Leon", portrait: "leonPortrait", text: "Why? Why did you?" },
+      { speaker: "Edwin", portrait: "edwinPortrait", text: "I did it to protect you all. I failed at that…. mum and dad… I couldn't save all of you." },
+      { speaker: "Leon", portrait: "leonPortrait", text: "They’re…? Who were those guys?" },
+      { speaker: "Edwin", portrait: "edwinPortrait", text: "You've heard of Guildlites? Run by Caleb Guildlite?" },
+      { speaker: "Leon", portrait: "leonPortrait", text: "I don't live under a rock… everyone has heard of them, they are the biggest tech company outside of silicon valley, not to mention all the charity work." },
+      { speaker: "Edwin", portrait: "edwinPortrait", text: "Well Caleb is an evil mastermind bent on revenge against the world and most of those charitable organisations are fronts for that… sooo yeah." },
+      { speaker: "Leon", portrait: "leonPortrait", text: "Going to need a bit more than that, won't lie." },
+      { type: "fullScreenScene", scene: "chapter2SigilScene", speaker: "Edwin", text: "You saw what I can do, what we can all do. A weird evolutionary quirk, magic or something else—we have no idea. We call them sigils. They grant the wielder power over something. Mine’s ice. Yours looks like it might be plants or earth maybe? Heath, you met, he’s water, Izzy wind. Caleb’s is light." },
+      { type: "fullScreenScene", scene: "chapter2CalebExperimentScene", speaker: "Edwin", text: "I don’t know why but Caleb feels we are superior to other humans and wants to exterminate those without powers. All the children’s homes he’s set up… they are exclusively to test children for sigils, awaken them through torture and brainwash them into his own army." },
+      { speaker: "Leon", portrait: "leonPortrait", text: "And he’s looking to murder your entire family becauuuuuse?" },
+      { type: "fullScreenScene", scene: "chapter2EdwinGuildliteScene", speaker: "Edwin", text: "I used to work for him." },
+      { type: "fullScreenScene", scene: "chapter2LeonShockedScene", speaker: "Leon", text: "You’d work for someone… like that?" },
+      { speaker: "Edwin", portrait: "edwinPortrait", text: "There are excuses, for another time, none of them excuse what I did for him. That’s why I made this place. For now though we need to make sure that you are never in a position like the underpass again. Training." },
     ],
   },
 ];
@@ -551,6 +613,34 @@ const UNITS = [
   },
 ];
 
+const CHAPTER_TWO_MAP = [
+  ["field", "field", "field", "field", "field", "field", "field", "field"],
+  ["field", "cover", "field", "field", "field", "field", "field", "field"],
+  ["field", "field", "field", "field", "fence", "fort", "fort", "field"],
+  ["field", "cover", "field", "field", "fence", "fort", "fort", "field"],
+  ["field", "field", "field", "cover", "field", "field", "field", "field"],
+  ["field", "field", "field", "field", "field", "field", "cover", "field"],
+  ["field", "cover", "field", "field", "field", "field", "field", "field"],
+  ["field", "field", "field", "field", "field", "field", "field", "field"],
+];
+
+const CHAPTER_TWO_UNITS = ["edwin", "leon"].map((unitId, index) => {
+  const baseUnit = UNITS.find((unit) => unit.id === unitId);
+  const fallbackPositions = {
+    edwin: { x: 1, y: 6, facing: "right" },
+    leon: { x: 2, y: 6, facing: "up" },
+  };
+  const placement = fallbackPositions[unitId] || { x: index + 1, y: 6, facing: "down" };
+  return {
+    ...baseUnit,
+    x: placement.x,
+    y: placement.y,
+    facing: placement.facing,
+    acted: false,
+    spriteState: "idle",
+  };
+});
+
 const LEVELS = {
   chapter1: {
     biome: "city",
@@ -559,6 +649,12 @@ const LEVELS = {
     battleMusic: { key: "chapter1BattleMusic", path: "/audio/chapter1_battle.mp3", volume: 0.45 },
     objective: "Escape through the glowing gate tile.",
   },
+  chapter2: {
+    biome: "farm",
+    map: CHAPTER_TWO_MAP,
+    units: CHAPTER_TWO_UNITS,
+    objective: "Training at Byron Farm.",
+  },
 };
 
 function tileColor(type) {
@@ -566,6 +662,9 @@ function tileColor(type) {
   if (type === "cover") return 0x475569;
   if (type === "gate") return 0x7c5c3b;
   if (type === "wall") return 0x6b7280;
+  if (type === "field") return 0x4d7c0f;
+  if (type === "fort") return 0x8b5a2b;
+  if (type === "fence") return 0x6b4f2d;
   return 0x1f2937;
 }
 
@@ -574,6 +673,9 @@ function tileLabel(type) {
   if (type === "cover") return "C";
   if (type === "gate") return "G";
   if (type === "wall") return "W";
+  if (type === "field") return "F";
+  if (type === "fort") return "FT";
+  if (type === "fence") return "FN";
   return "?";
 }
 
@@ -743,7 +845,7 @@ function queueIndividualDirectionalSpriteAssets(scene) {
   });
 }
 
-function queueChapterOneAssets(scene, levelData = LEVELS.chapter1) {
+function queueChapterAssets(scene, levelData = LEVELS.chapter1) {
   queueImage(scene, "edwinPortrait", "/portraits/edwin.jpg");
   queueImage(scene, "leonPortrait", "/portraits/leon.jpg");
   queueImage(scene, "kayleyPortrait", "/portraits/kayley.jpg");
@@ -758,11 +860,19 @@ function queueChapterOneAssets(scene, levelData = LEVELS.chapter1) {
   queueImage(scene, "underpassScene", "/scenes/underpass.jpg");
   queueImage(scene, "vanInteriorScene", "/scenes/van_interior.jpg");
   queueImage(scene, "byronFarmScene", "/scenes/byron_farm.jpg");
+  queueImage(scene, "chapter2BedroomScene", "/scenes/chapter2_bedroom.jpg");
+  queueImage(scene, "chapter2EdwinDoorScene", "/scenes/chapter2_edwin_door.jpg");
+  queueImage(scene, "chapter2FuneralSplitScene", "/scenes/chapter2_funeral_split.jpg");
+  queueImage(scene, "chapter2SigilScene", "/scenes/chapter2_sigil.jpg");
+  queueImage(scene, "chapter2CalebExperimentScene", "/scenes/chapter2_caleb_experiment.jpg");
+  queueImage(scene, "chapter2EdwinGuildliteScene", "/scenes/chapter2_edwin_guildlite.jpg");
+  queueImage(scene, "chapter2LeonShockedScene", "/scenes/chapter2_leon_shocked.jpg");
   queueImage(scene, ICE_OF_AGES_HIT_EFFECT_KEY, ICE_OF_AGES_HIT_EFFECT_PATH);
   queueImage(scene, BROTHERS_BLIGH_CUTIN_KEY, BROTHERS_BLIGH_CUTIN_PATH);
   queueImage(scene, BROTHERS_BLIGH_HIT_EFFECT_KEY, BROTHERS_BLIGH_HIT_EFFECT_PATH);
   queueBiomeTileAssets(scene, levelData?.biome);
   queueIndividualDirectionalSpriteAssets(scene);
+  queueAudio(scene, SMACK_SFX_KEY, SMACK_SFX_PATH);
   if (levelData?.battleMusic?.key && levelData?.battleMusic?.path) {
     queueAudio(scene, levelData.battleMusic.key, levelData.battleMusic.path);
   }
@@ -1028,11 +1138,14 @@ class BattleScene extends Phaser.Scene {
     this.loadFromSave = data.loadFromSave === true;
     this.loadedSaveData = data.saveData || null;
     this.loadedSlotNumber = data.slotNumber || null;
+    this.playChapterTwoOpening = data.playChapterTwoOpening === true;
+    this.skipChapterTwoTitleCard = data.skipChapter2TitleCard === true;
+    this.pendingChapterTwoTransitionData = data.pendingChapterTwoTransitionData || null;
     this.currentChapterNumber = this.loadedSaveData?.currentChapter || this.loadedSaveData?.chapter || 1;
   }
 
   preload() {
-    queueChapterOneAssets(this, this.getCurrentLevel());
+    queueChapterAssets(this, this.getCurrentLevel());
   }
 
   create() {
@@ -1092,6 +1205,7 @@ class BattleScene extends Phaser.Scene {
     this.currentLevelUpData = null;
     this.openingStep = 0;
     this.openingLine = 0;
+    this.activeOpeningSequence = CHAPTER_OPENING;
 
     this.cameras.main.setBackgroundColor("#0f172a");
     this.boardWidth = this.mapCols * TILE_SIZE;
@@ -1122,15 +1236,18 @@ class BattleScene extends Phaser.Scene {
     this.updateSelectedPanel();
     this.setObjectiveDisplayVisible(false);
 
-    if (this.loadFromSave) {
+    if (this.currentChapterNumber >= 2 && this.playChapterTwoOpening) {
+      this.startChapterTwoOpening();
+    } else if (this.loadFromSave) {
       this.startLoadedBattle();
     } else {
+      this.activeOpeningSequence = CHAPTER_OPENING;
       this.updateOpeningUI();
     }
   }
 
   getCurrentLevel() {
-    return LEVELS.chapter1;
+    return (this.currentChapterNumber || 1) >= 2 ? LEVELS.chapter2 : LEVELS.chapter1;
   }
 
   getSavedGameData() {
@@ -1151,6 +1268,7 @@ class BattleScene extends Phaser.Scene {
     if (!Array.isArray(saveData.units)) return;
 
     const savedById = new Map(saveData.units.map((unitState) => [unitState.id, unitState]));
+    const preserveMapPositions = (this.currentChapterNumber || 1) <= 1;
 
     this.units = this.units
       .map((unit) => {
@@ -1161,6 +1279,9 @@ class BattleScene extends Phaser.Scene {
         return {
           ...unit,
           ...saved,
+          x: preserveMapPositions ? (saved.x ?? unit.x) : unit.x,
+          y: preserveMapPositions ? (saved.y ?? unit.y) : unit.y,
+          facing: preserveMapPositions ? (saved.facing || unit.facing || "down") : (unit.facing || saved.facing || "down"),
           skills: (unit.skills || []).map((skill) => ({ ...skill })),
           weapons: (unit.weapons || []).map((weapon) => ({ ...weapon })),
           items: Array.isArray(saved.items) ? saved.items.map((item) => ({ ...item })) : (unit.items || []).map((item) => ({ ...item })),
@@ -1209,19 +1330,24 @@ class BattleScene extends Phaser.Scene {
       completedChapters: [1],
       savedAt: new Date().toISOString(),
       defeatedAllies: [...new Set(this.defeatedAllies || [])],
-      units: this.units.map((unit) => this.serializeUnitForSave(unit)),
+      units: this.units.filter((unit) => unit.team === "player").map((unit) => this.serializeUnitForSave(unit)),
     };
   }
 
   startLoadedBattle() {
     this.openingContainer.setVisible(false);
 
-    const saveData = this.getSavedGameData();
+    const saveData = this.loadedSaveData || this.getSavedGameData();
     const savedChapter = saveData?.currentChapter || saveData?.chapter || 1;
 
     if (savedChapter >= 2) {
-      this.setObjectiveDisplayVisible(false);
-      this.showChapterTwoTitleCard("Loaded save. Chapter 2 is ready to begin.");
+      this.pendingChapterTwoTransitionData = saveData || this.pendingChapterTwoTransitionData;
+      if (this.skipChapterTwoTitleCard) {
+        this.startChapterTwoOpening();
+      } else {
+        this.setObjectiveDisplayVisible(false);
+        this.showChapterTwoTitleCard("Loaded save. Chapter 2 is ready to begin.");
+      }
       return;
     }
 
@@ -1976,6 +2102,7 @@ class BattleScene extends Phaser.Scene {
     if (!unit) return 0;
     const terrain = this.getTerrainAt(unit.x, unit.y);
     if (terrain === "cover") return 2;
+    if (terrain === "fort") return 3;
     if (terrain === "gate") return 5;
     return 0;
   }
@@ -2068,13 +2195,19 @@ class BattleScene extends Phaser.Scene {
   calculateXpGain(attacker, defender, didKill) {
     if (!attacker || attacker.team !== "player") return 0;
     if (!defender || defender.team !== "enemy") return 0;
+
     const attackerLevel = attacker.level || 1;
     const defenderLevel = defender.level || 1;
-    let xp = 10;
-    xp += Math.max(0, defenderLevel - attackerLevel) * 4;
-    xp += Math.max(0, attackerLevel - defenderLevel) * -2;
-    if (didKill) xp += 25;
-    if (didKill && defender.boss) xp += 35;
+    const levelGap = defenderLevel - attackerLevel;
+
+    let xp = didKill ? 24 : 8;
+    if (levelGap > 0) {
+      xp += levelGap * 4;
+    } else if (levelGap < 0) {
+      xp = Math.round(xp * Math.pow(0.72, Math.abs(levelGap)));
+    }
+
+    if (didKill && defender.boss) xp += 18;
     xp = Math.round(xp * (attacker.xpRate || 1));
     return Math.max(1, xp);
   }
@@ -2440,6 +2573,7 @@ class BattleScene extends Phaser.Scene {
 
     try {
       window.localStorage.setItem(getSaveSlotKey(slotNumber), JSON.stringify(saveData));
+      this.pendingChapterTwoTransitionData = saveData;
       if (this.saveSlotStatusText) this.saveSlotStatusText.setText(`Saved to Slot ${slotNumber}. Moving to Chapter 2...`);
       this.time.delayedCall(550, () => this.finishChapterOne());
     } catch (error) {
@@ -2453,6 +2587,8 @@ class BattleScene extends Phaser.Scene {
       this.saveSlotContainer = null;
     }
 
+    this.currentChapterNumber = 2;
+    this.pendingChapterTwoTransitionData = this.pendingChapterTwoTransitionData || this.buildChapterSaveData(this.loadedSlotNumber || null);
     this.phaseText.setText("Chapter 2");
     this.phaseText.setColor("#fcd34d");
     this.helpText.setText("Chapter 2: Owed an Explanation.");
@@ -2580,9 +2716,9 @@ class BattleScene extends Phaser.Scene {
 
     const dim = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.9);
     dim.setInteractive();
-    const panel = createBannerPanel(this, GAME_WIDTH / 2, GAME_HEIGHT / 2, 600, 240, { innerInset: 18 });
+    const panel = createBannerPanel(this, GAME_WIDTH / 2, GAME_HEIGHT / 2, 600, 280, { innerInset: 18 });
 
-    this.chapterTransitionChapterText = this.add.text(GAME_WIDTH / 2, 226, CHAPTER_TWO_TITLE.chapter, {
+    this.chapterTransitionChapterText = this.add.text(GAME_WIDTH / 2, 214, CHAPTER_TWO_TITLE.chapter, {
       fontSize: "44px",
       fontStyle: "bold",
       color: "#f7ecd3",
@@ -2590,18 +2726,21 @@ class BattleScene extends Phaser.Scene {
       strokeThickness: 6,
     }).setOrigin(0.5);
 
-    this.chapterTransitionSubtitleText = this.add.text(GAME_WIDTH / 2, 284, CHAPTER_TWO_TITLE.subtitle, {
+    this.chapterTransitionSubtitleText = this.add.text(GAME_WIDTH / 2, 272, CHAPTER_TWO_TITLE.subtitle, {
       fontSize: "30px",
       color: "#e8c98b",
       stroke: "#0b0811",
       strokeThickness: 4,
     }).setOrigin(0.5);
 
-    this.chapterTransitionHintText = this.add.text(GAME_WIDTH / 2, 342, "Chapter 2 gameplay will begin here.", {
+    this.chapterTransitionHintText = this.add.text(GAME_WIDTH / 2, 326, "Continue into the Chapter 2 opening.", {
       fontSize: "14px",
       color: "#d8c4f0",
       align: "center",
+      wordWrap: { width: 500 },
     }).setOrigin(0.5);
+
+    const continueButton = createBannerButton(this, GAME_WIDTH / 2, 390, 190, 40, "Continue", () => this.continueFromChapterTransition(), "18px");
 
     this.chapterTransitionContainer.add([
       dim,
@@ -2609,6 +2748,7 @@ class BattleScene extends Phaser.Scene {
       this.chapterTransitionChapterText,
       this.chapterTransitionSubtitleText,
       this.chapterTransitionHintText,
+      continueButton.container,
     ]);
 
     this.uiLayer.add(this.chapterTransitionContainer);
@@ -2627,16 +2767,31 @@ class BattleScene extends Phaser.Scene {
     this.helpText.setText(message || "Chapter 2: Owed an Explanation.");
 
     if (this.chapterTransitionHintText) {
-      this.chapterTransitionHintText.setText(message || "Chapter 2 gameplay will begin here.");
+      this.chapterTransitionHintText.setText(message || "Continue into the Chapter 2 opening.");
     }
 
     this.chapterTransitionContainer.setVisible(true).setAlpha(0);
     this.tweens.add({ targets: this.chapterTransitionContainer, alpha: 1, duration: 420, ease: "Quad.Out" });
   }
 
+  continueFromChapterTransition() {
+    const saveData = this.pendingChapterTwoTransitionData || this.buildChapterSaveData(this.loadedSlotNumber || null);
+    this.stopBattleMusic();
+    this.scene.start("BattleScene", {
+      loadFromSave: true,
+      saveData,
+      slotNumber: saveData?.slotNumber || this.loadedSlotNumber || null,
+      playChapterTwoOpening: true,
+      skipChapter2TitleCard: true,
+    });
+  }
+
   createOpeningUI() {
     this.openingContainer = this.add.container(0, 0);
     this.openingFade = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.88);
+    this.openingFullSceneImage = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, "prologueScene").setVisible(false);
+    fitImageToBounds(this, this.openingFullSceneImage, "prologueScene", GAME_WIDTH, GAME_HEIGHT, true);
+
     this.titleCard = this.add.container(0, 0);
     const titleBg = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, 520, 220, 0x14091f, 0.97);
     titleBg.setStrokeStyle(3, 0xb6925f);
@@ -2651,10 +2806,10 @@ class BattleScene extends Phaser.Scene {
     this.titleCard.add([titleBg, this.titleChapter, this.titleSubtitle, this.titleTag, titleContinueButton, titleContinueText]);
 
     this.dialogueCard = this.add.container(0, 0);
-    const mainPanel = this.add.rectangle(480, 250, 860, 430, 0x12081d, 0.95);
-    mainPanel.setStrokeStyle(3, 0xb6925f);
-    const sceneFrame = this.add.rectangle(315, 175, 560, 315, 0x1e1030, 1);
-    sceneFrame.setStrokeStyle(2, 0xe4d0a8);
+    this.openingDialogueMainPanel = this.add.rectangle(480, 250, 860, 430, 0x12081d, 0.95);
+    this.openingDialogueMainPanel.setStrokeStyle(3, 0xb6925f);
+    this.openingSceneFrame = this.add.rectangle(315, 175, 560, 315, 0x1e1030, 1);
+    this.openingSceneFrame.setStrokeStyle(2, 0xe4d0a8);
     this.dialogueSceneImage = this.add.image(315, 175, "prologueScene");
     this.fitImageInBox(this.dialogueSceneImage, "prologueScene", 548, 308);
     this.dialogueSceneName = this.add.text(54, 30, "", { fontSize: "16px", color: "#e8c98b", fontStyle: "bold" });
@@ -2663,7 +2818,8 @@ class BattleScene extends Phaser.Scene {
     this.dialoguePortraitFrame = this.add.rectangle(720, 160, 120, 140, 0x24123a);
     this.dialoguePortraitFrame.setStrokeStyle(2, 0xe4d0a8);
     this.dialoguePortrait = this.add.image(720, 160, "edwinPortrait").setDisplaySize(110, 132);
-    this.dialoguePortraitPlaceholder = this.add.text(720, 160, "NO\nART", { fontSize: "20px", color: "#94a3b8", align: "center" }).setOrigin(0.5);
+    this.dialoguePortraitPlaceholder = this.add.text(720, 160, "NO
+ART", { fontSize: "20px", color: "#94a3b8", align: "center" }).setOrigin(0.5);
 
     this.impactContainer = this.add.container(0, 0).setVisible(false);
     const impactShadow = this.add.rectangle(480, 175, 560, 190, 0x020617, 0.82);
@@ -2672,21 +2828,23 @@ class BattleScene extends Phaser.Scene {
     this.impactAttackerFrame = this.add.rectangle(0, 0, 130, 150, 0x1f2937, 1);
     this.impactAttackerFrame.setStrokeStyle(2, 0x64748b);
     this.impactAttackerImage = this.add.image(0, -6, "edwinPortrait").setDisplaySize(112, 132);
-    this.impactAttackerPlaceholder = this.add.text(0, -6, "NO\nART", { fontSize: "20px", color: "#94a3b8", align: "center" }).setOrigin(0.5);
+    this.impactAttackerPlaceholder = this.add.text(0, -6, "NO
+ART", { fontSize: "20px", color: "#94a3b8", align: "center" }).setOrigin(0.5);
     this.impactAttackerName = this.add.text(0, 86, "", { fontSize: "16px", fontStyle: "bold", color: "#f7ecd3" }).setOrigin(0.5);
     this.impactAttackerSlot.add([this.impactAttackerFrame, this.impactAttackerImage, this.impactAttackerPlaceholder, this.impactAttackerName]);
     this.impactDefenderSlot = this.add.container(640, 175);
     this.impactDefenderFrame = this.add.rectangle(0, 0, 130, 150, 0x1f2937, 1);
     this.impactDefenderFrame.setStrokeStyle(2, 0x64748b);
     this.impactDefenderImage = this.add.image(0, -6, "edwinPortrait").setDisplaySize(112, 132);
-    this.impactDefenderPlaceholder = this.add.text(0, -6, "NO\nART", { fontSize: "20px", color: "#94a3b8", align: "center" }).setOrigin(0.5);
+    this.impactDefenderPlaceholder = this.add.text(0, -6, "NO
+ART", { fontSize: "20px", color: "#94a3b8", align: "center" }).setOrigin(0.5);
     this.impactDefenderName = this.add.text(0, 86, "", { fontSize: "16px", fontStyle: "bold", color: "#f7ecd3" }).setOrigin(0.5);
     this.impactDefenderSlot.add([this.impactDefenderFrame, this.impactDefenderImage, this.impactDefenderPlaceholder, this.impactDefenderName]);
     this.impactText = this.add.text(480, 175, "SMASH!", { fontSize: "28px", fontStyle: "bold", color: "#f8fafc", stroke: "#0f172a", strokeThickness: 6 }).setOrigin(0.5);
     this.impactContainer.add([impactShadow, this.impactAttackerSlot, this.impactDefenderSlot, this.impactText]);
 
-    const textBox = this.add.rectangle(480, 395, 800, 120, 0x1a0d2a, 0.98);
-    textBox.setStrokeStyle(2, 0xb6925f);
+    this.openingTextBox = this.add.rectangle(480, 395, 800, 120, 0x1a0d2a, 0.98);
+    this.openingTextBox.setStrokeStyle(2, 0xb6925f);
     this.dialogueSpeaker = this.add.text(90, 343, "", { fontSize: "24px", fontStyle: "bold", color: "#f7ecd3" });
     this.dialogueText = this.add.text(90, 378, "", { fontSize: "20px", color: "#eadff7", wordWrap: { width: 660 }, lineSpacing: 8 });
     this.openingBackButton = this.add.rectangle(700, 460, 118, 36, 0x1a0d2a);
@@ -2705,8 +2863,8 @@ class BattleScene extends Phaser.Scene {
     this.openingSkipButton.on("pointerdown", () => this.skipOpening());
     const skipText = this.add.text(777, 40, "Skip", { fontSize: "14px", fontStyle: "bold", color: "#f7ecd3" });
     this.dialogueCard.add([
-      mainPanel,
-      sceneFrame,
+      this.openingDialogueMainPanel,
+      this.openingSceneFrame,
       this.dialogueSceneImage,
       this.dialogueSceneName,
       this.dialoguePortraitPanel,
@@ -2714,7 +2872,7 @@ class BattleScene extends Phaser.Scene {
       this.dialoguePortrait,
       this.dialoguePortraitPlaceholder,
       this.impactContainer,
-      textBox,
+      this.openingTextBox,
       this.dialogueSpeaker,
       this.dialogueText,
       this.openingBackButton,
@@ -2724,7 +2882,7 @@ class BattleScene extends Phaser.Scene {
       this.openingSkipButton,
       skipText,
     ]);
-    this.openingContainer.add([this.openingFade, this.titleCard, this.dialogueCard]);
+    this.openingContainer.add([this.openingFade, this.openingFullSceneImage, this.titleCard, this.dialogueCard]);
     this.uiLayer.add(this.openingContainer);
   }
 
@@ -2741,6 +2899,9 @@ class BattleScene extends Phaser.Scene {
 
   playImpactBeat(line) {
     if (line.defender === "Kayley") this.startBattleMusic();
+    if (line.soundKey && this.cache.audio.exists(line.soundKey)) {
+      this.sound.play(line.soundKey, { volume: 0.72 });
+    }
     this.setImpactPortrait(this.impactAttackerImage, this.impactAttackerPlaceholder, this.impactAttackerName, line.attacker, line.attackerPortrait);
     this.setImpactPortrait(this.impactDefenderImage, this.impactDefenderPlaceholder, this.impactDefenderName, line.defender, line.defenderPortrait);
     this.tweens.killTweensOf(this.impactAttackerSlot);
@@ -2759,7 +2920,7 @@ class BattleScene extends Phaser.Scene {
       duration: 120,
       ease: "Cubic.Out",
       onComplete: () => {
-        this.impactText.setText(line.attacker === "Edwin" ? "SLASH!" : "SMASH!").setAlpha(1);
+        this.impactText.setText(line.impactText || (line.attacker === "Edwin" ? "SLASH!" : "SMASH!")).setAlpha(1);
         this.tweens.add({ targets: this.impactText, scale: 1.15, alpha: 0, duration: 220, ease: "Quad.Out" });
         this.impactDefenderFrame.setFillStyle(0x7f1d1d);
         if (this.impactDefenderImage.visible) this.impactDefenderImage.setTintFill(0xff6666);
@@ -2781,10 +2942,14 @@ class BattleScene extends Phaser.Scene {
   }
 
   updateOpeningUI() {
-    const step = CHAPTER_OPENING[this.openingStep];
+    const openingSequence = this.activeOpeningSequence || CHAPTER_OPENING;
+    const step = openingSequence[this.openingStep];
+    if (!step) return;
+
     if (step.type === "title") {
       this.titleCard.setVisible(true);
       this.dialogueCard.setVisible(false);
+      this.openingFullSceneImage.setVisible(false);
       this.titleChapter.setText(step.chapter);
       this.titleSubtitle.setText(step.subtitle);
       const tagText = step.tag || "";
@@ -2793,58 +2958,80 @@ class BattleScene extends Phaser.Scene {
       this.helpText.setText("Chapter opening.");
       return;
     }
+
     this.titleCard.setVisible(false);
     this.dialogueCard.setVisible(true);
     const line = step.lines[this.openingLine];
     const isImpact = line.type === "impact";
-    this.dialogueSceneName.setText(step.sceneName);
+    const isFullScreen = line.type === "fullScreenScene";
+    this.dialogueSceneName.setText(step.sceneName || "");
+
     const sceneTextureKey = step.background || "prologueScene";
     if (this.textures.exists(sceneTextureKey)) this.fitImageInBox(this.dialogueSceneImage, sceneTextureKey, 548, 308);
+
+    this.openingFullSceneImage.setVisible(isFullScreen);
+    if (isFullScreen) {
+      const fullSceneKey = line.scene || step.background || "prologueScene";
+      if (this.textures.exists(fullSceneKey)) {
+        fitImageToBounds(this, this.openingFullSceneImage, fullSceneKey, GAME_WIDTH, GAME_HEIGHT, true);
+        this.openingFullSceneImage.setTexture(fullSceneKey);
+      }
+    }
+
+    this.openingDialogueMainPanel.setVisible(!isFullScreen);
+    this.openingSceneFrame.setVisible(!isFullScreen);
+    this.dialogueSceneImage.setVisible(!isFullScreen);
+    this.dialogueSceneName.setVisible(!isFullScreen);
     this.dialogueSceneImage.setAlpha(isImpact ? 0.3 : 1);
     this.impactContainer.setVisible(isImpact);
-    this.dialoguePortraitPanel.setVisible(!isImpact);
-    this.dialoguePortraitFrame.setVisible(!isImpact);
+    this.dialoguePortraitPanel.setVisible(!isImpact && !isFullScreen);
+    this.dialoguePortraitFrame.setVisible(!isImpact && !isFullScreen);
+    this.openingTextBox.setVisible(true);
+    this.dialogueSpeaker.setVisible(true);
+    this.dialogueText.setVisible(true);
+
     if (isImpact) {
       this.dialogueSpeaker.setText("");
-      this.dialogueText.setText(line.text);
+      this.dialogueText.setText(line.text || "");
       this.dialoguePortrait.setVisible(false);
       this.dialoguePortraitPlaceholder.setVisible(false);
       this.playImpactBeat(line);
     } else {
-      this.dialogueSpeaker.setText(line.speaker);
-      this.dialogueText.setText(line.text);
-      if (line.portrait && this.textures.exists(line.portrait)) {
+      this.dialogueSpeaker.setText(line.speaker || "");
+      this.dialogueText.setText(line.text || "");
+      if (!isFullScreen && line.portrait && this.textures.exists(line.portrait)) {
         this.dialoguePortraitPanel.setVisible(true);
         this.dialoguePortraitFrame.setVisible(true);
         this.dialoguePortrait.setTexture(line.portrait).setDisplaySize(110, 132).setVisible(true);
         this.dialoguePortraitPlaceholder.setVisible(false);
       } else {
-        this.dialoguePortraitPanel.setVisible(false);
-        this.dialoguePortraitFrame.setVisible(false);
         this.dialoguePortrait.setVisible(false);
         this.dialoguePortraitPlaceholder.setVisible(false);
       }
     }
+
     this.openingBackButton.setAlpha(this.openingStep === 0 && this.openingLine === 0 ? 0.4 : 1);
-    const lastStep = this.openingStep === CHAPTER_OPENING.length - 1;
+    const lastStep = this.openingStep === openingSequence.length - 1;
     const lastLine = this.openingLine === step.lines.length - 1;
     this.openingNextLabel.setText(lastStep && lastLine ? "Start" : "Next");
   }
 
   goOpeningBack() {
-    if (this.openingStep === 0) return;
-    if (CHAPTER_OPENING[this.openingStep].type === "scene" && this.openingLine > 0) {
+    const openingSequence = this.activeOpeningSequence || CHAPTER_OPENING;
+    if (this.openingStep === 0 && this.openingLine === 0) return;
+    if (openingSequence[this.openingStep].type === "scene" && this.openingLine > 0) {
       this.openingLine -= 1;
     } else {
       this.openingStep -= 1;
-      const prev = CHAPTER_OPENING[this.openingStep];
+      const prev = openingSequence[this.openingStep];
       this.openingLine = prev.type === "scene" ? prev.lines.length - 1 : 0;
     }
     this.updateOpeningUI();
   }
 
   advanceOpening() {
-    const step = CHAPTER_OPENING[this.openingStep];
+    const openingSequence = this.activeOpeningSequence || CHAPTER_OPENING;
+    const step = openingSequence[this.openingStep];
     if (step.type === "title") {
       this.openingStep += 1;
       this.openingLine = 0;
@@ -2856,7 +3043,7 @@ class BattleScene extends Phaser.Scene {
       this.updateOpeningUI();
       return;
     }
-    if (this.openingStep < CHAPTER_OPENING.length - 1) {
+    if (this.openingStep < openingSequence.length - 1) {
       this.openingStep += 1;
       this.openingLine = 0;
       this.updateOpeningUI();
@@ -2869,9 +3056,25 @@ class BattleScene extends Phaser.Scene {
     this.finishOpening();
   }
 
+  startChapterTwoOpening() {
+    this.chapterTransitionContainer.setVisible(false).setAlpha(0);
+    this.phase = "intro";
+    this.busy = false;
+    this.setObjectiveDisplayVisible(false);
+    this.activeOpeningSequence = CHAPTER_TWO_OPENING;
+    this.openingStep = 0;
+    this.openingLine = 0;
+    this.openingContainer.setVisible(true);
+    this.helpText.setText("Watch the Chapter 2 opening.");
+    this.updateOpeningUI();
+  }
+
   finishOpening() {
     this.openingContainer.setVisible(false);
+    this.openingFullSceneImage.setVisible(false);
     this.startPlayerPhase();
+    this.selectedUnitId = this.units.find((unit) => unit.team === "player")?.id || null;
+    this.updateSelectedPanel();
   }
 
   startBattleMusic() {
@@ -2925,7 +3128,7 @@ class BattleScene extends Phaser.Scene {
 
 
   getEscapeTile() {
-    return CHAPTER_ONE_ESCAPE_TILE;
+    return (this.currentChapterNumber || 1) === 1 ? CHAPTER_ONE_ESCAPE_TILE : null;
   }
 
   isEscapeTile(x, y) {
@@ -3360,7 +3563,7 @@ class BattleScene extends Phaser.Scene {
     if (!effectKey) return;
 
     this.getSkillHitTilesAt(unit, skill, unit.x, unit.y).forEach((tile, index) => {
-      this.time.delayedCall(index * 45, () => this.playTileEffect(tile.x, tile.y, effectKey));
+      this.time.delayedCall(index * SKILL_TILE_EFFECT_STAGGER, () => this.playTileEffect(tile.x, tile.y, effectKey));
     });
   }
 
@@ -3409,11 +3612,11 @@ class BattleScene extends Phaser.Scene {
           yoyo: true,
           repeat: 3,
         });
-        this.time.delayedCall(820, () => {
+        this.time.delayedCall(BROTHERS_BLIGH_CUTIN_HOLD_DURATION, () => {
           this.tweens.add({
             targets: container,
             alpha: 0,
-            duration: 180,
+            duration: BROTHERS_BLIGH_CUTIN_FADE_DURATION,
             ease: "Quad.Out",
             onComplete: () => {
               container.destroy();
@@ -3446,14 +3649,40 @@ class BattleScene extends Phaser.Scene {
     effect.setDepth(9997);
     this.overlayLayer.add(effect);
 
+    const isBrothersBligh = effectKey === BROTHERS_BLIGH_HIT_EFFECT_KEY;
+    const appearDuration = isBrothersBligh ? BROTHERS_BLIGH_HIT_APPEAR_DURATION : SKILL_TILE_EFFECT_APPEAR_DURATION;
+    const holdDuration = isBrothersBligh ? BROTHERS_BLIGH_HIT_HOLD_DURATION : SKILL_TILE_EFFECT_HOLD_DURATION;
+    const fadeDuration = isBrothersBligh ? BROTHERS_BLIGH_HIT_FADE_DURATION : SKILL_TILE_EFFECT_FADE_DURATION;
+    const startScale = isBrothersBligh ? 0.56 : 0.82;
+    const holdScale = isBrothersBligh ? 1.06 : 1;
+    const endScale = isBrothersBligh ? 1.1 : SKILL_TILE_EFFECT_END_SCALE;
+    const baseScaleX = effect.scaleX || 1;
+    const baseScaleY = effect.scaleY || 1;
+    effect.setAlpha(0);
+    effect.setScale(baseScaleX * startScale, baseScaleY * startScale);
+
     this.tweens.add({
       targets: effect,
-      alpha: 0,
-      scaleX: effect.scaleX * 1.25,
-      scaleY: effect.scaleY * 1.25,
-      duration: 520,
-      ease: "Quad.Out",
-      onComplete: () => effect.destroy(),
+      alpha: 1,
+      scaleX: baseScaleX * holdScale,
+      scaleY: baseScaleY * holdScale,
+      duration: appearDuration,
+      ease: isBrothersBligh ? "Expo.Out" : "Back.Out",
+      onComplete: () => {
+        this.time.delayedCall(holdDuration, () => {
+          if (!effect?.active) return;
+
+          this.tweens.add({
+            targets: effect,
+            alpha: 0,
+            scaleX: baseScaleX * endScale,
+            scaleY: baseScaleY * endScale,
+            duration: fadeDuration,
+            ease: "Quad.Out",
+            onComplete: () => effect.destroy(),
+          });
+        });
+      },
     });
   }
 
@@ -4391,7 +4620,8 @@ class BattleScene extends Phaser.Scene {
 
   isWalkable(x, y) {
     if (!this.isInBounds(x, y)) return false;
-    return this.getTerrainAt(x, y) !== "wall";
+    const terrain = this.getTerrainAt(x, y);
+    return terrain !== "wall" && terrain !== "fence";
   }
 
   reachableTiles(unit) {
