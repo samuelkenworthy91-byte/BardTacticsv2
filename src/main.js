@@ -1,8 +1,3 @@
-Dupe.com
-Dupe.com
-
-
-
 import Phaser from "phaser";
 
 const GAME_WIDTH = 960;
@@ -934,7 +929,7 @@ class LoadingScene extends Phaser.Scene {
     this.load.on("progress", (value) => this.updateLoadingDisplay(value, barX, barY, barWidth));
     this.load.once("complete", () => this.updateLoadingDisplay(1, barX, barY, barWidth));
     queueImage(this, LOADING_RUNNER_KEY, LOADING_RUNNER_PATH);
-    queueChapterOneAssets(this, LEVELS.chapter1);
+    queueChapterAssets(this, LEVELS.chapter1);
   }
 
   sizeLoadingRunnerSprite(sprite) {
@@ -5321,3 +5316,4 @@ const config = {
 };
 
 new Phaser.Game(config);
+
