@@ -3,7 +3,7 @@ import Phaser from "phaser";
 const GAME_WIDTH = 960;
 const GAME_HEIGHT = 540;
  
-const TILE_SIZE = 72;
+const TILE_SIZE = 64;
 const MAP_COLS = 8;
 const MAP_ROWS = 8;
  
@@ -15,12 +15,12 @@ const PLAYER_MOVE_DURATION = 1350;
 const PLAYER_ACTION_PAUSE = 450;
 const SKILL_BANNER_DURATION = 1250;
 const SKILL_IMPACT_DELAY = 520;
-
+ 
 const SAVE_KEY = "bardsTacticsSave";
 const TITLE_SCREEN_KEY = "bardsTitleScreen";
 const TITLE_SCREEN_PATH = "/ui/title_screen.png";
-const LOADING_RUNNER_KEY = "edwin_move_left";
-const LOADING_RUNNER_PATH = "/sprites/edwin/move_left.png";
+const LOADING_RUNNER_KEY = "edwin_move_right";
+const LOADING_RUNNER_PATH = "/sprites/edwin/move_right.png";
  
 const CARDINAL_DIRECTIONS = ["down", "up", "left", "right"];
  
@@ -839,17 +839,17 @@ function canAttack(attacker, defender) {
  
 function fitImageToBounds(scene, image, textureKey, maxWidth, maxHeight, cover = false) {
   if (!scene?.textures?.exists(textureKey) || !image) return;
-
+ 
   const source = scene.textures.get(textureKey)?.getSourceImage();
   if (!source?.width || !source?.height) return;
-
+ 
   const scale = cover
     ? Math.max(maxWidth / source.width, maxHeight / source.height)
     : Math.min(maxWidth / source.width, maxHeight / source.height);
-
+ 
   image.setDisplaySize(source.width * scale, source.height * scale);
 }
-
+ 
 function createBannerPanel(scene, x, y, width, height, options = {}) {
   const container = scene.add.container(x, y);
   const shadowOffset = options.shadowOffset ?? 5;
@@ -861,7 +861,7 @@ function createBannerPanel(scene, x, y, width, height, options = {}) {
   container.add([shadow, outer, inner]);
   return { container, shadow, outer, inner };
 }
-
+ 
 function createBannerButton(scene, x, y, width, height, label, onClick, fontSize = "22px") {
   const container = scene.add.container(x, y);
   const shadow = scene.add.rectangle(4, 4, width, height, 0x000000, 0.34).setOrigin(0.5);
@@ -895,23 +895,23 @@ function createBannerButton(scene, x, y, width, height, label, onClick, fontSize
   container.add([shadow, outer, inner, text, hit]);
   return { container, shadow, outer, inner, text, hit };
 }
-
+ 
 function queueImage(scene, key, path) {
   if (!scene || !key || !path) return;
   if (scene.textures.exists(key)) return;
   scene.load.image(key, path);
 }
-
+ 
 function queueAudio(scene, key, path) {
   if (!scene || !key || !path) return;
   if (scene.cache?.audio?.exists(key)) return;
   scene.load.audio(key, [path]);
 }
-
+ 
 function queueBiomeTileAssets(scene, biomeKey) {
   const biome = BIOMES[biomeKey];
   if (!biome) return;
-
+ 
   const queuedKeys = new Set();
   Object.values(biome.terrainTextures).forEach((entry) => {
     if (!entry?.key || !entry?.path || queuedKeys.has(entry.key)) return;
@@ -919,10 +919,10 @@ function queueBiomeTileAssets(scene, biomeKey) {
     queuedKeys.add(entry.key);
   });
 }
-
+ 
 function queueIndividualDirectionalSpriteAssets(scene) {
   const queuedKeys = new Set();
-
+ 
   Object.values(INDIVIDUAL_UNIT_SPRITE_SETS).forEach((spriteSet) => {
     Object.values(spriteSet).forEach((entry) => {
       if (Array.isArray(entry)) {
@@ -933,7 +933,7 @@ function queueIndividualDirectionalSpriteAssets(scene) {
         });
         return;
       }
-
+ 
       Object.values(entry || {}).forEach((directionEntry) => {
         if (!directionEntry?.key || !directionEntry?.path || queuedKeys.has(directionEntry.key)) return;
         queueImage(scene, directionEntry.key, directionEntry.path);
@@ -942,7 +942,7 @@ function queueIndividualDirectionalSpriteAssets(scene) {
     });
   });
 }
-
+ 
 function queueChapterOneAssets(scene, levelData = LEVELS.chapter1) {
   queueImage(scene, "edwinPortrait", "/portraits/edwin.jpg");
   queueImage(scene, "leonPortrait", "/portraits/leon.jpg");
@@ -952,45 +952,45 @@ function queueChapterOneAssets(scene, levelData = LEVELS.chapter1) {
   queueImage(scene, "thugPortrait", "/portraits/thug.jpg");
   queueImage(scene, "heathPortrait", "/portraits/heath.jpg");
   queueImage(scene, "izzyPortrait", "/portraits/izzy.jpg");
-
+ 
   queueImage(scene, "prologueScene", "/scenes/prologue.jpg");
   queueImage(scene, "leonsHouseScene", "/scenes/leons_house.jpg");
   queueImage(scene, "walkToSchoolScene", "/scenes/walk_to_school.jpg");
   queueImage(scene, "underpassScene", "/scenes/underpass.jpg");
   queueImage(scene, "vanInteriorScene", "/scenes/van_interior.jpg");
   queueImage(scene, "byronFarmScene", "/scenes/byron_farm.jpg");
-
+ 
   queueBiomeTileAssets(scene, levelData?.biome);
   queueIndividualDirectionalSpriteAssets(scene);
-
+ 
   if (levelData?.battleMusic?.key && levelData?.battleMusic?.path) {
     queueAudio(scene, levelData.battleMusic.key, levelData.battleMusic.path);
   }
 }
-
+ 
 class LoadingScene extends Phaser.Scene {
   constructor() {
     super("LoadingScene");
   }
-
+ 
   init(data = {}) {
     this.nextSceneData = data || {};
   }
-
+ 
   preload() {
     this.cameras.main.setBackgroundColor("#06030b");
-
+ 
     const centerX = GAME_WIDTH / 2;
     const centerY = GAME_HEIGHT / 2;
     const barX = 180;
     const barY = 318;
     const barWidth = 600;
     const barHeight = 8;
-
+ 
     this.add.rectangle(centerX, centerY, GAME_WIDTH, GAME_HEIGHT, 0x06030b, 1);
-
+ 
     const panel = createBannerPanel(this, centerX, centerY, 700, 250, { innerInset: 18 });
-
+ 
     const loadingText = this.add.text(0, -82, "Loading", {
       fontSize: "42px",
       fontStyle: "bold",
@@ -998,113 +998,124 @@ class LoadingScene extends Phaser.Scene {
       stroke: "#0b0811",
       strokeThickness: 5,
     }).setOrigin(0.5);
-
+ 
     const hintText = this.add.text(0, -42, "Preparing Chapter 1: 4 Years Gone", {
       fontSize: "16px",
       color: "#d8c4f0",
     }).setOrigin(0.5);
-
+ 
     panel.container.add([loadingText, hintText]);
-
+ 
     this.add.rectangle(barX + barWidth / 2, barY, barWidth, barHeight, 0x101828, 1).setStrokeStyle(2, 0xb6925f, 0.9);
     this.loadingTrail = this.add.rectangle(barX, barY, 1, barHeight, 0x38bdf8, 0.95).setOrigin(0, 0.5);
-
-    this.loadingRunnerShadow = this.add.ellipse(barX, barY + 22, 42, 12, 0x000000, 0.38);
-
+ 
+    this.loadingRunnerShadow = this.add.ellipse(barX, barY + 18, 52, 14, 0x000000, 0.38);
+ 
     if (this.textures.exists(LOADING_RUNNER_KEY)) {
-      this.loadingRunner = this.add.image(barX, barY - 8, LOADING_RUNNER_KEY);
-      this.loadingRunner.setOrigin(0.5, 0.92);
-      this.loadingRunner.setDisplaySize(54, 54);
+      this.loadingRunner = this.add.image(barX, barY - 2, LOADING_RUNNER_KEY);
+      this.loadingRunner.setOrigin(0.5, 1);
+      this.sizeLoadingRunnerSprite(this.loadingRunner);
     } else {
-      this.loadingRunner = this.add.circle(barX, barY - 8, 14, 0x38bdf8, 1);
+      this.loadingRunner = this.add.circle(barX, barY - 2, 14, 0x38bdf8, 1);
       this.loadingRunner.setStrokeStyle(2, 0xf7ecd3);
     }
-
-    this.loadingPercentText = this.add.text(barX, barY - 66, "0%", {
+ 
+    this.loadingPercentText = this.add.text(barX, barY - 116, "0%", {
       fontSize: "18px",
       fontStyle: "bold",
       color: "#f7ecd3",
       stroke: "#0b0811",
       strokeThickness: 4,
     }).setOrigin(0.5);
-
-    this.loadingRunnerGlow = this.add.circle(barX, barY - 10, 23, 0x38bdf8, 0.12);
-
+ 
+    this.loadingRunnerGlow = this.add.circle(barX, barY - 46, 28, 0x38bdf8, 0.12);
+ 
     this.updateLoadingDisplay(0, barX, barY, barWidth);
-
+ 
     this.load.on("filecomplete-image-" + LOADING_RUNNER_KEY, () => {
       if (this.loadingRunner?.destroy) this.loadingRunner.destroy();
-      this.loadingRunner = this.add.image(barX, barY - 8, LOADING_RUNNER_KEY);
-      this.loadingRunner.setOrigin(0.5, 0.92);
-      this.loadingRunner.setDisplaySize(54, 54);
+      this.loadingRunner = this.add.image(barX, barY - 2, LOADING_RUNNER_KEY);
+      this.loadingRunner.setOrigin(0.5, 1);
+      this.sizeLoadingRunnerSprite(this.loadingRunner);
       this.updateLoadingDisplay(this.currentLoadingProgress || 0, barX, barY, barWidth);
     });
-
+ 
     this.load.on("progress", (value) => {
       this.updateLoadingDisplay(value, barX, barY, barWidth);
     });
-
+ 
     this.load.once("complete", () => {
       this.updateLoadingDisplay(1, barX, barY, barWidth);
     });
-
+ 
     queueImage(this, LOADING_RUNNER_KEY, LOADING_RUNNER_PATH);
     queueChapterOneAssets(this, LEVELS.chapter1);
   }
-
+ 
+  sizeLoadingRunnerSprite(sprite) {
+    if (!sprite || !this.textures.exists(LOADING_RUNNER_KEY)) return;
+ 
+    const source = this.textures.get(LOADING_RUNNER_KEY)?.getSourceImage();
+    const sourceHeight = source?.height || 96;
+    const maxHeight = 112;
+    const scale = sourceHeight > maxHeight ? maxHeight / sourceHeight : 1;
+ 
+    sprite.setScale(scale);
+  }
+ 
   updateLoadingDisplay(value, barX, barY, barWidth) {
     const progress = Phaser.Math.Clamp(value || 0, 0, 1);
     this.currentLoadingProgress = progress;
-
+ 
     const runnerX = barX + barWidth * progress;
     const percent = Math.round(progress * 100);
-
+ 
     if (this.loadingTrail) {
       this.loadingTrail.displayWidth = Math.max(1, barWidth * progress);
     }
-
+ 
     if (this.loadingRunner) {
       this.loadingRunner.x = runnerX;
-      this.loadingRunner.y = barY - 8;
+      this.loadingRunner.y = barY - 2;
     }
-
+ 
     if (this.loadingRunnerShadow) {
       this.loadingRunnerShadow.x = runnerX;
-      this.loadingRunnerShadow.y = barY + 22;
+      this.loadingRunnerShadow.y = barY + 18;
     }
-
+ 
     if (this.loadingRunnerGlow) {
       this.loadingRunnerGlow.x = runnerX;
-      this.loadingRunnerGlow.y = barY - 10;
+      this.loadingRunnerGlow.y = barY - 46;
     }
-
+ 
     if (this.loadingPercentText) {
       this.loadingPercentText.x = runnerX;
-      this.loadingPercentText.y = barY - 66;
+      this.loadingPercentText.y = barY - 116;
       this.loadingPercentText.setText(`${percent}%`);
     }
   }
-
+ 
   create() {
     this.time.delayedCall(350, () => {
       this.scene.start("BattleScene", this.nextSceneData || {});
     });
   }
 }
-
+ 
 class TitleScene extends Phaser.Scene {
   constructor() {
     super("TitleScene");
   }
-
+ 
   preload() {
     queueImage(this, TITLE_SCREEN_KEY, TITLE_SCREEN_PATH);
     queueImage(this, LOADING_RUNNER_KEY, LOADING_RUNNER_PATH);
   }
-
+ 
   create() {
     this.cameras.main.setBackgroundColor("#06030b");
-
+ 
     if (this.textures.exists(TITLE_SCREEN_KEY)) {
       const splash = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, TITLE_SCREEN_KEY);
       fitImageToBounds(this, splash, TITLE_SCREEN_KEY, GAME_WIDTH, GAME_HEIGHT, true);
@@ -1118,9 +1129,9 @@ class TitleScene extends Phaser.Scene {
         strokeThickness: 6,
       }).setOrigin(0.5);
     }
-
+ 
     this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.12);
-
+ 
     const promptPanel = createBannerPanel(this, GAME_WIDTH / 2, GAME_HEIGHT - 42, 300, 48, { innerInset: 12 });
     const promptText = this.add.text(0, 0, "Click to Start", {
       fontSize: "24px",
@@ -1130,7 +1141,7 @@ class TitleScene extends Phaser.Scene {
       strokeThickness: 4,
     }).setOrigin(0.5);
     promptPanel.container.add(promptText);
-
+ 
     this.tweens.add({
       targets: promptPanel.container,
       alpha: 0.45,
@@ -1138,23 +1149,23 @@ class TitleScene extends Phaser.Scene {
       yoyo: true,
       repeat: -1,
     });
-
+ 
     this.input.once("pointerdown", () => {
       this.scene.start("MainMenuScene");
     });
   }
 }
-
+ 
 class MainMenuScene extends Phaser.Scene {
   constructor() {
     super("MainMenuScene");
   }
-
+ 
   preload() {
     queueImage(this, TITLE_SCREEN_KEY, TITLE_SCREEN_PATH);
     queueImage(this, LOADING_RUNNER_KEY, LOADING_RUNNER_PATH);
   }
-
+ 
   getSaveData() {
     try {
       const raw = window.localStorage.getItem(SAVE_KEY);
@@ -1163,18 +1174,18 @@ class MainMenuScene extends Phaser.Scene {
       return null;
     }
   }
-
+ 
   create() {
     this.cameras.main.setBackgroundColor("#06030b");
-
+ 
     if (this.textures.exists(TITLE_SCREEN_KEY)) {
       const bg = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, TITLE_SCREEN_KEY);
       fitImageToBounds(this, bg, TITLE_SCREEN_KEY, GAME_WIDTH, GAME_HEIGHT, true);
       bg.setAlpha(0.45);
     }
-
+ 
     this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x06030b, 0.58);
-
+ 
     const panel = createBannerPanel(this, GAME_WIDTH / 2, GAME_HEIGHT / 2, 390, 250, { innerInset: 16 });
     const heading = this.add.text(0, -82, "Main Menu", {
       fontSize: "34px",
@@ -1187,11 +1198,11 @@ class MainMenuScene extends Phaser.Scene {
       fontSize: "16px",
       color: "#d8c4f0",
     }).setOrigin(0.5);
-
+ 
     const newGameButton = createBannerButton(this, 0, 12, 220, 48, "New Game", () => {
       this.scene.start("LoadingScene", { loadFromSave: false });
     }, "24px");
-
+ 
     const loadGameButton = createBannerButton(this, 0, 72, 220, 48, "Load Game", () => {
       const saveData = this.getSaveData();
       if (!saveData) {
@@ -1200,14 +1211,14 @@ class MainMenuScene extends Phaser.Scene {
       }
       this.scene.start("LoadingScene", { loadFromSave: true, saveData });
     }, "24px");
-
+ 
     this.statusText = this.add.text(0, 118, "", {
       fontSize: "14px",
       color: "#f4d7d7",
       align: "center",
       wordWrap: { width: 280 },
     }).setOrigin(0.5, 0);
-
+ 
     panel.container.add([
       heading,
       subtitle,
@@ -1217,12 +1228,12 @@ class MainMenuScene extends Phaser.Scene {
     ]);
   }
 }
-
+ 
 class BattleScene extends Phaser.Scene {
   constructor() {
     super("BattleScene");
   }
-
+ 
   init(data = {}) {
     data = data || {};
     this.loadFromSave = data.loadFromSave === true;
@@ -1232,10 +1243,10 @@ class BattleScene extends Phaser.Scene {
   getCurrentLevel() {
     return LEVELS.chapter1;
   }
-
+ 
   getSavedGameData() {
     if (this.loadedSaveData) return this.loadedSaveData;
-
+ 
     try {
       const raw = window.localStorage.getItem(SAVE_KEY);
       return raw ? JSON.parse(raw) : null;
@@ -1243,13 +1254,13 @@ class BattleScene extends Phaser.Scene {
       return null;
     }
   }
-
+ 
   startLoadedBattle() {
     this.openingContainer.setVisible(false);
     this.startPlayerPhase();
     this.selectedUnitId = "edwin";
     this.updateSelectedPanel();
-
+ 
     if (this.getSavedGameData()) {
       this.helpText.setText("Loaded game. Player Phase. Click Edwin or Leon.");
     }
@@ -1594,8 +1605,8 @@ class BattleScene extends Phaser.Scene {
  
     this.boardWidth = this.mapCols * TILE_SIZE;
     this.boardHeight = this.mapRows * TILE_SIZE;
-    this.boardX = 184;
-    this.boardY = 18;
+    this.boardX = 200;
+    this.boardY = 14;
  
     this.tileLayer = this.add.layer();
     this.overlayLayer = this.add.layer();
@@ -1615,7 +1626,7 @@ class BattleScene extends Phaser.Scene {
     this.setupInput();
     this.updateSelectedPanel();
     this.setObjectiveDisplayVisible(false);
-
+ 
     if (this.loadFromSave) {
       this.startLoadedBattle();
     } else {
@@ -1624,139 +1635,146 @@ class BattleScene extends Phaser.Scene {
   }
  
   createTopUI() {
-    const panel = createBannerPanel(this, 88, 83, 152, 134, { innerInset: 14 });
+    const panel = createBannerPanel(this, 88, 92, 170, 170, { innerInset: 14 });
     this.topInfoPanel = panel.container;
-
-    this.phaseText = this.add.text(-58, -50, "Opening", {
-      fontSize: "18px",
-      fontStyle: "bold",
-      color: "#f7ecd3",
-      stroke: "#0b0811",
-      strokeThickness: 3,
-    });
-
-    this.helpText = this.add.text(-58, -24, "Watch the chapter opening.", {
-      fontSize: "11px",
-      color: "#d8c4f0",
-      wordWrap: { width: 118 },
-      lineSpacing: 2,
-    });
-
-    this.objectiveHeader = this.add.text(-58, 30, "Objective", {
-      fontSize: "12px",
+ 
+    this.objectiveHeader = this.add.text(-68, -68, "Objective", {
+      fontSize: "13px",
       fontStyle: "bold",
       color: "#e8c98b",
       stroke: "#0b0811",
       strokeThickness: 2,
     });
-
-    this.objectiveText = this.add.text(-58, 48, this.levelData?.objective || "Defeat Falan, the gang leader.", {
+ 
+    this.objectiveText = this.add.text(-68, -48, this.levelData?.objective || "Defeat Falan, the gang leader.", {
       fontSize: "11px",
       color: "#f7ecd3",
-      wordWrap: { width: 118 },
+      wordWrap: { width: 136 },
       lineSpacing: 2,
     });
-
+ 
+    this.phaseText = this.add.text(-68, 14, "Opening", {
+      fontSize: "16px",
+      fontStyle: "bold",
+      color: "#f7ecd3",
+      stroke: "#0b0811",
+      strokeThickness: 3,
+    });
+ 
+    this.helpText = this.add.text(-68, 40, "Watch the chapter opening.", {
+      fontSize: "11px",
+      color: "#d8c4f0",
+      wordWrap: { width: 136 },
+      lineSpacing: 2,
+    });
+ 
     panel.container.add([
-      this.phaseText,
-      this.helpText,
       this.objectiveHeader,
       this.objectiveText,
+      this.phaseText,
+      this.helpText,
     ]);
-
+ 
     this.uiLayer.add(panel.container);
   }
-
+ 
   setObjectiveDisplayVisible(visible) {
     const shouldShow = !!visible;
     if (this.objectiveHeader) this.objectiveHeader.setVisible(shouldShow);
     if (this.objectiveText) this.objectiveText.setVisible(shouldShow);
   }
-
-  createSidePanel() {
-    const x = 704;
-    const y = 72;
  
-    const bg = this.add.rectangle(x + 120, y + 220, 248, 440, 0x111827, 0.92);
+  createSidePanel() {
+    const x = 722;
+    const y = 28;
+    const panelWidth = 232;
+    const panelHeight = 500;
+    const innerX = x + 14;
+    const barWidth = 200;
+    this.sidePanelBarWidth = barWidth;
+ 
+    const bg = this.add.rectangle(x + panelWidth / 2, y + panelHeight / 2, panelWidth, panelHeight, 0x111827, 0.92);
     bg.setStrokeStyle(2, 0x334155);
  
-    const title = this.add.text(x + 16, y + 14, "Selected Unit", {
-      fontSize: "20px",
+    const title = this.add.text(innerX, y + 12, "Selected Unit", {
+      fontSize: "18px",
       fontStyle: "bold",
       color: "#f7ecd3",
     });
  
-    this.portraitFrame = this.add.rectangle(x + 64, y + 88, 96, 120, 0x1f2937);
+    this.portraitFrame = this.add.rectangle(innerX + 44, y + 76, 88, 104, 0x1f2937);
     this.portraitFrame.setStrokeStyle(2, 0x475569);
  
-    this.portraitImage = this.add.image(x + 64, y + 88, "edwinPortrait");
-    this.portraitImage.setDisplaySize(96, 120);
+    this.portraitImage = this.add.image(innerX + 44, y + 76, "edwinPortrait");
+    this.portraitImage.setDisplaySize(88, 104);
     this.portraitImage.setVisible(false);
  
-    this.portraitPlaceholder = this.add.text(x + 64, y + 88, "NO\nART", {
-      fontSize: "20px",
+    this.portraitPlaceholder = this.add.text(innerX + 44, y + 76, "NO\nART", {
+      fontSize: "18px",
       color: "#94a3b8",
       align: "center",
     }).setOrigin(0.5);
  
-    this.unitNameText = this.add.text(x + 16, y + 156, "None", {
-      fontSize: "22px",
+    this.unitNameText = this.add.text(innerX, y + 136, "None", {
+      fontSize: "21px",
       fontStyle: "bold",
       color: "#f7ecd3",
     });
  
-    this.unitClassText = this.add.text(x + 16, y + 190, "", {
-      fontSize: "14px",
+    this.unitClassText = this.add.text(innerX, y + 166, "", {
+      fontSize: "12px",
       color: "#94a3b8",
+      wordWrap: { width: 202 },
     });
  
-    this.hpBarText = this.add.text(x + 16, y + 216, "", {
-      fontSize: "13px",
+    this.hpBarText = this.add.text(innerX, y + 198, "", {
+      fontSize: "12px",
       color: "#fecaca",
     });
  
-    this.hpBarBg = this.add.rectangle(x + 16, y + 238, 210, 10, 0x1f2937);
+    this.hpBarBg = this.add.rectangle(innerX, y + 218, barWidth, 9, 0x1f2937);
     this.hpBarBg.setOrigin(0, 0.5);
     this.hpBarBg.setStrokeStyle(1, 0x475569);
  
-    this.hpBarFill = this.add.rectangle(x + 16, y + 238, 210, 10, 0xef4444);
+    this.hpBarFill = this.add.rectangle(innerX, y + 218, barWidth, 9, 0xef4444);
     this.hpBarFill.setOrigin(0, 0.5);
     this.hpBarFill.displayWidth = 0;
  
-    this.levelXpText = this.add.text(x + 16, y + 250, "", {
-      fontSize: "13px",
+    this.levelXpText = this.add.text(innerX, y + 230, "", {
+      fontSize: "12px",
       color: "#d8c4f0",
     });
  
-    this.xpBarBg = this.add.rectangle(x + 16, y + 272, 210, 10, 0x1f2937);
+    this.xpBarBg = this.add.rectangle(innerX, y + 250, barWidth, 9, 0x1f2937);
     this.xpBarBg.setOrigin(0, 0.5);
     this.xpBarBg.setStrokeStyle(1, 0x475569);
  
-    this.xpBarFill = this.add.rectangle(x + 16, y + 272, 210, 10, 0x8b5cf6);
+    this.xpBarFill = this.add.rectangle(innerX, y + 250, barWidth, 9, 0x8b5cf6);
     this.xpBarFill.setOrigin(0, 0.5);
     this.xpBarFill.displayWidth = 0;
  
-    this.sigilText = this.add.text(x + 16, y + 286, "Sigil", {
-      fontSize: "12px",
+    this.sigilText = this.add.text(innerX, y + 264, "Sigil", {
+      fontSize: "11px",
       color: "#ddd6fe",
     });
  
     this.sigilOrbs = [0, 1, 2].map((index) => {
-      const orb = this.add.circle(x + 60 + index * 22, y + 292, 7, 0x2e1065, 1);
+      const orb = this.add.circle(innerX + 54 + index * 20, y + 270, 6, 0x2e1065, 1);
       orb.setStrokeStyle(2, 0xc4b5fd);
       return orb;
     });
  
-    this.unitStatsText = this.add.text(x + 16, y + 306, "", {
-      fontSize: "12px",
+    this.unitStatsText = this.add.text(innerX, y + 284, "", {
+      fontSize: "11px",
       color: "#e2e8f0",
-      lineSpacing: 2,
+      lineSpacing: 1,
     });
  
-    this.weaponText = this.add.text(x + 16, y + 414, "", {
-      fontSize: "12px",
+    this.weaponText = this.add.text(innerX, y + 396, "", {
+      fontSize: "11px",
       color: "#c4b5fd",
-      wordWrap: { width: 210 },
+      wordWrap: { width: 202 },
+      lineSpacing: 1,
     });
  
     this.sidePanelParts = [
@@ -1912,9 +1930,9 @@ class BattleScene extends Phaser.Scene {
     this.skillBannerContainer.setDepth(10000);
     this.skillBannerContainer.setVisible(false);
     this.skillBannerContainer.setAlpha(0);
-
+ 
     const panel = createBannerPanel(this, 0, 0, 490, 60, { innerInset: 14 });
-
+ 
     this.skillBannerText = this.add.text(0, 0, "", {
       fontSize: "24px",
       fontStyle: "bold",
@@ -1922,21 +1940,21 @@ class BattleScene extends Phaser.Scene {
       stroke: "#0b0811",
       strokeThickness: 4,
     }).setOrigin(0.5);
-
+ 
     panel.container.add(this.skillBannerText);
     this.skillBannerContainer.add(panel.container);
     this.uiLayer.add(this.skillBannerContainer);
   }
-
+ 
   showSkillBanner(skillName) {
     if (!this.skillBannerContainer || !this.skillBannerText) return;
-
+ 
     this.tweens.killTweensOf(this.skillBannerContainer);
     this.skillBannerText.setText(skillName);
     this.skillBannerContainer.setVisible(true);
     this.skillBannerContainer.setAlpha(0);
     this.skillBannerContainer.y = 28;
-
+ 
     this.tweens.add({
       targets: this.skillBannerContainer,
       alpha: 1,
@@ -1958,7 +1976,7 @@ class BattleScene extends Phaser.Scene {
       },
     });
   }
-
+ 
   showCombatXpPopup(unit, amount, startLevel, startXp) {
     if (!this.combatXpContainer || !unit || amount <= 0) return;
  
@@ -3814,25 +3832,25 @@ class BattleScene extends Phaser.Scene {
  
   showActionMenu(unit, message = null) {
     if (!unit || unit.team !== "player" || unit.acted || unit.hp <= 0) return;
-
+ 
     this.closeActionMenu();
-
+ 
     this.selectedUnitId = unit.id;
     this.moveTiles = [];
     this.targetTiles = [];
     this.redrawSelection();
     this.updateSelectedPanel();
-
+ 
     const centerX = this.boardX + unit.x * TILE_SIZE + TILE_SIZE / 2;
     const centerY = this.boardY + unit.y * TILE_SIZE + TILE_SIZE / 2;
     const menuWidth = 152;
     const menuHeight = 208;
     const x = Phaser.Math.Clamp(centerX + TILE_SIZE * 0.95, menuWidth / 2 + 8, GAME_WIDTH - menuWidth / 2 - 8);
     const y = Phaser.Math.Clamp(centerY - 8, menuHeight / 2 + 8, GAME_HEIGHT - menuHeight / 2 - 8);
-
+ 
     const container = this.add.container(x, y);
     container.setDepth(9998);
-
+ 
     const panel = createBannerPanel(this, 0, 0, menuWidth, menuHeight, { innerInset: 12 });
     const title = this.add.text(0, -78, unit.name, {
       fontSize: "16px",
@@ -3841,29 +3859,29 @@ class BattleScene extends Phaser.Scene {
       stroke: "#0b0811",
       strokeThickness: 3,
     }).setOrigin(0.5);
-
+ 
     container.add([panel.container, title]);
-
+ 
     const actions = [
       { label: "Attack", handler: () => this.chooseActionAttack(unit.id) },
       { label: "Skill", handler: () => this.chooseActionSkill(unit.id) },
       { label: "Item", handler: () => this.chooseActionItem(unit.id) },
       { label: "Wait", handler: () => this.waitUnit(unit.id) },
     ];
-
+ 
     actions.forEach((action, index) => {
       const button = createBannerButton(this, 0, -38 + index * 40, menuWidth - 20, 32, action.label, () => action.handler(), "16px");
       container.add(button.container);
     });
-
+ 
     this.actionMenuContainer = container;
     this.actionMenuOpen = true;
     this.actionMenuUnitId = unit.id;
     this.uiLayer.add(container);
-
+ 
     this.helpText.setText(message || `${unit.name} is ready. Choose an action.`);
   }
-
+ 
   chooseActionAttack(unitId) {
     const unit = this.units.find((u) => u.id === unitId);
     if (!unit || unit.team !== "player" || unit.acted) return;
@@ -4535,10 +4553,10 @@ class BattleScene extends Phaser.Scene {
     const currentHp = Math.max(0, unit.hp || 0);
     const maxHp = Math.max(1, unit.maxHp || 1);
     this.hpBarText.setText(`HP ${currentHp}/${maxHp}`);
-    this.hpBarFill.displayWidth = 210 * Phaser.Math.Clamp(currentHp / maxHp, 0, 1);
+    this.hpBarFill.displayWidth = (this.sidePanelBarWidth || 200) * Phaser.Math.Clamp(currentHp / maxHp, 0, 1);
  
     this.levelXpText.setText(`Lv ${level} XP ${xp}/100`);
-    this.xpBarFill.displayWidth = 210 * Phaser.Math.Clamp(xp / 100, 0, 1);
+    this.xpBarFill.displayWidth = (this.sidePanelBarWidth || 200) * Phaser.Math.Clamp(xp / 100, 0, 1);
  
     const sigilPoints = Phaser.Math.Clamp(unit.sigilPoints ?? 0, 0, unit.maxSigilPoints ?? 3);
     const maxSigilPoints = unit.maxSigilPoints ?? 3;
