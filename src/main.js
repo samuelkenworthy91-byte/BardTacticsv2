@@ -2813,8 +2813,7 @@ class BattleScene extends Phaser.Scene {
     this.dialoguePortraitFrame = this.add.rectangle(720, 160, 120, 140, 0x24123a);
     this.dialoguePortraitFrame.setStrokeStyle(2, 0xe4d0a8);
     this.dialoguePortrait = this.add.image(720, 160, "edwinPortrait").setDisplaySize(110, 132);
-    this.dialoguePortraitPlaceholder = this.add.text(720, 160, "NO
-ART", { fontSize: "20px", color: "#94a3b8", align: "center" }).setOrigin(0.5);
+    this.dialoguePortraitPlaceholder = this.add.text(720, 160, "NO\nART", { fontSize: "20px", color: "#94a3b8", align: "center" }).setOrigin(0.5);
 
     this.impactContainer = this.add.container(0, 0).setVisible(false);
     const impactShadow = this.add.rectangle(480, 175, 560, 190, 0x020617, 0.82);
@@ -2823,16 +2822,14 @@ ART", { fontSize: "20px", color: "#94a3b8", align: "center" }).setOrigin(0.5);
     this.impactAttackerFrame = this.add.rectangle(0, 0, 130, 150, 0x1f2937, 1);
     this.impactAttackerFrame.setStrokeStyle(2, 0x64748b);
     this.impactAttackerImage = this.add.image(0, -6, "edwinPortrait").setDisplaySize(112, 132);
-    this.impactAttackerPlaceholder = this.add.text(0, -6, "NO
-ART", { fontSize: "20px", color: "#94a3b8", align: "center" }).setOrigin(0.5);
+    this.impactAttackerPlaceholder = this.add.text(0, -6, "NO\nART", { fontSize: "20px", color: "#94a3b8", align: "center" }).setOrigin(0.5);
     this.impactAttackerName = this.add.text(0, 86, "", { fontSize: "16px", fontStyle: "bold", color: "#f7ecd3" }).setOrigin(0.5);
     this.impactAttackerSlot.add([this.impactAttackerFrame, this.impactAttackerImage, this.impactAttackerPlaceholder, this.impactAttackerName]);
     this.impactDefenderSlot = this.add.container(640, 175);
     this.impactDefenderFrame = this.add.rectangle(0, 0, 130, 150, 0x1f2937, 1);
     this.impactDefenderFrame.setStrokeStyle(2, 0x64748b);
     this.impactDefenderImage = this.add.image(0, -6, "edwinPortrait").setDisplaySize(112, 132);
-    this.impactDefenderPlaceholder = this.add.text(0, -6, "NO
-ART", { fontSize: "20px", color: "#94a3b8", align: "center" }).setOrigin(0.5);
+    this.impactDefenderPlaceholder = this.add.text(0, -6, "NO\nART", { fontSize: "20px", color: "#94a3b8", align: "center" }).setOrigin(0.5);
     this.impactDefenderName = this.add.text(0, 86, "", { fontSize: "16px", fontStyle: "bold", color: "#f7ecd3" }).setOrigin(0.5);
     this.impactDefenderSlot.add([this.impactDefenderFrame, this.impactDefenderImage, this.impactDefenderPlaceholder, this.impactDefenderName]);
     this.impactText = this.add.text(480, 175, "SMASH!", { fontSize: "28px", fontStyle: "bold", color: "#f8fafc", stroke: "#0f172a", strokeThickness: 6 }).setOrigin(0.5);
