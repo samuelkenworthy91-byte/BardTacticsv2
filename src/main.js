@@ -57,13 +57,6 @@ const CHAPTER_ONE_GAME_OVER_UNIT_IDS = ["edwin", "leon"];
 const CHAPTER_ONE_ESCAPE_TILE = { x: 6, y: 0 };
 const OPPORTUNITY_ATTACK_HIT_RATE = 50;
 const OPPORTUNITY_ATTACK_PAUSE = 650;
-const SKILL_TILE_EFFECT_STAGGER = 180;
-const SKILL_TILE_EFFECT_APPEAR_DURATION = 220;
-const SKILL_TILE_EFFECT_HOLD_DURATION = 1000;
-const SKILL_TILE_EFFECT_FADE_DURATION = 700;
-const SKILL_TILE_EFFECT_END_SCALE = 1.18;
-const BROTHERS_BLIGH_CUTIN_HOLD_DURATION = 1500;
-const BROTHERS_BLIGH_CUTIN_FADE_DURATION = 360;
 
 const CARDINAL_DIRECTIONS = ["down", "up", "left", "right"];
 const CLOCKWISE_DIRECTIONS = ["up", "right", "down", "left"];
@@ -3367,7 +3360,7 @@ class BattleScene extends Phaser.Scene {
     if (!effectKey) return;
 
     this.getSkillHitTilesAt(unit, skill, unit.x, unit.y).forEach((tile, index) => {
-      this.time.delayedCall(index * SKILL_TILE_EFFECT_STAGGER, () => this.playTileEffect(tile.x, tile.y, effectKey));
+      this.time.delayedCall(index * 45, () => this.playTileEffect(tile.x, tile.y, effectKey));
     });
   }
 
@@ -3416,11 +3409,11 @@ class BattleScene extends Phaser.Scene {
           yoyo: true,
           repeat: 3,
         });
-        this.time.delayedCall(BROTHERS_BLIGH_CUTIN_HOLD_DURATION, () => {
+        this.time.delayedCall(820, () => {
           this.tweens.add({
             targets: container,
             alpha: 0,
-            duration: BROTHERS_BLIGH_CUTIN_FADE_DURATION,
+            duration: 180,
             ease: "Quad.Out",
             onComplete: () => {
               container.destroy();
@@ -3453,33 +3446,14 @@ class BattleScene extends Phaser.Scene {
     effect.setDepth(9997);
     this.overlayLayer.add(effect);
 
-    const baseScaleX = effect.scaleX || 1;
-    const baseScaleY = effect.scaleY || 1;
-    effect.setAlpha(0);
-    effect.setScale(baseScaleX * 0.82, baseScaleY * 0.82);
-
     this.tweens.add({
       targets: effect,
-      alpha: 1,
-      scaleX: baseScaleX,
-      scaleY: baseScaleY,
-      duration: SKILL_TILE_EFFECT_APPEAR_DURATION,
-      ease: "Back.Out",
-      onComplete: () => {
-        this.time.delayedCall(SKILL_TILE_EFFECT_HOLD_DURATION, () => {
-          if (!effect?.active) return;
-
-          this.tweens.add({
-            targets: effect,
-            alpha: 0,
-            scaleX: baseScaleX * SKILL_TILE_EFFECT_END_SCALE,
-            scaleY: baseScaleY * SKILL_TILE_EFFECT_END_SCALE,
-            duration: SKILL_TILE_EFFECT_FADE_DURATION,
-            ease: "Quad.Out",
-            onComplete: () => effect.destroy(),
-          });
-        });
-      },
+      alpha: 0,
+      scaleX: effect.scaleX * 1.25,
+      scaleY: effect.scaleY * 1.25,
+      duration: 520,
+      ease: "Quad.Out",
+      onComplete: () => effect.destroy(),
     });
   }
 
