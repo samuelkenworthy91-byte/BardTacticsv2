@@ -21,8 +21,11 @@ const TITLE_SCREEN_KEY = "bardsTitleScreen";
 const TITLE_SCREEN_PATH = "/ui/title_screen.png";
 const LOADING_RUNNER_KEY = "edwin_move_right";
 const LOADING_RUNNER_PATH = "/sprites/edwin/move_right.png";
+const ICE_OF_AGES_HIT_EFFECT_KEY = "iceOfAgesHitEffect";
+const ICE_OF_AGES_HIT_EFFECT_PATH = "/effects/ice_of_ages_hit.png";
  
 const CARDINAL_DIRECTIONS = ["down", "up", "left", "right"];
+const CLOCKWISE_DIRECTIONS = ["up", "right", "down", "left"];
 const LEVEL_UP_STATS = [
   { key: "hp", label: "HP", description: "+1 max HP and current HP" },
   { key: "str", label: "STR", description: "+1 physical damage" },
@@ -75,6 +78,7 @@ const INDIVIDUAL_UNIT_SPRITE_SETS = {
     idle: createDirectionalStateEntries("falan", "idle"),
     move: createDirectionalStateEntries("falan", "move"),
     attack: createDirectionalStateEntries("falan", "attack"),
+    spin: createDirectionalStateEntries("falan", "spin"),
     hurt: createDirectionalStateEntries("falan", "hurt"),
     death: createDeathEntries("falan"),
   },
@@ -182,7 +186,7 @@ const CHAPTER_OPENING = [
     type: "title",
     chapter: "Chapter 1",
     subtitle: "4 Years Gone",
-    tag: "The Underpass",
+    tag: "",
   },
   {
     type: "scene",
@@ -408,7 +412,7 @@ const UNITS = [
     spd: 5,
     luck: 3,
     weapons: [{ name: "Katars", baseDamage: 3, range: 1, damageType: "physical", stat: "str", hitRate: 100, speedBonus: 2 }],
-    skills: [{ id: "manicDervish", name: "Manic Dervish", cost: 3, type: "adjacentSquare", damageFormula: "strPlusSpd", animationState: "attack" }],
+    skills: [{ id: "manicDervish", name: "Manic Dervish", cost: 3, type: "adjacentSquare", damageFormula: "strPlusSpd", animationState: "spin" }],
     acted: false,
     color: 0xf87171,
     boss: true,
@@ -693,6 +697,7 @@ function queueChapterOneAssets(scene, levelData = LEVELS.chapter1) {
   queueImage(scene, "underpassScene", "/scenes/underpass.jpg");
   queueImage(scene, "vanInteriorScene", "/scenes/van_interior.jpg");
   queueImage(scene, "byronFarmScene", "/scenes/byron_farm.jpg");
+  queueImage(scene, ICE_OF_AGES_HIT_EFFECT_KEY, ICE_OF_AGES_HIT_EFFECT_PATH);
   queueBiomeTileAssets(scene, levelData?.biome);
   queueIndividualDirectionalSpriteAssets(scene);
   if (levelData?.battleMusic?.key && levelData?.battleMusic?.path) {
@@ -1968,7 +1973,9 @@ class BattleScene extends Phaser.Scene {
       this.dialogueCard.setVisible(false);
       this.titleChapter.setText(step.chapter);
       this.titleSubtitle.setText(step.subtitle);
-      this.titleTag.setText(step.tag);
+      const tagText = step.tag || "";
+      this.titleTag.setText(tagText);
+      this.titleTag.setVisible(tagText.length > 0);
       this.helpText.setText("Chapter opening.");
       return;
     }
@@ -2290,6 +2297,73 @@ class BattleScene extends Phaser.Scene {
     }
   }
  
+  playUnitSpinAnimation(unit, duration = 900) {
+    if (!unit) return;
+ 
+    const originalFacing = CARDINAL_DIRECTIONS.includes(unit.facing) ? unit.facing : "down";
+    const startIndex = CLOCKWISE_DIRECTIONS.indexOf(originalFacing);
+    const spinOrder = startIndex >= 0
+      ? [...CLOCKWISE_DIRECTIONS.slice(startIndex), ...CLOCKWISE_DIRECTIONS.slice(0, startIndex)]
+      : [originalFacing, ...CLOCKWISE_DIRECTIONS.filter((direction) => direction !== originalFacing)];
+    const frameDuration = Math.max(110, Math.floor(duration / Math.max(1, spinOrder.length)));
+ 
+    spinOrder.forEach((direction, index) => {
+      this.time.delayedCall(index * frameDuration, () => {
+        if (!unit || unit.hp <= 0) return;
+        unit.facing = direction;
+        const usedSpinFrame = this.setUnitSpriteFrame(unit, "spin", direction);
+        if (!usedSpinFrame) this.setUnitSpriteFrame(unit, "attack", direction);
+      });
+    });
+ 
+    this.time.delayedCall(frameDuration * spinOrder.length + 40, () => {
+      if (!unit || unit.hp <= 0) return;
+      unit.facing = originalFacing;
+      this.setUnitSpriteFrame(unit, "idle", originalFacing);
+    });
+  }
+ 
+  playSkillTileEffects(unit, skill) {
+    if (!unit || !skill) return;
+    if (skill.id !== "iceOfAges") return;
+ 
+    this.getSkillHitTilesAt(unit, skill, unit.x, unit.y).forEach((tile, index) => {
+      this.time.delayedCall(index * 45, () => this.playTileEffect(tile.x, tile.y, ICE_OF_AGES_HIT_EFFECT_KEY));
+    });
+  }
+ 
+  playTileEffect(tileX, tileY, textureKey) {
+    const x = this.boardX + tileX * TILE_SIZE + TILE_SIZE / 2;
+    const y = this.boardY + tileY * TILE_SIZE + TILE_SIZE / 2;
+ 
+    let effect;
+    if (textureKey && this.textures.exists(textureKey)) {
+      effect = this.add.image(x, y, textureKey).setOrigin(0.5);
+      const source = this.textures.get(textureKey)?.getSourceImage();
+      const maxSize = TILE_SIZE * 0.82;
+      if (source?.width && source?.height) {
+        const scale = Math.min(maxSize / source.width, maxSize / source.height);
+        effect.setScale(scale);
+      }
+    } else {
+      effect = this.add.circle(x, y, TILE_SIZE * 0.26, 0x93c5fd, 0.62);
+      effect.setStrokeStyle(2, 0xdbeafe, 0.9);
+    }
+ 
+    effect.setDepth(9997);
+    this.overlayLayer.add(effect);
+ 
+    this.tweens.add({
+      targets: effect,
+      alpha: 0,
+      scaleX: effect.scaleX * 1.25,
+      scaleY: effect.scaleY * 1.25,
+      duration: 520,
+      ease: "Quad.Out",
+      onComplete: () => effect.destroy(),
+    });
+  }
+ 
   playUnitHurt(unit, duration = 360) {
     if (!unit) return;
     const sprite = this.unitSprites[unit.id];
@@ -2443,8 +2517,10 @@ class BattleScene extends Phaser.Scene {
       entries: unit.skills || [],
       emptyText: `${unit.name} has no skills yet.`,
       getLabel: (skill) => `${skill.name} (${skill.cost || 0} SP)`,
+      layout: "leftPanel",
       getSummary: (skill) => this.getSkillSummary(unit, skill),
       getTargets: (skill) => this.getSkillTargetsAt(unit, skill, unit.x, unit.y),
+      getPreviewTiles: (skill) => this.getSkillHitTilesAt(unit, skill, unit.x, unit.y),
       canChoose: (skill) => this.canUseSkill(unit, skill),
       disabledText: (skill) => `${skill.name} needs ${skill.cost} Sigil Points.`,
       onChoose: (skill) => {
@@ -2484,12 +2560,18 @@ class BattleScene extends Phaser.Scene {
  
     const centerX = this.boardX + unit.x * TILE_SIZE + TILE_SIZE / 2;
     const centerY = this.boardY + unit.y * TILE_SIZE + TILE_SIZE / 2;
-    const menuWidth = 310;
-    const rowHeight = 42;
-    const menuHeight = Phaser.Math.Clamp(132 + entries.length * rowHeight, 210, 430);
+    const rowHeight = config.layout === "leftPanel" ? 38 : 42;
+    const menuWidth = config.layout === "leftPanel" ? 184 : 310;
+    const menuHeight = config.layout === "leftPanel"
+      ? Phaser.Math.Clamp(142 + entries.length * rowHeight, 214, 330)
+      : Phaser.Math.Clamp(132 + entries.length * rowHeight, 210, 430);
     const maxRightBeforeSidePanel = 708;
-    const x = Phaser.Math.Clamp(centerX + TILE_SIZE * 1.1, menuWidth / 2 + 8, maxRightBeforeSidePanel - menuWidth / 2);
-    const y = Phaser.Math.Clamp(centerY, menuHeight / 2 + 8, GAME_HEIGHT - menuHeight / 2 - 8);
+    const x = config.layout === "leftPanel"
+      ? 92
+      : Phaser.Math.Clamp(centerX + TILE_SIZE * 1.1, menuWidth / 2 + 8, maxRightBeforeSidePanel - menuWidth / 2);
+    const y = config.layout === "leftPanel"
+      ? Phaser.Math.Clamp(190 + menuHeight / 2, menuHeight / 2 + 8, GAME_HEIGHT - menuHeight / 2 - 8)
+      : Phaser.Math.Clamp(centerY, menuHeight / 2 + 8, GAME_HEIGHT - menuHeight / 2 - 8);
     const container = this.add.container(x, y).setDepth(9999);
     const panel = createBannerPanel(this, 0, 0, menuWidth, menuHeight, { innerInset: 12 });
     const title = this.add.text(0, -menuHeight / 2 + 26, config.title || "Menu", {
@@ -2500,8 +2582,8 @@ class BattleScene extends Phaser.Scene {
       strokeThickness: 3,
     }).setOrigin(0.5);
  
-    this.selectionMenuSummaryText = this.add.text(-menuWidth / 2 + 18, menuHeight / 2 - 58, "Hover an option to preview it.", {
-      fontSize: "11px",
+    this.selectionMenuSummaryText = this.add.text(-menuWidth / 2 + 18, menuHeight / 2 - 64, "Hover an option to preview it.", {
+      fontSize: config.layout === "leftPanel" ? "10px" : "11px",
       color: "#d8c4f0",
       wordWrap: { width: menuWidth - 36 },
       lineSpacing: 2,
@@ -2518,19 +2600,19 @@ class BattleScene extends Phaser.Scene {
       const rowY = -menuHeight / 2 + 66 + index * rowHeight;
       const label = config.getLabel ? config.getLabel(entry) : entry.name;
       const canChoose = config.canChoose ? config.canChoose(entry) : true;
-      const button = createBannerButton(this, 0, rowY, menuWidth - 26, 32, label, () => {
+      const button = createBannerButton(this, 0, rowY, menuWidth - 26, config.layout === "leftPanel" ? 30 : 32, label, () => {
         if (!canChoose) {
           this.helpText.setText(config.disabledText ? config.disabledText(entry) : "That option cannot be used now.");
           return;
         }
         if (typeof config.onChoose === "function") config.onChoose(entry);
-      }, "14px");
+      }, config.layout === "leftPanel" ? "12px" : "14px");
  
       button.container.setAlpha(canChoose ? 1 : 0.45);
       button.hit.on("pointerover", () => {
-        const targets = config.getTargets ? config.getTargets(entry) : [];
+        const previewTiles = config.getPreviewTiles ? config.getPreviewTiles(entry) : (config.getTargets ? config.getTargets(entry) : []);
         const highlight = TARGET_HIGHLIGHT[config.type] || TARGET_HIGHLIGHT.skill;
-        this.showTargetHighlightsForUnits(targets, highlight.fill, highlight.stroke);
+        this.showTargetHighlightsForUnits(previewTiles, highlight.fill, highlight.stroke);
         if (this.selectionMenuSummaryText) {
           this.selectionMenuSummaryText.setText(config.getSummary ? config.getSummary(entry) : "");
         }
@@ -2550,9 +2632,9 @@ class BattleScene extends Phaser.Scene {
  
     const firstEntry = entries[0];
     if (firstEntry) {
-      const targets = config.getTargets ? config.getTargets(firstEntry) : [];
+      const previewTiles = config.getPreviewTiles ? config.getPreviewTiles(firstEntry) : (config.getTargets ? config.getTargets(firstEntry) : []);
       const highlight = TARGET_HIGHLIGHT[config.type] || TARGET_HIGHLIGHT.skill;
-      this.showTargetHighlightsForUnits(targets, highlight.fill, highlight.stroke);
+      this.showTargetHighlightsForUnits(previewTiles, highlight.fill, highlight.stroke);
       if (this.selectionMenuSummaryText) {
         this.selectionMenuSummaryText.setText(config.getSummary ? config.getSummary(firstEntry) : "");
       }
@@ -2586,13 +2668,14 @@ class BattleScene extends Phaser.Scene {
   getSkillSummary(unit, skill) {
     if (!unit || !skill) return "";
     const targets = this.getSkillTargetsAt(unit, skill, unit.x, unit.y);
+    const hitTiles = this.getSkillHitTilesAt(unit, skill, unit.x, unit.y);
     let effect = "Uses a special technique.";
     if (skill.damageFormula === "mag") {
-      effect = `Deals ${unit.mag || 0} damage to every unit in the squares around ${unit.name}.`;
+      effect = `Deals ${unit.mag || 0} damage to every unit in the surrounding squares.`;
     } else if (skill.damageFormula === "strPlusSpd") {
-      effect = `Deals ${(unit.str || 0) + (unit.spd || 0)} damage to every unit in the squares around ${unit.name}.`;
+      effect = `Deals ${(unit.str || 0) + (unit.spd || 0)} damage to every unit in the surrounding squares.`;
     }
-    return `${skill.name}: costs ${skill.cost || 0} Sigil Point${(skill.cost || 0) === 1 ? "" : "s"}. ${effect} Targets now: ${targets.length}.`;
+    return `${skill.name}: costs ${skill.cost || 0} Sigil Point${(skill.cost || 0) === 1 ? "" : "s"}. ${effect} Hit zone: ${hitTiles.length} tile${hitTiles.length === 1 ? "" : "s"}. Units currently hit: ${targets.length}.`;
   }
  
   getSkillById(unit, skillId) {
@@ -2604,14 +2687,30 @@ class BattleScene extends Phaser.Scene {
     return (unit.sigilPoints ?? 0) >= (skill.cost ?? 0);
   }
  
+  getSkillHitTilesAt(unit, skill, x = unit.x, y = unit.y) {
+    if (!unit || !skill) return [];
+    if (skill.type === "adjacentSquare") {
+      const tiles = [];
+      for (let dy = -1; dy <= 1; dy += 1) {
+        for (let dx = -1; dx <= 1; dx += 1) {
+          if (dx === 0 && dy === 0) continue;
+          const tileX = x + dx;
+          const tileY = y + dy;
+          if (this.isInBounds(tileX, tileY)) tiles.push({ x: tileX, y: tileY });
+        }
+      }
+      return tiles;
+    }
+    return [];
+  }
+ 
   getSkillTargetsAt(unit, skill, x = unit.x, y = unit.y) {
     if (!unit || !skill) return [];
     if (skill.type === "adjacentSquare") {
+      const hitTileKeys = new Set(this.getSkillHitTilesAt(unit, skill, x, y).map((tile) => tileKey(tile.x, tile.y)));
       return this.units.filter((other) => {
         if (!other || other.id === unit.id || other.hp <= 0) return false;
-        const dx = Math.abs(other.x - x);
-        const dy = Math.abs(other.y - y);
-        return dx <= 1 && dy <= 1;
+        return hitTileKeys.has(tileKey(other.x, other.y));
       });
     }
     return [];
@@ -2647,9 +2746,14 @@ class BattleScene extends Phaser.Scene {
     this.updateSelectedPanel();
     this.showSkillBanner(skill.name);
     this.helpText.setText(`${unit.name} uses ${skill.name}!`);
-    this.playUnitState(unit, skill.animationState || "attack", SKILL_IMPACT_DELAY + 450);
+    if (skill.animationState === "spin") {
+      this.playUnitSpinAnimation(unit, SKILL_IMPACT_DELAY + 450);
+    } else {
+      this.playUnitState(unit, skill.animationState || "attack", SKILL_IMPACT_DELAY + 450);
+    }
     const targetResults = targets.map((target) => ({ target, wasAlive: target.hp > 0, damage: this.calculateSkillDamage(unit, target, skill) }));
     this.time.delayedCall(SKILL_IMPACT_DELAY, () => {
+      this.playSkillTileEffects(unit, skill);
       let totalXp = 0;
       let defeatedFalan = false;
       let defeatedEdwin = false;
