@@ -30,6 +30,24 @@ const LOADING_RUNNER_KEY = "edwin_move_right";
 const LOADING_RUNNER_PATH = "/sprites/edwin/move_right.png";
 const ICE_OF_AGES_HIT_EFFECT_KEY = "iceOfAgesHitEffect";
 const ICE_OF_AGES_HIT_EFFECT_PATH = "/effects/ice_of_ages_hit.png";
+const BROTHERS_BLIGH_CUTIN_KEY = "brothersBlighCutin";
+const BROTHERS_BLIGH_CUTIN_PATH = "/effects/brothers_bligh_cutin.png";
+const BROTHERS_BLIGH_HIT_EFFECT_KEY = "brothersBlighHitEffect";
+const BROTHERS_BLIGH_HIT_EFFECT_PATH = "/effects/brothers_bligh_hit.png";
+const BROTHERS_BLIGH_SKILL = {
+  id: "brothersBligh",
+  name: "Brother's Bligh",
+  cost: 3,
+  partnerCost: 3,
+  type: "forwardRectangle",
+  width: 3,
+  depth: 2,
+  targetTeam: "enemy",
+  damageFormula: "brothersCombinedStrMag",
+  animationState: "magic",
+  cutinKey: BROTHERS_BLIGH_CUTIN_KEY,
+  hitEffectKey: BROTHERS_BLIGH_HIT_EFFECT_KEY,
+};
 const CHAPTER_TWO_TITLE = { chapter: "Chapter 2", subtitle: "Owed an Explanation" };
 const ALLIED_DEATH_LINES = {
   leon: "I can't...not yet...I only just found you.",
@@ -741,6 +759,8 @@ function queueChapterOneAssets(scene, levelData = LEVELS.chapter1) {
   queueImage(scene, "vanInteriorScene", "/scenes/van_interior.jpg");
   queueImage(scene, "byronFarmScene", "/scenes/byron_farm.jpg");
   queueImage(scene, ICE_OF_AGES_HIT_EFFECT_KEY, ICE_OF_AGES_HIT_EFFECT_PATH);
+  queueImage(scene, BROTHERS_BLIGH_CUTIN_KEY, BROTHERS_BLIGH_CUTIN_PATH);
+  queueImage(scene, BROTHERS_BLIGH_HIT_EFFECT_KEY, BROTHERS_BLIGH_HIT_EFFECT_PATH);
   queueBiomeTileAssets(scene, levelData?.biome);
   queueIndividualDirectionalSpriteAssets(scene);
   if (levelData?.battleMusic?.key && levelData?.battleMusic?.path) {
@@ -2898,66 +2918,94 @@ class BattleScene extends Phaser.Scene {
     ));
   }
  
+  getAdjacentOpponents(unit) {
+    return this.getAdjacentEnemies(unit);
+  }
+ 
   getOpportunityThreatBeforeMove(unit, targetX, targetY) {
-    if (!unit || unit.team !== "player") return null;
+    if (!unit) return null;
  
     const turnStartThreatIds = new Set(unit.opportunityThreatIdsAtTurnStart || []);
     if (turnStartThreatIds.size === 0) return null;
  
     const oldPosition = { x: unit.x, y: unit.y };
  
-    return this.units.find((enemy) => {
-      if (!enemy || enemy.team === unit.team || enemy.hp <= 0) return false;
-      if (!turnStartThreatIds.has(enemy.id)) return false;
-      if (Math.abs(enemy.x - oldPosition.x) + Math.abs(enemy.y - oldPosition.y) !== 1) return false;
-      const newDistance = Math.abs(enemy.x - targetX) + Math.abs(enemy.y - targetY);
+    return this.units.find((opponent) => {
+      if (!opponent || opponent.team === unit.team || opponent.hp <= 0) return false;
+      if (!turnStartThreatIds.has(opponent.id)) return false;
+      if (Math.abs(opponent.x - oldPosition.x) + Math.abs(opponent.y - oldPosition.y) !== 1) return false;
+      const newDistance = Math.abs(opponent.x - targetX) + Math.abs(opponent.y - targetY);
       if (newDistance <= 1) return false;
-      return !!getWeaponForTarget(enemy, unit);
+      return !!getWeaponForTarget(opponent, unit);
     }) || null;
   }
  
-  resolveOpportunityAttack(enemy, unit, onComplete) {
-    if (!enemy || !unit || unit.hp <= 0) {
+  resolveOpportunityAttack(attacker, defender, onComplete) {
+    if (!attacker || !defender || defender.hp <= 0) {
       if (typeof onComplete === "function") onComplete();
       return;
     }
  
-    const weapon = getWeaponForTarget(enemy, unit) || getDefaultWeapon(enemy);
+    const weapon = getWeaponForTarget(attacker, defender) || getDefaultWeapon(attacker);
     if (!weapon) {
       if (typeof onComplete === "function") onComplete();
       return;
     }
  
-    this.helpText.setText(`${enemy.name} makes an opportunity attack!`);
-    this.faceUnitToward(enemy, unit);
-    this.faceUnitToward(unit, enemy);
-    this.playUnitState(enemy, this.getAttackAnimationState(enemy, weapon), OPPORTUNITY_ATTACK_PAUSE);
+    this.helpText.setText(`${attacker.name} makes an opportunity attack!`);
+    this.faceUnitToward(attacker, defender);
+    this.faceUnitToward(defender, attacker);
+    this.playUnitState(attacker, this.getAttackAnimationState(attacker, weapon), OPPORTUNITY_ATTACK_PAUSE);
  
     const hit = Phaser.Math.Between(1, 100) <= OPPORTUNITY_ATTACK_HIT_RATE;
-    const damage = hit ? this.calculateDamage(enemy, unit, weapon) : 0;
+    const damage = hit ? this.calculateDamage(attacker, defender, weapon) : 0;
  
     this.time.delayedCall(220, () => {
       this.showFloatingText(
-        this.boardX + unit.x * TILE_SIZE + TILE_SIZE / 2,
-        this.boardY + unit.y * TILE_SIZE + 8,
+        this.boardX + defender.x * TILE_SIZE + TILE_SIZE / 2,
+        this.boardY + defender.y * TILE_SIZE + 8,
         hit ? `OPPORTUNITY -${damage}` : "OPPORTUNITY MISS",
         hit ? "#fca5a5" : "#fef3c7"
       );
  
       if (hit) {
-        unit.hp = Math.max(0, unit.hp - damage);
-        this.playUnitHurt(unit, 360);
-        this.refreshUnitSprite(unit);
+        defender.hp = Math.max(0, defender.hp - damage);
+        this.playUnitHurt(defender, 360);
+        this.refreshUnitSprite(defender);
         this.updateSelectedPanel();
       }
     });
  
     this.time.delayedCall(OPPORTUNITY_ATTACK_PAUSE, () => {
-      if (unit.hp <= 0) {
-        this.handleAllyUnitDeath(unit);
+      if (defender.hp <= 0) {
+        this.handleOpportunityDefeat(defender, onComplete);
         return;
       }
  
+      if (typeof onComplete === "function") onComplete();
+    });
+  }
+ 
+  handleOpportunityDefeat(unit, onComplete = null) {
+    if (!unit) {
+      if (typeof onComplete === "function") onComplete();
+      return;
+    }
+ 
+    unit.hp = 0;
+ 
+    if (unit.team === "player") {
+      this.handleAllyUnitDeath(unit, onComplete);
+      return;
+    }
+ 
+    if (unit.id === "falan") {
+      this.handleFalanDefeat(unit, onComplete);
+      return;
+    }
+ 
+    this.playUnitDeath(unit, () => {
+      this.removeUnitSpriteAndData(unit.id);
       if (typeof onComplete === "function") onComplete();
     });
   }
@@ -3227,10 +3275,75 @@ class BattleScene extends Phaser.Scene {
  
   playSkillTileEffects(unit, skill) {
     if (!unit || !skill) return;
-    if (skill.id !== "iceOfAges") return;
+ 
+    let effectKey = null;
+    if (skill.id === "iceOfAges") effectKey = ICE_OF_AGES_HIT_EFFECT_KEY;
+    if (skill.id === "brothersBligh") effectKey = BROTHERS_BLIGH_HIT_EFFECT_KEY;
+    if (!effectKey) return;
  
     this.getSkillHitTilesAt(unit, skill, unit.x, unit.y).forEach((tile, index) => {
-      this.time.delayedCall(index * 45, () => this.playTileEffect(tile.x, tile.y, ICE_OF_AGES_HIT_EFFECT_KEY));
+      this.time.delayedCall(index * 45, () => this.playTileEffect(tile.x, tile.y, effectKey));
+    });
+  }
+ 
+  playBrothersBlighCutin(onComplete = null) {
+    const container = this.add.container(0, 0).setDepth(22000).setAlpha(0);
+    const dim = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.72);
+    dim.setInteractive();
+ 
+    const panel = createBannerPanel(this, GAME_WIDTH / 2, GAME_HEIGHT / 2, 680, 300, { innerInset: 18 });
+ 
+    let cutinVisual;
+    if (this.textures.exists(BROTHERS_BLIGH_CUTIN_KEY)) {
+      cutinVisual = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 12, BROTHERS_BLIGH_CUTIN_KEY).setOrigin(0.5);
+      fitImageToBounds(this, cutinVisual, BROTHERS_BLIGH_CUTIN_KEY, 620, 230, false);
+    } else {
+      cutinVisual = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 20, "Edwin + Leon", {
+        fontSize: "38px",
+        fontStyle: "bold",
+        color: "#f7ecd3",
+        stroke: "#0b0811",
+        strokeThickness: 6,
+      }).setOrigin(0.5);
+    }
+ 
+    const comboText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 116, "COMBINING ABILITIES", {
+      fontSize: "28px",
+      fontStyle: "bold",
+      color: "#7dd3fc",
+      stroke: "#0b0811",
+      strokeThickness: 6,
+    }).setOrigin(0.5);
+ 
+    container.add([dim, panel.container, cutinVisual, comboText]);
+    this.uiLayer.add(container);
+ 
+    this.tweens.add({
+      targets: container,
+      alpha: 1,
+      duration: 160,
+      ease: "Quad.Out",
+      onComplete: () => {
+        this.tweens.add({
+          targets: comboText,
+          alpha: 0.35,
+          duration: 120,
+          yoyo: true,
+          repeat: 3,
+        });
+        this.time.delayedCall(820, () => {
+          this.tweens.add({
+            targets: container,
+            alpha: 0,
+            duration: 180,
+            ease: "Quad.Out",
+            onComplete: () => {
+              container.destroy();
+              if (typeof onComplete === "function") onComplete();
+            },
+          });
+        });
+      },
     });
   }
  
@@ -3418,10 +3531,67 @@ class BattleScene extends Phaser.Scene {
     this.helpText.setText(`Choose an enemy for ${unit.name} to attack. Press Space to cancel.`);
   }
  
+ 
+  getBrotherUnits() {
+    return {
+      edwin: this.units.find((unit) => unit.id === "edwin" && unit.hp > 0) || null,
+      leon: this.units.find((unit) => unit.id === "leon" && unit.hp > 0) || null,
+    };
+  }
+ 
+  isBrotherUnit(unit) {
+    return !!unit && (unit.id === "edwin" || unit.id === "leon");
+  }
+ 
+  areBrothersAdjacent() {
+    const brothers = this.getBrotherUnits();
+    return !!brothers.edwin && !!brothers.leon && distance(brothers.edwin, brothers.leon) === 1;
+  }
+ 
+  getAvailableSkills(unit) {
+    if (!unit) return [];
+ 
+    const skills = (unit.skills || []).map((skill) => ({ ...skill }));
+ 
+    if (this.isBrotherUnit(unit) && this.areBrothersAdjacent()) {
+      skills.push({ ...BROTHERS_BLIGH_SKILL });
+    }
+ 
+    return skills;
+  }
+ 
+  getBrotherSkillPartner(unit) {
+    if (!this.isBrotherUnit(unit)) return null;
+    const brothers = this.getBrotherUnits();
+    return unit.id === "edwin" ? brothers.leon : brothers.edwin;
+  }
+ 
+  getCombinedBrotherPower() {
+    const brothers = this.getBrotherUnits();
+    if (!brothers.edwin || !brothers.leon) return 0;
+    return (brothers.edwin.str || 0) + (brothers.edwin.mag || 0) + (brothers.leon.str || 0) + (brothers.leon.mag || 0);
+  }
+ 
+  spendSkillCost(unit, skill) {
+    if (!unit || !skill) return;
+ 
+    if (skill.id === "brothersBligh") {
+      const partner = this.getBrotherSkillPartner(unit);
+      unit.sigilPoints = Math.max(0, (unit.sigilPoints ?? 0) - (skill.cost ?? 0));
+      if (partner) {
+        partner.sigilPoints = Math.max(0, (partner.sigilPoints ?? 0) - (skill.partnerCost ?? skill.cost ?? 0));
+        this.refreshUnitSprite(partner);
+      }
+      return;
+    }
+ 
+    unit.sigilPoints = Math.max(0, (unit.sigilPoints ?? 0) - (skill.cost ?? 0));
+  }
+ 
   chooseActionSkill(unitId) {
     const unit = this.units.find((u) => u.id === unitId);
     if (!unit || unit.team !== "player" || unit.acted) return;
-    const skills = unit.skills || [];
+    const skills = this.getAvailableSkills(unit);
     if (skills.length === 0) {
       this.helpText.setText(`${unit.name} has no skills yet. Choose another action.`);
       return;
@@ -3433,7 +3603,7 @@ class BattleScene extends Phaser.Scene {
     this.showChoiceMenu(unit, {
       type: "skill",
       title: "Skills",
-      entries: unit.skills || [],
+      entries: this.getAvailableSkills(unit),
       emptyText: `${unit.name} has no skills yet.`,
       getLabel: (skill) => `${skill.name} (${skill.cost || 0} SP)`,
       layout: "leftPanel",
@@ -3447,9 +3617,9 @@ class BattleScene extends Phaser.Scene {
           this.helpText.setText(`${skill.name} needs ${skill.cost} Sigil Points.`);
           return;
         }
-        const targets = this.getSkillTargetsAt(unit, skill, unit.x, unit.y);
-        if (targets.length === 0) {
-          this.helpText.setText(`No units are in range for ${skill.name}. Choose another action.`);
+        const hitTiles = this.getSkillHitTilesAt(unit, skill, unit.x, unit.y);
+        if (hitTiles.length === 0) {
+          this.helpText.setText(`No valid tiles are in range for ${skill.name}. Choose another action.`);
           return;
         }
         this.closeSelectionMenu(false);
@@ -3589,25 +3759,41 @@ class BattleScene extends Phaser.Scene {
     const targets = this.getSkillTargetsAt(unit, skill, unit.x, unit.y);
     const hitTiles = this.getSkillHitTilesAt(unit, skill, unit.x, unit.y);
     let effect = "Uses a special technique.";
-    if (skill.damageFormula === "mag") {
+ 
+    if (skill.id === "brothersBligh") {
+      const partner = this.getBrotherSkillPartner(unit);
+      const power = this.getCombinedBrotherPower();
+      effect = `Combines Edwin and Leon's STR + MAG for ${power} damage in a 3x2 blast ahead of ${unit.name}. Costs 3 SP from both brothers${partner ? "" : " (partner missing)"}.`;
+    } else if (skill.damageFormula === "mag") {
       effect = `Deals ${unit.mag || 0} damage to every unit in the surrounding squares.`;
     } else if (skill.damageFormula === "strPlusSpd") {
       effect = `Deals ${(unit.str || 0) + (unit.spd || 0)} damage to every unit in the surrounding squares.`;
     }
+ 
     return `${skill.name}: costs ${skill.cost || 0} Sigil Point${(skill.cost || 0) === 1 ? "" : "s"}. ${effect} Hit zone: ${hitTiles.length} tile${hitTiles.length === 1 ? "" : "s"}. Units currently hit: ${targets.length}.`;
   }
  
   getSkillById(unit, skillId) {
-    return (unit?.skills || []).find((skill) => skill.id === skillId) || null;
+    return this.getAvailableSkills(unit).find((skill) => skill.id === skillId) || null;
   }
  
   canUseSkill(unit, skill) {
     if (!unit || !skill) return false;
+ 
+    if (skill.id === "brothersBligh") {
+      const partner = this.getBrotherSkillPartner(unit);
+      return this.areBrothersAdjacent() &&
+        !!partner &&
+        (unit.sigilPoints ?? 0) >= (skill.cost ?? 0) &&
+        (partner.sigilPoints ?? 0) >= (skill.partnerCost ?? skill.cost ?? 0);
+    }
+ 
     return (unit.sigilPoints ?? 0) >= (skill.cost ?? 0);
   }
  
   getSkillHitTilesAt(unit, skill, x = unit.x, y = unit.y) {
     if (!unit || !skill) return [];
+ 
     if (skill.type === "adjacentSquare") {
       const tiles = [];
       for (let dy = -1; dy <= 1; dy += 1) {
@@ -3620,25 +3806,62 @@ class BattleScene extends Phaser.Scene {
       }
       return tiles;
     }
+ 
+    if (skill.type === "forwardRectangle") {
+      const tiles = [];
+      const facing = CARDINAL_DIRECTIONS.includes(unit.facing) ? unit.facing : "down";
+      const depth = skill.depth || 2;
+      const halfWidth = Math.floor((skill.width || 3) / 2);
+ 
+      for (let forward = 1; forward <= depth; forward += 1) {
+        for (let side = -halfWidth; side <= halfWidth; side += 1) {
+          let tileX = x;
+          let tileY = y;
+ 
+          if (facing === "down") {
+            tileX = x + side;
+            tileY = y + forward;
+          } else if (facing === "up") {
+            tileX = x + side;
+            tileY = y - forward;
+          } else if (facing === "right") {
+            tileX = x + forward;
+            tileY = y + side;
+          } else if (facing === "left") {
+            tileX = x - forward;
+            tileY = y + side;
+          }
+ 
+          if (this.isInBounds(tileX, tileY)) tiles.push({ x: tileX, y: tileY });
+        }
+      }
+ 
+      return tiles;
+    }
+ 
     return [];
   }
  
   getSkillTargetsAt(unit, skill, x = unit.x, y = unit.y) {
     if (!unit || !skill) return [];
-    if (skill.type === "adjacentSquare") {
-      const hitTileKeys = new Set(this.getSkillHitTilesAt(unit, skill, x, y).map((tile) => tileKey(tile.x, tile.y)));
-      return this.units.filter((other) => {
-        if (!other || other.id === unit.id || other.hp <= 0) return false;
-        return hitTileKeys.has(tileKey(other.x, other.y));
-      });
-    }
-    return [];
+ 
+    const hitTileKeys = new Set(this.getSkillHitTilesAt(unit, skill, x, y).map((tile) => tileKey(tile.x, tile.y)));
+    if (hitTileKeys.size === 0) return [];
+ 
+    return this.units.filter((other) => {
+      if (!other || other.id === unit.id || other.hp <= 0) return false;
+      if (!hitTileKeys.has(tileKey(other.x, other.y))) return false;
+      if (skill.targetTeam === "enemy" && other.team === unit.team) return false;
+      if (skill.targetTeam === "ally" && other.team !== unit.team) return false;
+      return true;
+    });
   }
  
   calculateSkillDamage(unit, target, skill) {
     if (!unit || !skill) return 0;
     if (skill.damageFormula === "mag") return Math.max(0, unit.mag || 0);
     if (skill.damageFormula === "strPlusSpd") return Math.max(0, (unit.str || 0) + (unit.spd || 0));
+    if (skill.damageFormula === "brothersCombinedStrMag") return Math.max(0, this.getCombinedBrotherPower());
     return Math.max(0, skill.baseDamage || 0);
   }
  
@@ -3646,8 +3869,9 @@ class BattleScene extends Phaser.Scene {
     const unit = this.units.find((u) => u.id === unitId);
     const skill = this.getSkillById(unit, skillId);
     if (!unit || !skill || unit.hp <= 0 || !this.canUseSkill(unit, skill)) return false;
+    const hitTiles = this.getSkillHitTilesAt(unit, skill, unit.x, unit.y);
     const targets = this.getSkillTargetsAt(unit, skill, unit.x, unit.y);
-    if (targets.length === 0) return false;
+    if (hitTiles.length === 0) return false;
     this.closeActionMenu();
     this.closeSelectionMenu(false);
     this.pendingItemUse = null;
@@ -3660,19 +3884,22 @@ class BattleScene extends Phaser.Scene {
     this.targetTileStroke = null;
     this.redrawSelection();
     this.updateSelectedPanel();
-    unit.sigilPoints = Math.max(0, (unit.sigilPoints ?? 0) - (skill.cost ?? 0));
+    this.spendSkillCost(unit, skill);
     this.refreshUnitSprite(unit);
     this.updateSelectedPanel();
     this.showSkillBanner(skill.name);
     this.helpText.setText(`${unit.name} uses ${skill.name}!`);
-    if (skill.animationState === "spin") {
-      this.playUnitSpinAnimation(unit, SKILL_IMPACT_DELAY + 450);
-    } else {
-      this.playUnitState(unit, skill.animationState || "attack", SKILL_IMPACT_DELAY + 450);
-    }
-    const targetResults = targets.map((target) => ({ target, wasAlive: target.hp > 0, damage: this.calculateSkillDamage(unit, target, skill) }));
-    this.time.delayedCall(SKILL_IMPACT_DELAY, () => {
-      this.playSkillTileEffects(unit, skill);
+ 
+    const beginSkillImpact = () => {
+      if (skill.animationState === "spin") {
+        this.playUnitSpinAnimation(unit, SKILL_IMPACT_DELAY + 450);
+      } else {
+        this.playUnitState(unit, skill.animationState || "attack", SKILL_IMPACT_DELAY + 450);
+      }
+ 
+      const targetResults = targets.map((target) => ({ target, wasAlive: target.hp > 0, damage: this.calculateSkillDamage(unit, target, skill) }));
+      this.time.delayedCall(SKILL_IMPACT_DELAY, () => {
+        this.playSkillTileEffects(unit, skill);
       let totalXp = 0;
       let defeatedFalan = false;
       const defeatedPlayerUnits = [];
@@ -3749,7 +3976,14 @@ class BattleScene extends Phaser.Scene {
         this.clearSelection(`${unit.name} used ${skill.name}.`);
         this.checkEndOfPlayerPhase();
       });
-    });
+    };
+ 
+    if (skill.id === "brothersBligh") {
+      this.playBrothersBlighCutin(beginSkillImpact);
+    } else {
+      beginSkillImpact();
+    }
+ 
     return true;
   }
  
@@ -4405,7 +4639,10 @@ Crit: Luck difference %. Critical hits deal x3 damage.${itemSummary}`
     this.clearSelection("Enemies are moving...");
     this.busy = true;
     this.enemyIndex = 0;
-    this.enemyTurnOrder = this.units.filter((u) => u.team === "enemy");
+    this.enemyTurnOrder = this.units.filter((u) => u.team === "enemy" && u.hp > 0);
+    this.enemyTurnOrder.forEach((enemy) => {
+      enemy.opportunityThreatIdsAtTurnStart = this.getAdjacentOpponents(enemy).map((opponent) => opponent.id);
+    });
     this.time.delayedCall(ENEMY_ACTION_PAUSE, () => this.runNextEnemy());
   }
  
@@ -4431,7 +4668,14 @@ Crit: Luck difference %. Critical hits deal x3 damage.${itemSummary}`
       return;
     }
     const afterMove = () => {
-      if (plan.action) this.time.delayedCall(ENEMY_ACTION_PAUSE, () => this.executeEnemyAction(enemy, plan.action));
+      const actingEnemy = this.units.find((unit) => unit.id === enemy.id);
+      if (!actingEnemy || actingEnemy.hp <= 0) {
+        this.enemyIndex += 1;
+        this.time.delayedCall(ENEMY_ACTION_PAUSE, () => this.runNextEnemy());
+        return;
+      }
+ 
+      if (plan.action) this.time.delayedCall(ENEMY_ACTION_PAUSE, () => this.executeEnemyAction(actingEnemy, plan.action));
       else {
         this.enemyIndex += 1;
         this.time.delayedCall(ENEMY_ACTION_PAUSE, () => this.runNextEnemy());
@@ -4471,25 +4715,42 @@ Crit: Luck difference %. Critical hits deal x3 damage.${itemSummary}`
       if (typeof onComplete === "function") onComplete();
       return;
     }
+ 
     const oldX = enemy.x;
     const oldY = enemy.y;
-    enemy.facing = this.getDirectionFromDelta(moveTarget.x - oldX, moveTarget.y - oldY, enemy.facing || "down");
-    this.playUnitState(enemy, "move", ENEMY_MOVE_DURATION + 150);
-    enemy.x = moveTarget.x;
-    enemy.y = moveTarget.y;
-    this.helpText.setText(`${enemy.name} moves.`);
-    this.tweens.add({
-      targets: sprite.container,
-      x: this.boardX + enemy.x * TILE_SIZE + TILE_SIZE / 2,
-      y: this.boardY + enemy.y * TILE_SIZE + TILE_SIZE / 2,
-      duration: ENEMY_MOVE_DURATION,
-      ease: "Sine.easeInOut",
-      onComplete: () => {
-        this.refreshUnitSprite(enemy);
-        this.setUnitSpriteFrame(enemy, "idle", enemy.facing || "down");
+    const opportunityAttacker = this.getOpportunityThreatBeforeMove(enemy, moveTarget.x, moveTarget.y);
+ 
+    const completeEnemyMove = () => {
+      if (!enemy || enemy.hp <= 0 || !this.unitSprites[enemy.id]) {
         if (typeof onComplete === "function") onComplete();
-      },
-    });
+        return;
+      }
+ 
+      enemy.facing = this.getDirectionFromDelta(moveTarget.x - oldX, moveTarget.y - oldY, enemy.facing || "down");
+      this.playUnitState(enemy, "move", ENEMY_MOVE_DURATION + 150);
+      enemy.x = moveTarget.x;
+      enemy.y = moveTarget.y;
+      this.helpText.setText(`${enemy.name} moves.`);
+      this.tweens.add({
+        targets: sprite.container,
+        x: this.boardX + enemy.x * TILE_SIZE + TILE_SIZE / 2,
+        y: this.boardY + enemy.y * TILE_SIZE + TILE_SIZE / 2,
+        duration: ENEMY_MOVE_DURATION,
+        ease: "Sine.easeInOut",
+        onComplete: () => {
+          this.refreshUnitSprite(enemy);
+          this.setUnitSpriteFrame(enemy, "idle", enemy.facing || "down");
+          if (typeof onComplete === "function") onComplete();
+        },
+      });
+    };
+ 
+    if (opportunityAttacker) {
+      this.resolveOpportunityAttack(opportunityAttacker, enemy, completeEnemyMove);
+      return;
+    }
+ 
+    completeEnemyMove();
   }
  
   getLivingOpponents(unit) {
@@ -4522,6 +4783,43 @@ Crit: Luck difference %. Critical hits deal x3 damage.${itemSummary}`
     const expectedDamage = expectedDamagePerHit * attackCount * ((weapon.hitRate ?? 100) / 100);
     const canKill = totalDamage >= defender.hp || expectedDamage >= defender.hp;
     return { canKill, totalDamage, expectedDamage, score: (canKill ? 100000 : 0) + expectedDamage * 100 + totalDamage };
+  }
+ 
+ 
+  getIncomingThreatScoreAt(unit, x, y) {
+    if (!unit) return { expectedDamage: 0, lethal: false, adjacentThreats: 0 };
+ 
+    let expectedDamage = 0;
+    let adjacentThreats = 0;
+ 
+    this.getLivingOpponents(unit).forEach((opponent) => {
+      const distToTile = Math.abs(opponent.x - x) + Math.abs(opponent.y - y);
+      if (distToTile === 1) adjacentThreats += 1;
+ 
+      const weapon = this.getWeaponForPosition(opponent, { ...unit, x, y }, opponent.x, opponent.y);
+      if (!weapon) return;
+ 
+      const attackScore = this.calculateAttackScoreAt(opponent, { ...unit, x, y }, weapon);
+      if (!attackScore) return;
+      expectedDamage += attackScore.expectedDamage || 0;
+    });
+ 
+    return {
+      expectedDamage,
+      lethal: expectedDamage >= (unit.hp || 0),
+      adjacentThreats,
+    };
+  }
+ 
+  getOpportunityRiskForMove(unit, x, y) {
+    if (!unit) return 0;
+    const threat = this.getOpportunityThreatBeforeMove(unit, x, y);
+    if (!threat) return 0;
+ 
+    const weapon = getWeaponForTarget(threat, unit) || getDefaultWeapon(threat);
+    if (!weapon) return 0;
+ 
+    return this.calculateDamage(threat, unit, weapon) * (OPPORTUNITY_ATTACK_HIT_RATE / 100);
   }
  
   evaluateEnemyActionAt(enemy, x, y) {
@@ -4560,21 +4858,33 @@ Crit: Luck difference %. Critical hits deal x3 damage.${itemSummary}`
   }
  
   chooseEnemyPlan(enemy) {
+    enemy.opportunityThreatIdsAtTurnStart = this.getAdjacentOpponents(enemy).map((opponent) => opponent.id);
+ 
     const options = [{ x: enemy.x, y: enemy.y }, ...this.reachableTiles(enemy)];
     const nearest = this.getNearestOpponent(enemy);
     let bestPlan = null;
+ 
     options.forEach((option) => {
       const action = this.evaluateEnemyActionAt(enemy, option.x, option.y);
       const moveDistance = Math.abs(option.x - enemy.x) + Math.abs(option.y - enemy.y);
       const approachScore = nearest ? -1 * (Math.abs(option.x - nearest.x) + Math.abs(option.y - nearest.y)) : 0;
       const actionScore = action ? action.score : -100000;
-      const score = actionScore + approachScore - moveDistance * 3;
-      if (!bestPlan || score > bestPlan.score) bestPlan = { move: option, action, score };
+      const threat = this.getIncomingThreatScoreAt(enemy, option.x, option.y);
+      const opportunityRisk = this.getOpportunityRiskForMove(enemy, option.x, option.y);
+      const dangerPenalty = threat.expectedDamage * 85 + opportunityRisk * 120 + threat.adjacentThreats * 12 + (threat.lethal ? 65000 : 0);
+      const score = actionScore + approachScore - moveDistance * 3 - dangerPenalty;
+ 
+      if (!bestPlan || score > bestPlan.score) {
+        bestPlan = { move: option, action, score, threat, opportunityRisk };
+      }
     });
+ 
     if (bestPlan?.action) return bestPlan;
     if (!nearest) return null;
+ 
     const move = this.chooseEnemyMoveToward(enemy, nearest);
     if (!move) return null;
+ 
     const enRouteAction = this.evaluateEnemyActionAt(enemy, move.x, move.y);
     return { move, action: enRouteAction, score: bestPlan?.score || 0 };
   }
@@ -4582,15 +4892,25 @@ Crit: Luck difference %. Critical hits deal x3 damage.${itemSummary}`
   chooseEnemyMoveToward(enemy, target) {
     const options = this.reachableTiles(enemy);
     if (!options.length) return null;
+ 
+    const currentThreat = this.getIncomingThreatScoreAt(enemy, enemy.x, enemy.y);
     let best = { x: enemy.x, y: enemy.y };
-    let bestScore = distance(enemy, target);
+    let bestScore = -999999;
+ 
     for (const option of options) {
-      const score = Math.abs(option.x - target.x) + Math.abs(option.y - target.y);
-      if (score < bestScore) {
+      const distanceToTarget = target ? Math.abs(option.x - target.x) + Math.abs(option.y - target.y) : 0;
+      const threat = this.getIncomingThreatScoreAt(enemy, option.x, option.y);
+      const opportunityRisk = this.getOpportunityRiskForMove(enemy, option.x, option.y);
+      const dangerPenalty = threat.expectedDamage * 85 + opportunityRisk * 120 + threat.adjacentThreats * 10 + (threat.lethal ? 65000 : 0);
+      const safetyBonus = currentThreat.lethal && !threat.lethal ? 12000 : 0;
+      const score = -distanceToTarget * 8 - dangerPenalty + safetyBonus;
+ 
+      if (score > bestScore) {
         best = option;
         bestScore = score;
       }
     }
+ 
     return best;
   }
  
