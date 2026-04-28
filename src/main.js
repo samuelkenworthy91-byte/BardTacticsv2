@@ -36,6 +36,9 @@ const ALLIED_DEATH_LINES = {
   edwin: "Please...take care of Leon for me.",
 };
 const CHAPTER_ONE_GAME_OVER_UNIT_IDS = ["edwin", "leon"];
+const CHAPTER_ONE_ESCAPE_TILE = { x: 6, y: 0 };
+const OPPORTUNITY_ATTACK_HIT_RATE = 50;
+const OPPORTUNITY_ATTACK_PAUSE = 650;
  
 const CARDINAL_DIRECTIONS = ["down", "up", "left", "right"];
 const CLOCKWISE_DIRECTIONS = ["up", "right", "down", "left"];
@@ -271,13 +274,6 @@ const CHAPTER_OPENING = [
 ];
  
 const POST_BATTLE_SCENE = [
-  {
-    type: "mapDialogue",
-    speaker: "Falan",
-    portrait: "falanPortrait",
-    text: "I... didn't believe... Caleb... you're good, Bligh... but the others will end you.",
-  },
-  { type: "unitDeath", unitId: "falan", autoAdvanceDelay: 1400 },
   { type: "mapDialogue", speaker: "Leon", portrait: "leonPortrait", text: "I..." },
   {
     type: "mapAction",
@@ -425,6 +421,7 @@ const UNITS = [
     spd: 5,
     luck: 3,
     weapons: [{ name: "Katars", baseDamage: 3, range: 1, damageType: "physical", stat: "str", hitRate: 100, speedBonus: 2 }],
+    deathLine: "I... didn\'t believe... Caleb... you\'re good, Bligh... but the others will end you.",
     skills: [{ id: "manicDervish", name: "Manic Dervish", cost: 3, type: "adjacentSquare", damageFormula: "strPlusSpd", animationState: "spin" }],
     acted: false,
     color: 0xf87171,
@@ -542,7 +539,7 @@ const LEVELS = {
     map: MAP,
     units: UNITS,
     battleMusic: { key: "chapter1BattleMusic", path: "/audio/chapter1_battle.mp3", volume: 0.45 },
-    objective: "Defeat Falan, the gang leader.",
+    objective: "Escape through the glowing gate tile.",
   },
 };
  
@@ -1081,12 +1078,14 @@ class BattleScene extends Phaser.Scene {
     this.boardX = 200;
     this.boardY = 14;
     this.tileLayer = this.add.layer();
+    this.escapeLayer = this.add.layer();
     this.overlayLayer = this.add.layer();
     this.unitLayer = this.add.layer();
     this.uiLayer = this.add.layer();
  
     this.createTopUI();
     this.drawBoard();
+    this.createEscapeCursor();
     this.drawUnits();
     this.createSidePanel();
     this.createPreviewUI();
@@ -1221,7 +1220,7 @@ class BattleScene extends Phaser.Scene {
       stroke: "#0b0811",
       strokeThickness: 2,
     });
-    this.objectiveText = this.add.text(-68, -48, this.levelData?.objective || "Defeat Falan, the gang leader.", {
+    this.objectiveText = this.add.text(-68, -48, this.levelData?.objective || "Escape through the glowing gate tile.", {
       fontSize: "11px",
       color: "#f7ecd3",
       wordWrap: { width: 136 },
@@ -2426,7 +2425,7 @@ class BattleScene extends Phaser.Scene {
  
     this.pendingAllyDeathContinue = onContinue;
     this.allyDeathSpeakerText.setText(unit.name || "Ally");
-    this.allyDeathLineText.setText(ALLIED_DEATH_LINES[unit.id] || "I have to fall back...");
+    this.allyDeathLineText.setText(unit.deathLine || ALLIED_DEATH_LINES[unit.id] || "I have to fall back...");
  
     if (unit.portraitKey && this.textures.exists(unit.portraitKey)) {
       this.allyDeathPortrait.setTexture(unit.portraitKey).setDisplaySize(118, 140).setVisible(true);
@@ -2843,6 +2842,175 @@ class BattleScene extends Phaser.Scene {
     return entry ? entry.key : null;
   }
  
+ 
+  getEscapeTile() {
+    return CHAPTER_ONE_ESCAPE_TILE;
+  }
+ 
+  isEscapeTile(x, y) {
+    const escapeTile = this.getEscapeTile();
+    return !!escapeTile && x === escapeTile.x && y === escapeTile.y;
+  }
+ 
+  createEscapeCursor() {
+    if (!this.escapeLayer) return;
+    this.escapeLayer.removeAll(true);
+ 
+    const escapeTile = this.getEscapeTile();
+    if (!escapeTile || !this.isInBounds(escapeTile.x, escapeTile.y)) return;
+ 
+    const centerX = this.boardX + escapeTile.x * TILE_SIZE + TILE_SIZE / 2;
+    const centerY = this.boardY + escapeTile.y * TILE_SIZE + TILE_SIZE / 2;
+ 
+    const glow = this.add.rectangle(centerX, centerY, TILE_SIZE - 4, TILE_SIZE - 4, 0x38bdf8, 0.18).setOrigin(0.5);
+    glow.setStrokeStyle(4, 0x7dd3fc, 0.98);
+ 
+    const inner = this.add.rectangle(centerX, centerY, TILE_SIZE - 18, TILE_SIZE - 18, 0x38bdf8, 0.08).setOrigin(0.5);
+    inner.setStrokeStyle(2, 0xdbeafe, 0.9);
+ 
+    const label = this.add.text(centerX, centerY + TILE_SIZE * 0.35, "ESCAPE", {
+      fontSize: "9px",
+      fontStyle: "bold",
+      color: "#dbeafe",
+      stroke: "#020617",
+      strokeThickness: 3,
+    }).setOrigin(0.5);
+ 
+    this.escapeLayer.add([glow, inner, label]);
+ 
+    this.tweens.add({
+      targets: [glow, inner],
+      alpha: { from: 0.28, to: 0.72 },
+      duration: 760,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.easeInOut",
+    });
+  }
+ 
+  getAdjacentEnemies(unit) {
+    if (!unit) return [];
+    return this.units.filter((other) => (
+      other &&
+      other.team !== unit.team &&
+      other.hp > 0 &&
+      distance(unit, other) === 1
+    ));
+  }
+ 
+  getOpportunityThreatBeforeMove(unit, targetX, targetY) {
+    if (!unit || unit.team !== "player") return null;
+ 
+    const turnStartThreatIds = new Set(unit.opportunityThreatIdsAtTurnStart || []);
+    if (turnStartThreatIds.size === 0) return null;
+ 
+    const oldPosition = { x: unit.x, y: unit.y };
+ 
+    return this.units.find((enemy) => {
+      if (!enemy || enemy.team === unit.team || enemy.hp <= 0) return false;
+      if (!turnStartThreatIds.has(enemy.id)) return false;
+      if (Math.abs(enemy.x - oldPosition.x) + Math.abs(enemy.y - oldPosition.y) !== 1) return false;
+      const newDistance = Math.abs(enemy.x - targetX) + Math.abs(enemy.y - targetY);
+      if (newDistance <= 1) return false;
+      return !!getWeaponForTarget(enemy, unit);
+    }) || null;
+  }
+ 
+  resolveOpportunityAttack(enemy, unit, onComplete) {
+    if (!enemy || !unit || unit.hp <= 0) {
+      if (typeof onComplete === "function") onComplete();
+      return;
+    }
+ 
+    const weapon = getWeaponForTarget(enemy, unit) || getDefaultWeapon(enemy);
+    if (!weapon) {
+      if (typeof onComplete === "function") onComplete();
+      return;
+    }
+ 
+    this.helpText.setText(`${enemy.name} makes an opportunity attack!`);
+    this.faceUnitToward(enemy, unit);
+    this.faceUnitToward(unit, enemy);
+    this.playUnitState(enemy, this.getAttackAnimationState(enemy, weapon), OPPORTUNITY_ATTACK_PAUSE);
+ 
+    const hit = Phaser.Math.Between(1, 100) <= OPPORTUNITY_ATTACK_HIT_RATE;
+    const damage = hit ? this.calculateDamage(enemy, unit, weapon) : 0;
+ 
+    this.time.delayedCall(220, () => {
+      this.showFloatingText(
+        this.boardX + unit.x * TILE_SIZE + TILE_SIZE / 2,
+        this.boardY + unit.y * TILE_SIZE + 8,
+        hit ? `OPPORTUNITY -${damage}` : "OPPORTUNITY MISS",
+        hit ? "#fca5a5" : "#fef3c7"
+      );
+ 
+      if (hit) {
+        unit.hp = Math.max(0, unit.hp - damage);
+        this.playUnitHurt(unit, 360);
+        this.refreshUnitSprite(unit);
+        this.updateSelectedPanel();
+      }
+    });
+ 
+    this.time.delayedCall(OPPORTUNITY_ATTACK_PAUSE, () => {
+      if (unit.hp <= 0) {
+        this.handleAllyUnitDeath(unit);
+        return;
+      }
+ 
+      if (typeof onComplete === "function") onComplete();
+    });
+  }
+ 
+  handleFalanDefeat(falan, onComplete = null) {
+    if (!falan) {
+      if (typeof onComplete === "function") onComplete();
+      return;
+    }
+ 
+    if (falan.deathHandled) {
+      if (typeof onComplete === "function") onComplete();
+      return;
+    }
+ 
+    falan.deathHandled = true;
+    falan.hp = 0;
+    this.refreshUnitSprite(falan);
+ 
+    this.showAllyDeathCutscene(falan, () => {
+      this.playUnitDeath(falan, () => {
+        this.removeUnitSpriteAndData(falan.id);
+        if (typeof onComplete === "function") onComplete();
+      });
+    });
+  }
+ 
+  escapeUnit(unitId) {
+    const unit = this.units.find((candidate) => candidate.id === unitId);
+    if (!unit || unit.team !== "player" || unit.acted || unit.hp <= 0) return;
+ 
+    if (!this.isEscapeTile(unit.x, unit.y)) {
+      this.helpText.setText("Only a unit standing on the glowing gate tile can escape.");
+      return;
+    }
+ 
+    this.closeActionMenu();
+    this.closeSelectionMenu(false);
+    delete unit.pendingMoveOrigin;
+    unit.acted = true;
+    this.refreshUnitSprite(unit);
+    this.clearSelection(`${unit.name} escaped through the gate!`);
+    this.busy = true;
+    this.showFloatingText(
+      this.boardX + unit.x * TILE_SIZE + TILE_SIZE / 2,
+      this.boardY + unit.y * TILE_SIZE + 8,
+      "ESCAPE",
+      "#7dd3fc"
+    );
+ 
+    this.time.delayedCall(650, () => this.startPostBattleScene());
+  }
+ 
   drawBoard() {
     this.tileLayer.removeAll(true);
     for (let row = 0; row < this.mapRows; row += 1) {
@@ -3185,32 +3353,49 @@ class BattleScene extends Phaser.Scene {
     this.targetTileStroke = null;
     this.redrawSelection();
     this.updateSelectedPanel();
+ 
     const centerX = this.boardX + unit.x * TILE_SIZE + TILE_SIZE / 2;
     const centerY = this.boardY + unit.y * TILE_SIZE + TILE_SIZE / 2;
-    const menuWidth = 152;
-    const menuHeight = 208;
-    const x = Phaser.Math.Clamp(centerX + TILE_SIZE * 0.95, menuWidth / 2 + 8, GAME_WIDTH - menuWidth / 2 - 8);
-    const y = Phaser.Math.Clamp(centerY - 8, menuHeight / 2 + 8, GAME_HEIGHT - menuHeight / 2 - 8);
-    const container = this.add.container(x, y).setDepth(9998);
-    const panel = createBannerPanel(this, 0, 0, menuWidth, menuHeight, { innerInset: 12 });
-    const title = this.add.text(0, -78, unit.name, { fontSize: "16px", fontStyle: "bold", color: "#f7ecd3", stroke: "#0b0811", strokeThickness: 3 }).setOrigin(0.5);
-    container.add([panel.container, title]);
     const actions = [
       { label: "Attack", handler: () => this.chooseActionAttack(unit.id) },
       { label: "Skill", handler: () => this.chooseActionSkill(unit.id) },
       { label: "Item", handler: () => this.chooseActionItem(unit.id) },
       { label: "Wait", handler: () => this.waitUnit(unit.id) },
     ];
+ 
+    if (this.isEscapeTile(unit.x, unit.y)) {
+      actions.unshift({ label: "Escape", handler: () => this.escapeUnit(unit.id) });
+    }
+ 
+    const menuWidth = 152;
+    const menuHeight = 52 + actions.length * 40 + 36;
+    const x = Phaser.Math.Clamp(centerX + TILE_SIZE * 0.95, menuWidth / 2 + 8, GAME_WIDTH - menuWidth / 2 - 8);
+    const y = Phaser.Math.Clamp(centerY - 8, menuHeight / 2 + 8, GAME_HEIGHT - menuHeight / 2 - 8);
+    const container = this.add.container(x, y).setDepth(9998);
+    const panel = createBannerPanel(this, 0, 0, menuWidth, menuHeight, { innerInset: 12 });
+    const title = this.add.text(0, -menuHeight / 2 + 26, unit.name, {
+      fontSize: "16px",
+      fontStyle: "bold",
+      color: "#f7ecd3",
+      stroke: "#0b0811",
+      strokeThickness: 3,
+    }).setOrigin(0.5);
+ 
+    container.add([panel.container, title]);
+ 
     actions.forEach((action, index) => {
-      const button = createBannerButton(this, 0, -38 + index * 40, menuWidth - 20, 32, action.label, () => action.handler(), "16px");
+      const button = createBannerButton(this, 0, -menuHeight / 2 + 66 + index * 40, menuWidth - 20, 32, action.label, () => action.handler(), "16px");
       container.add(button.container);
     });
+ 
     this.actionMenuContainer = container;
     this.actionMenuOpen = true;
     this.actionMenuUnitId = unit.id;
     this.uiLayer.add(container);
+ 
+    const escapeHint = this.isEscapeTile(unit.x, unit.y) ? " Escape is available." : "";
     const cancelHint = unit.pendingMoveOrigin ? " Space cancels the move." : " Space goes back.";
-    this.helpText.setText(message || `${unit.name} is ready. Choose an action.${cancelHint}`);
+    this.helpText.setText(message || `${unit.name} is ready. Choose an action.${escapeHint}${cancelHint}`);
   }
  
   chooseActionAttack(unitId) {
@@ -3544,8 +3729,16 @@ class BattleScene extends Phaser.Scene {
           return;
         }
         if (defeatedFalan) {
-          this.busy = false;
-          this.startPostBattleScene();
+          const falan = this.units.find((candidate) => candidate.id === "falan");
+          this.handleFalanDefeat(falan, () => {
+            this.busy = false;
+            if (typeof options.onComplete === "function") {
+              options.onComplete();
+              return;
+            }
+            this.clearSelection(`${unit.name} defeated Falan. Find the glowing gate and escape.`);
+            this.checkEndOfPlayerPhase();
+          });
           return;
         }
         this.busy = false;
@@ -3979,36 +4172,53 @@ class BattleScene extends Phaser.Scene {
     const unit = this.units.find((u) => u.id === unitId);
     const sprite = this.unitSprites[unitId];
     if (!unit || !sprite || unit.team !== "player" || unit.acted) return;
+ 
     this.closeActionMenu();
     this.busy = true;
+ 
     const oldX = unit.x;
     const oldY = unit.y;
     const oldFacing = unit.facing || "down";
-    unit.pendingMoveOrigin = { x: oldX, y: oldY, facing: oldFacing };
-    unit.facing = this.getDirectionFromDelta(x - oldX, y - oldY, oldFacing);
-    this.playUnitState(unit, "move", PLAYER_MOVE_DURATION + PLAYER_ACTION_PAUSE);
-    unit.x = x;
-    unit.y = y;
-    const targetX = this.boardX + x * TILE_SIZE + TILE_SIZE / 2;
-    const targetY = this.boardY + y * TILE_SIZE + TILE_SIZE / 2;
-    this.tweens.add({
-      targets: sprite.container,
-      x: targetX,
-      y: targetY,
-      duration: PLAYER_MOVE_DURATION,
-      ease: "Sine.easeInOut",
-      onComplete: () => {
-        this.setUnitSpriteFrame(unit, "idle", unit.facing || "down");
-        this.moveTiles = [];
-        this.targetTiles = [];
-        this.redrawSelection();
-        this.updateSelectedPanel();
-        this.time.delayedCall(PLAYER_ACTION_PAUSE, () => {
-          this.busy = false;
-          this.showActionMenu(unit);
-        });
-      },
-    });
+    const opportunityEnemy = this.getOpportunityThreatBeforeMove(unit, x, y);
+ 
+    const completeMove = () => {
+      if (unit.hp <= 0) return;
+ 
+      unit.pendingMoveOrigin = { x: oldX, y: oldY, facing: oldFacing };
+      unit.facing = this.getDirectionFromDelta(x - oldX, y - oldY, oldFacing);
+      this.playUnitState(unit, "move", PLAYER_MOVE_DURATION + PLAYER_ACTION_PAUSE);
+      unit.x = x;
+      unit.y = y;
+ 
+      const targetX = this.boardX + x * TILE_SIZE + TILE_SIZE / 2;
+      const targetY = this.boardY + y * TILE_SIZE + TILE_SIZE / 2;
+ 
+      this.tweens.add({
+        targets: sprite.container,
+        x: targetX,
+        y: targetY,
+        duration: PLAYER_MOVE_DURATION,
+        ease: "Sine.easeInOut",
+        onComplete: () => {
+          this.setUnitSpriteFrame(unit, "idle", unit.facing || "down");
+          this.moveTiles = [];
+          this.targetTiles = [];
+          this.redrawSelection();
+          this.updateSelectedPanel();
+          this.time.delayedCall(PLAYER_ACTION_PAUSE, () => {
+            this.busy = false;
+            this.showActionMenu(unit);
+          });
+        },
+      });
+    };
+ 
+    if (opportunityEnemy) {
+      this.resolveOpportunityAttack(opportunityEnemy, unit, completeMove);
+      return;
+    }
+ 
+    completeMove();
   }
  
   attackEnemy(attackerId, defenderId) {
@@ -4043,8 +4253,6 @@ class BattleScene extends Phaser.Scene {
         defender.hp = 0;
         if (defeatedFalan) {
           this.refreshUnitSprite(defender);
-          this.playUnitHurt(defender);
-          this.clearSelection(`${attacker.name} defeated ${defender.name}!`);
         } else {
           this.playUnitDeath(defender, () => this.removeUnitSpriteAndData(defender.id));
           this.clearSelection(`${attacker.name} defeated ${defender.name}!`);
@@ -4059,9 +4267,12 @@ class BattleScene extends Phaser.Scene {
       this.updateSelectedPanel();
  
       if (defeatedFalan) {
-        this.time.delayedCall(650, () => {
-          this.busy = false;
-          this.startPostBattleScene();
+        this.time.delayedCall(350, () => {
+          this.handleFalanDefeat(defender, () => {
+            this.busy = false;
+            this.clearSelection(`${attacker.name} defeated Falan. Find the glowing gate and escape.`);
+            this.checkEndOfPlayerPhase();
+          });
         });
         return;
       }
@@ -4442,11 +4653,12 @@ Crit: Luck difference %. Critical hits deal x3 damage.${itemSummary}`
       if (unit.team === "player") {
         unit.acted = false;
         delete unit.pendingMoveOrigin;
+        unit.opportunityThreatIdsAtTurnStart = this.getAdjacentEnemies(unit).map((enemy) => enemy.id);
         this.refreshUnitSprite(unit);
         this.setUnitSpriteFrame(unit, "idle", unit.facing || "down");
       }
     }
-    this.helpText.setText("Player Phase. Click Edwin or Leon.");
+    this.helpText.setText("Player Phase. Reach the glowing gate tile and choose Escape.");
     this.busy = false;
   }
 }
