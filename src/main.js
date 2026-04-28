@@ -1087,6 +1087,7 @@ class BattleScene extends Phaser.Scene {
     this.postBattleActionSteps = new Set();
     this.postBattleStarted = false;
     this.levelUpQueue = [];
+    this.pendingLevelUpCallbacks = [];
     this.levelUpAllocationOpen = false;
     this.currentLevelUpData = null;
     this.openingStep = 0;
@@ -1743,7 +1744,17 @@ class BattleScene extends Phaser.Scene {
     const unit = data ? this.units.find((candidate) => candidate.id === data.unitId) : null;
     if (!data || !unit) return;
     this.levelUpSubtitle.setText(`${unit.name} reached Lv ${data.level}.`);
-    this.levelUpRollText.setText(`Luck ${data.luckAtRoll} weighted the level-up die and rolled ${data.pointsTotal} point${data.pointsTotal === 1 ? "" : "s"}.`);
+
+    const bonusCount = Math.max(0, (data.pointsTotal || 1) - 1);
+    const rollSummary = (data.luckRolls || [])
+      .map((roll, index) => `Roll ${index + 1}: ${roll} ${roll <= data.luckAtRoll ? "success" : "stop"}`)
+      .join(" | ");
+
+    this.levelUpRollText.setText(
+      bonusCount > 0
+        ? `Base 1 point. Luck ${data.luckAtRoll} earned ${bonusCount} bonus point${bonusCount === 1 ? "" : "s"}. ${rollSummary}`
+        : `Base 1 point. Luck ${data.luckAtRoll} earned no bonus points. ${rollSummary}`
+    );
     this.levelUpPointsText.setText(`Points left: ${data.pointsRemaining}`);
     this.levelUpStatRows.forEach((row) => {
       const current = this.getLevelUpStatValue(unit, row.stat.key);
@@ -1785,43 +1796,93 @@ class BattleScene extends Phaser.Scene {
       this.updateSelectedPanel();
     }
     this.processLevelUpQueue();
+
+    if (!this.levelUpAllocationOpen && this.levelUpQueue.length === 0) {
+      this.flushLevelUpCallbacks();
+    }
   }
 
   rollLevelUpPoints(unit) {
-    const luck = Math.max(0, unit?.luck || 0);
-    const faces = [1, 2, 3, 4, 5, 6];
-    const weights = faces.map((face) => Math.max(1, 10 + luck * (face - 3.5)));
-    const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
-    let roll = Phaser.Math.FloatBetween(0, totalWeight);
-    let result = 1;
-    for (let index = 0; index < faces.length; index += 1) {
-      roll -= weights[index];
-      if (roll <= 0) {
-        result = faces[index];
-        break;
+    const luck = Phaser.Math.Clamp(Math.max(0, unit?.luck || 0), 0, 100);
+    const luckRolls = [];
+    let points = 1;
+    let keepRolling = true;
+
+    while (keepRolling) {
+      const roll = Phaser.Math.Between(1, 100);
+      luckRolls.push(roll);
+
+      if (roll <= luck) {
+        points += 1;
+      } else {
+        keepRolling = false;
+      }
+
+      // Safety guard: a Luck score of 100 would otherwise never stop.
+      if (luckRolls.length >= 25) {
+        keepRolling = false;
       }
     }
-    const extraPotential = Math.max(0, (luck - 12) / 8);
-    const guaranteedExtras = Math.floor(extraPotential);
-    const extraChance = (extraPotential - guaranteedExtras) * 100;
-    const chanceExtra = Phaser.Math.Between(1, 100) <= extraChance ? 1 : 0;
-    return result + guaranteedExtras + chanceExtra;
+
+    return { points, luckRolls };
   }
 
-  queueLevelUpAllocation(unit, points) {
+  queueLevelUpAllocation(unit, rollInfo) {
     if (!unit || unit.team !== "player") return;
+
+    const points = typeof rollInfo === "number" ? rollInfo : rollInfo?.points || 1;
+    const luckRolls = Array.isArray(rollInfo?.luckRolls) ? rollInfo.luckRolls : [];
+
     this.levelUpQueue.push({
       unitId: unit.id,
       level: unit.level,
       pointsTotal: points,
       pointsRemaining: points,
-      luckAtRoll: unit.luck || 0,
+      luckAtRoll: Phaser.Math.Clamp(Math.max(0, unit.luck || 0), 0, 100),
+      luckRolls,
       allocations: {},
     });
   }
 
+  hasPendingLevelUps() {
+    return this.levelUpAllocationOpen || this.levelUpQueue.length > 0;
+  }
+
+  runAfterLevelUps(callback) {
+    if (!this.hasPendingLevelUps()) {
+      if (typeof callback === "function") callback();
+      return false;
+    }
+
+    this.pendingLevelUpCallbacks = this.pendingLevelUpCallbacks || [];
+
+    if (typeof callback === "function") {
+      this.pendingLevelUpCallbacks.push(callback);
+    }
+
+    this.processLevelUpQueue();
+    return true;
+  }
+
+  flushLevelUpCallbacks() {
+    if (this.hasPendingLevelUps()) return;
+
+    const callbacks = this.pendingLevelUpCallbacks || [];
+    this.pendingLevelUpCallbacks = [];
+
+    callbacks.forEach((callback) => {
+      if (typeof callback === "function") callback();
+    });
+  }
+
   processLevelUpQueue() {
-    if (this.levelUpAllocationOpen || this.levelUpQueue.length === 0) return;
+    if (this.levelUpAllocationOpen) return;
+
+    if (this.levelUpQueue.length === 0) {
+      this.flushLevelUpCallbacks();
+      return;
+    }
+
     const next = this.levelUpQueue.shift();
     const unit = this.units.find((candidate) => candidate.id === next.unitId);
     if (!unit) {
@@ -2959,6 +3020,7 @@ class BattleScene extends Phaser.Scene {
 
     const hit = Phaser.Math.Between(1, 100) <= OPPORTUNITY_ATTACK_HIT_RATE;
     const damage = hit ? this.calculateDamage(attacker, defender, weapon) : 0;
+    const defenderWasAlive = defender.hp > 0;
 
     this.time.delayedCall(220, () => {
       this.showFloatingText(
@@ -2977,12 +3039,28 @@ class BattleScene extends Phaser.Scene {
     });
 
     this.time.delayedCall(OPPORTUNITY_ATTACK_PAUSE, () => {
-      if (defender.hp <= 0) {
-        this.handleOpportunityDefeat(defender, onComplete);
+      const didKill = defenderWasAlive && defender.hp <= 0;
+
+      if (didKill && attacker.team === "player" && defender.team === "enemy") {
+        const xpGain = this.calculateXpGain(attacker, defender, true);
+        if (xpGain > 0) this.awardXp(attacker, xpGain);
+      }
+
+      const continueAfterLevelUp = () => {
+        if (defender.hp <= 0) {
+          this.handleOpportunityDefeat(defender, onComplete);
+          return;
+        }
+
+        if (typeof onComplete === "function") onComplete();
+      };
+
+      if (this.hasPendingLevelUps()) {
+        this.runAfterLevelUps(continueAfterLevelUp);
         return;
       }
 
-      if (typeof onComplete === "function") onComplete();
+      continueAfterLevelUp();
     });
   }
 
@@ -4627,11 +4705,21 @@ Crit: Luck difference %. Critical hits deal x3 damage.${itemSummary}`
   }
 
   checkEndOfPlayerPhase() {
+    if (this.hasPendingLevelUps()) {
+      this.runAfterLevelUps(() => this.checkEndOfPlayerPhase());
+      return;
+    }
+
     const remaining = this.units.filter((u) => u.team === "player" && !u.acted && u.hp > 0);
     if (remaining.length === 0) this.startEnemyPhase();
   }
 
   startEnemyPhase() {
+    if (this.hasPendingLevelUps()) {
+      this.runAfterLevelUps(() => this.startEnemyPhase());
+      return;
+    }
+
     this.closeActionMenu();
     this.phase = "enemy";
     this.phaseText.setText("Enemy Phase");
@@ -4648,6 +4736,11 @@ Crit: Luck difference %. Critical hits deal x3 damage.${itemSummary}`
   }
 
   runNextEnemy() {
+    if (this.hasPendingLevelUps()) {
+      this.runAfterLevelUps(() => this.runNextEnemy());
+      return;
+    }
+
     if (this.enemyIndex >= this.enemyTurnOrder.length) {
       this.startPlayerPhase();
       return;
