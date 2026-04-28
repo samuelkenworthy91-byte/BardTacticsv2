@@ -2845,57 +2845,209 @@ class BattleScene extends Phaser.Scene {
     this.uiLayer.add(this.chapterTransitionContainer);
   }
 
-  showChapterTwoTitleCard(message = "") {
-    if (this.postBattleContainer) this.postBattleContainer.setVisible(false);
-    if (this.openingContainer) this.openingContainer.setVisible(false);
-    if (this.previewContainer) this.previewContainer.setVisible(false);
+sshowChapterTwoTitleCard(message) {
+    var displayMessage = message;
+
+    if (!displayMessage) {
+      displayMessage = "";
+    }
+
+    if (this.postBattleContainer) {
+      this.postBattleContainer.setVisible(false);
+    }
+
+    if (this.openingContainer) {
+      this.openingContainer.setVisible(false);
+    }
+
+    if (this.previewContainer) {
+      this.previewContainer.setVisible(false);
+    }
 
     this.phase = "chapter2";
     this.busy = true;
+
     this.setObjectiveDisplayVisible(false);
+
     this.phaseText.setText("Chapter 2");
     this.phaseText.setColor("#fcd34d");
-    this.helpText.setText(message || "Chapter 2: Owed an Explanation.");
 
-    if (this.chapterTransitionHintText) {
-      this.chapterTransitionHintText.setText(message || "Continue into the Chapter 2 opening.");
+    if (displayMessage) {
+      this.helpText.setText(displayMessage);
+    } else {
+      this.helpText.setText("Chapter 2: Owed an Explanation.");
     }
 
-    this.chapterTransitionContainer.setVisible(true).setAlpha(0);
-    this.tweens.add({ targets: this.chapterTransitionContainer, alpha: 1, duration: 420, ease: "Quad.Out" });
+    if (this.chapterTransitionHintText) {
+      if (displayMessage) {
+        this.chapterTransitionHintText.setText(displayMessage);
+      } else {
+        this.chapterTransitionHintText.setText("Continue into the Chapter 2 opening.");
+      }
+    }
+
+    this.chapterTransitionContainer.setVisible(true);
+    this.chapterTransitionContainer.setAlpha(0);
+
+    this.tweens.add({
+      targets: this.chapterTransitionContainer,
+      alpha: 1,
+      duration: 420,
+      ease: "Quad.easeOut"
+    });
   }
 
   continueFromChapterTransition() {
-    const saveData = this.pendingChapterTwoTransitionData || this.buildChapterSaveData(this.loadedSlotNumber || null);
+    var saveData = this.pendingChapterTwoTransitionData;
+
+    if (!saveData) {
+      saveData = this.buildChapterSaveData(this.loadedSlotNumber || null);
+    }
+
+    var slotNumber = null;
+
+    if (saveData) {
+      if (saveData.slotNumber) {
+        slotNumber = saveData.slotNumber;
+      }
+    }
+
+    if (!slotNumber) {
+      if (this.loadedSlotNumber) {
+        slotNumber = this.loadedSlotNumber;
+      }
+    }
+
     this.stopBattleMusic();
+
     this.scene.start("BattleScene", {
       loadFromSave: true,
-      saveData,
-      slotNumber: saveData?.slotNumber || this.loadedSlotNumber || null,
+      saveData: saveData,
+      slotNumber: slotNumber,
       playChapterTwoOpening: true,
-      skipChapter2TitleCard: true,
+      skipChapter2TitleCard: true
     });
   }
 
   createOpeningUI() {
     this.openingContainer = this.add.container(0, 0);
-    this.openingFade = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.88);
-    this.openingFullSceneImage = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, "prologueScene").setVisible(false);
-    fitImageToBounds(this, this.openingFullSceneImage, "prologueScene", GAME_WIDTH, GAME_HEIGHT, true);
+
+    this.openingFade = this.add.rectangle(
+      GAME_WIDTH / 2,
+      GAME_HEIGHT / 2,
+      GAME_WIDTH,
+      GAME_HEIGHT,
+      0x000000,
+      0.88
+    );
+
+    this.openingFullSceneImage = this.add.image(
+      GAME_WIDTH / 2,
+      GAME_HEIGHT / 2,
+      "prologueScene"
+    );
+
+    this.openingFullSceneImage.setVisible(false);
+
+    fitImageToBounds(
+      this,
+      this.openingFullSceneImage,
+      "prologueScene",
+      GAME_WIDTH,
+      GAME_HEIGHT,
+      true
+    );
 
     this.titleCard = this.add.container(0, 0);
-    const titleBg = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, 520, 220, 0x14091f, 0.97);
+
+    var titleBg = this.add.rectangle(
+      GAME_WIDTH / 2,
+      GAME_HEIGHT / 2,
+      520,
+      220,
+      0x14091f,
+      0.97
+    );
+
     titleBg.setStrokeStyle(3, 0xb6925f);
-    this.titleChapter = this.add.text(GAME_WIDTH / 2, 215, "", { fontSize: "42px", fontStyle: "bold", color: "#f7ecd3" }).setOrigin(0.5);
-    this.titleSubtitle = this.add.text(GAME_WIDTH / 2, 270, "", { fontSize: "28px", color: "#e8c98b" }).setOrigin(0.5);
-    this.titleTag = this.add.text(GAME_WIDTH / 2, 315, "", { fontSize: "18px", color: "#d8c4f0" }).setOrigin(0.5);
-    const titleContinueButton = this.add.rectangle(GAME_WIDTH / 2, 370, 190, 42, 0x1a0d2a);
+
+    this.titleChapter = this.add.text(
+      GAME_WIDTH / 2,
+      215,
+      "",
+      {
+        fontSize: "42px",
+        fontStyle: "bold",
+        color: "#f7ecd3"
+      }
+    );
+
+    this.titleChapter.setOrigin(0.5);
+
+    this.titleSubtitle = this.add.text(
+      GAME_WIDTH / 2,
+      270,
+      "",
+      {
+        fontSize: "28px",
+        color: "#e8c98b"
+      }
+    );
+
+    this.titleSubtitle.setOrigin(0.5);
+
+    this.titleTag = this.add.text(
+      GAME_WIDTH / 2,
+      315,
+      "",
+      {
+        fontSize: "18px",
+        color: "#d8c4f0"
+      }
+    );
+
+    this.titleTag.setOrigin(0.5);
+
+    var titleContinueButton = this.add.rectangle(
+      GAME_WIDTH / 2,
+      370,
+      190,
+      42,
+      0x1a0d2a
+    );
+
     titleContinueButton.setStrokeStyle(2, 0xb6925f);
     titleContinueButton.setInteractive({ useHandCursor: true });
-    titleContinueButton.on("pointerdown", () => this.advanceOpening());
-    const titleContinueText = this.add.text(GAME_WIDTH / 2, 370, "Continue", { fontSize: "18px", fontStyle: "bold", color: "#f7ecd3" }).setOrigin(0.5);
-    this.titleCard.add([titleBg, this.titleChapter, this.titleSubtitle, this.titleTag, titleContinueButton, titleContinueText]);
 
+    titleContinueButton.on(
+      "pointerdown",
+      function () {
+        this.advanceOpening();
+      },
+      this
+    );
+
+    var titleContinueText = this.add.text(
+      GAME_WIDTH / 2,
+      370,
+      "Continue",
+      {
+        fontSize: "18px",
+        fontStyle: "bold",
+        color: "#f7ecd3"
+      }
+    );
+
+    titleContinueText.setOrigin(0.5);
+
+    this.titleCard.add([
+      titleBg,
+      this.titleChapter,
+      this.titleSubtitle,
+      this.titleTag,
+      titleContinueButton,
+      titleContinueText
+    ]);
     this.dialogueCard = this.add.container(0, 0);
     this.openingDialogueMainPanel = this.add.rectangle(480, 250, 860, 430, 0x12081d, 0.95);
     this.openingDialogueMainPanel.setStrokeStyle(3, 0xb6925f);
