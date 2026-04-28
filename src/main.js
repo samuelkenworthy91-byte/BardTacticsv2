@@ -16,17 +16,26 @@ const SKILL_BANNER_DURATION = 1250;
 const SKILL_IMPACT_DELAY = 520;
 const LEVEL_UP_PANEL_DEPTH = 20000;
 const STANDARD_BATTLE_PANEL_DEPTH = 15000;
-const STANDARD_BATTLE_INTRO_DURATION = 260;
-const STANDARD_BATTLE_HIT_STEP_DURATION = 700;
-const STANDARD_BATTLE_OUTRO_DURATION = 260;
+const STANDARD_BATTLE_INTRO_DURATION = 700;
+const STANDARD_BATTLE_HIT_STEP_DURATION = 900;
+const STANDARD_BATTLE_END_HOLD_DURATION = 900;
+const STANDARD_BATTLE_OUTRO_DURATION = 700;
  
 const SAVE_KEY = "bardsTacticsSave";
+const SAVE_SLOT_COUNT = 3;
+const SAVE_SLOT_KEY_PREFIX = `${SAVE_KEY}_slot_`;
 const TITLE_SCREEN_KEY = "bardsTitleScreen";
 const TITLE_SCREEN_PATH = "/ui/title_screen.png";
 const LOADING_RUNNER_KEY = "edwin_move_right";
 const LOADING_RUNNER_PATH = "/sprites/edwin/move_right.png";
 const ICE_OF_AGES_HIT_EFFECT_KEY = "iceOfAgesHitEffect";
 const ICE_OF_AGES_HIT_EFFECT_PATH = "/effects/ice_of_ages_hit.png";
+const CHAPTER_TWO_TITLE = { chapter: "Chapter 2", subtitle: "Owed an Explanation" };
+const ALLIED_DEATH_LINES = {
+  leon: "I can't...not yet...I only just found you.",
+  edwin: "Please...take care of Leon for me.",
+};
+const CHAPTER_ONE_GAME_OVER_UNIT_IDS = ["edwin", "leon"];
  
 const CARDINAL_DIRECTIONS = ["down", "up", "left", "right"];
 const CLOCKWISE_DIRECTIONS = ["up", "right", "down", "left"];
@@ -586,6 +595,39 @@ function canAttack(attacker, defender) {
   return !!getWeaponForTarget(attacker, defender);
 }
  
+function getSaveSlotKey(slotNumber) {
+  return `${SAVE_SLOT_KEY_PREFIX}${slotNumber}`;
+}
+ 
+function readSaveSlot(slotNumber) {
+  try {
+    const raw = window.localStorage.getItem(getSaveSlotKey(slotNumber));
+    return raw ? JSON.parse(raw) : null;
+  } catch (error) {
+    return null;
+  }
+}
+ 
+function getSaveSlotLabel(slotNumber) {
+  const saveData = readSaveSlot(slotNumber);
+  if (!saveData) return `Slot ${slotNumber}: Empty`;
+ 
+  const chapter = saveData.currentChapter || saveData.chapter || 1;
+  const chapterName = saveData.chapterTitle || saveData.chapterName || `Chapter ${chapter}`;
+  const savedAt = saveData.savedAt || saveData.completedAt;
+  let dateLabel = "saved game";
+ 
+  if (savedAt) {
+    try {
+      dateLabel = new Date(savedAt).toLocaleString();
+    } catch (error) {
+      dateLabel = "saved game";
+    }
+  }
+ 
+  return `Slot ${slotNumber}: ${chapterName} - ${dateLabel}`;
+}
+ 
 function fitImageToBounds(scene, image, textureKey, maxWidth, maxHeight, cover = false) {
   if (!scene?.textures?.exists(textureKey) || !image) return;
   const source = scene.textures.get(textureKey)?.getSourceImage();
@@ -857,15 +899,6 @@ class MainMenuScene extends Phaser.Scene {
     queueImage(this, LOADING_RUNNER_KEY, LOADING_RUNNER_PATH);
   }
  
-  getSaveData() {
-    try {
-      const raw = window.localStorage.getItem(SAVE_KEY);
-      return raw ? JSON.parse(raw) : null;
-    } catch (error) {
-      return null;
-    }
-  }
- 
   create() {
     this.cameras.main.setBackgroundColor("#06030b");
     if (this.textures.exists(TITLE_SCREEN_KEY)) {
@@ -885,15 +918,87 @@ class MainMenuScene extends Phaser.Scene {
     const subtitle = this.add.text(0, -48, "Choose your path.", { fontSize: "16px", color: "#d8c4f0" }).setOrigin(0.5);
     const newGameButton = createBannerButton(this, 0, 12, 220, 48, "New Game", () => this.scene.start("LoadingScene", { loadFromSave: false }), "24px");
     const loadGameButton = createBannerButton(this, 0, 72, 220, 48, "Load Game", () => {
-      const saveData = this.getSaveData();
-      if (!saveData) {
-        this.statusText.setText("No local save data found.");
-        return;
-      }
-      this.scene.start("LoadingScene", { loadFromSave: true, saveData });
+      this.scene.start("LoadGameScene");
     }, "24px");
     this.statusText = this.add.text(0, 118, "", { fontSize: "14px", color: "#f4d7d7", align: "center", wordWrap: { width: 280 } }).setOrigin(0.5, 0);
     panel.container.add([heading, subtitle, newGameButton.container, loadGameButton.container, this.statusText]);
+  }
+}
+ 
+class LoadGameScene extends Phaser.Scene {
+  constructor() {
+    super("LoadGameScene");
+  }
+ 
+  init(data = {}) {
+    this.fromGameOver = data.fromGameOver === true;
+    this.defeatedUnitName = data.defeatedUnitName || "";
+  }
+ 
+  preload() {
+    queueImage(this, TITLE_SCREEN_KEY, TITLE_SCREEN_PATH);
+    queueImage(this, LOADING_RUNNER_KEY, LOADING_RUNNER_PATH);
+  }
+ 
+  create() {
+    this.cameras.main.setBackgroundColor("#06030b");
+ 
+    if (this.textures.exists(TITLE_SCREEN_KEY)) {
+      const bg = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, TITLE_SCREEN_KEY);
+      fitImageToBounds(this, bg, TITLE_SCREEN_KEY, GAME_WIDTH, GAME_HEIGHT, true);
+      bg.setAlpha(0.36);
+    }
+ 
+    this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x06030b, 0.68);
+ 
+    const panelHeight = this.fromGameOver ? 388 : 342;
+    const panel = createBannerPanel(this, GAME_WIDTH / 2, GAME_HEIGHT / 2, 640, panelHeight, { innerInset: 16 });
+ 
+    const heading = this.add.text(0, -panelHeight / 2 + 42, this.fromGameOver ? "Game Over" : "Load Game", {
+      fontSize: this.fromGameOver ? "34px" : "32px",
+      fontStyle: "bold",
+      color: this.fromGameOver ? "#fca5a5" : "#f7ecd3",
+      stroke: "#0b0811",
+      strokeThickness: 5,
+    }).setOrigin(0.5);
+ 
+    const subText = this.fromGameOver
+      ? `${this.defeatedUnitName || "An ally"} has fallen. Choose a save slot to load.`
+      : "Choose one of your three save slots.";
+ 
+    const subtitle = this.add.text(0, -panelHeight / 2 + 82, subText, {
+      fontSize: "15px",
+      color: "#d8c4f0",
+      align: "center",
+      wordWrap: { width: 560 },
+    }).setOrigin(0.5);
+ 
+    this.statusText = this.add.text(0, panelHeight / 2 - 54, "", {
+      fontSize: "14px",
+      color: "#f4d7d7",
+      align: "center",
+      wordWrap: { width: 540 },
+    }).setOrigin(0.5);
+ 
+    panel.container.add([heading, subtitle, this.statusText]);
+ 
+    for (let slotNumber = 1; slotNumber <= SAVE_SLOT_COUNT; slotNumber += 1) {
+      const saveData = readSaveSlot(slotNumber);
+      const button = createBannerButton(this, 0, -panelHeight / 2 + 128 + (slotNumber - 1) * 54, 540, 42, getSaveSlotLabel(slotNumber), () => {
+        const selectedSave = readSaveSlot(slotNumber);
+        if (!selectedSave) {
+          this.statusText.setText(`Slot ${slotNumber} is empty.`);
+          return;
+        }
+        this.scene.start("LoadingScene", { loadFromSave: true, saveData: selectedSave, slotNumber });
+      }, "13px");
+ 
+      button.container.setAlpha(saveData ? 1 : 0.55);
+      panel.container.add(button.container);
+    }
+ 
+    const backButton = createBannerButton(this, 0, panelHeight / 2 - 18, 180, 34, "Back", () => this.scene.start("MainMenuScene"), "16px");
+    panel.container.add(backButton.container);
   }
 }
  
@@ -905,6 +1010,8 @@ class BattleScene extends Phaser.Scene {
   init(data = {}) {
     this.loadFromSave = data.loadFromSave === true;
     this.loadedSaveData = data.saveData || null;
+    this.loadedSlotNumber = data.slotNumber || null;
+    this.currentChapterNumber = this.loadedSaveData?.currentChapter || this.loadedSaveData?.chapter || 1;
   }
  
   preload() {
@@ -929,6 +1036,9 @@ class BattleScene extends Phaser.Scene {
       items: (unit.items || []).map((item) => ({ ...item })),
     }));
  
+    this.defeatedAllies = [];
+    this.applyLoadedSaveData(this.loadedSaveData);
+ 
     this.selectedUnitId = null;
     this.moveTiles = [];
     this.targetTiles = [];
@@ -951,6 +1061,9 @@ class BattleScene extends Phaser.Scene {
     this.skillBannerText = null;
     this.standardBattleSceneOpen = false;
     this.standardBattleContainer = null;
+    this.allyDeathContainer = null;
+    this.pendingAllyDeathContinue = null;
+    this.chapterTransitionContainer = null;
     this.battleMusic = null;
     this.battleMusicStarted = false;
     this.postBattleStep = 0;
@@ -983,6 +1096,8 @@ class BattleScene extends Phaser.Scene {
     this.createLevelUpAllocationUI();
     this.createOpeningUI();
     this.createPostBattleUI();
+    this.createAllyDeathCutsceneUI();
+    this.createChapterTransitionUI();
     this.setupInput();
     this.updateSelectedPanel();
     this.setObjectiveDisplayVisible(false);
@@ -1008,12 +1123,92 @@ class BattleScene extends Phaser.Scene {
     }
   }
  
+  applyLoadedSaveData(saveData) {
+    if (!saveData) return;
+ 
+    this.defeatedAllies = Array.isArray(saveData.defeatedAllies) ? [...saveData.defeatedAllies] : [];
+ 
+    if (!Array.isArray(saveData.units)) return;
+ 
+    const savedById = new Map(saveData.units.map((unitState) => [unitState.id, unitState]));
+ 
+    this.units = this.units
+      .map((unit) => {
+        const saved = savedById.get(unit.id);
+        if (!saved) return unit;
+        if (saved.alive === false) return null;
+ 
+        return {
+          ...unit,
+          ...saved,
+          skills: (unit.skills || []).map((skill) => ({ ...skill })),
+          weapons: (unit.weapons || []).map((weapon) => ({ ...weapon })),
+          items: Array.isArray(saved.items) ? saved.items.map((item) => ({ ...item })) : (unit.items || []).map((item) => ({ ...item })),
+          acted: false,
+          spriteState: "idle",
+        };
+      })
+      .filter(Boolean);
+  }
+ 
+  serializeUnitForSave(unit) {
+    return {
+      id: unit.id,
+      name: unit.name,
+      title: unit.title,
+      team: unit.team,
+      className: unit.className,
+      level: unit.level || 1,
+      xp: unit.xp || 0,
+      hp: Math.max(0, unit.hp || 0),
+      maxHp: unit.maxHp || 1,
+      str: unit.str || 0,
+      mag: unit.mag || 0,
+      def: unit.def || 0,
+      res: unit.res || 0,
+      spd: unit.spd || 0,
+      luck: unit.luck || 0,
+      move: unit.move || 0,
+      x: unit.x,
+      y: unit.y,
+      facing: unit.facing || "down",
+      sigilPoints: unit.sigilPoints ?? 0,
+      maxSigilPoints: unit.maxSigilPoints ?? 3,
+      items: (unit.items || []).map((item) => ({ ...item })),
+      alive: unit.hp > 0,
+    };
+  }
+ 
+  buildChapterSaveData(slotNumber = null) {
+    return {
+      version: 2,
+      slotNumber,
+      currentChapter: 2,
+      chapter: 2,
+      chapterTitle: `${CHAPTER_TWO_TITLE.chapter}: ${CHAPTER_TWO_TITLE.subtitle}`,
+      completedChapters: [1],
+      savedAt: new Date().toISOString(),
+      defeatedAllies: [...new Set(this.defeatedAllies || [])],
+      units: this.units.map((unit) => this.serializeUnitForSave(unit)),
+    };
+  }
+ 
   startLoadedBattle() {
     this.openingContainer.setVisible(false);
+ 
+    const saveData = this.getSavedGameData();
+    const savedChapter = saveData?.currentChapter || saveData?.chapter || 1;
+ 
+    if (savedChapter >= 2) {
+      this.setObjectiveDisplayVisible(false);
+      this.showChapterTwoTitleCard("Loaded save. Chapter 2 is ready to begin.");
+      return;
+    }
+ 
     this.startPlayerPhase();
     this.selectedUnitId = "edwin";
     this.updateSelectedPanel();
-    if (this.getSavedGameData()) this.helpText.setText("Loaded game. Player Phase. Click Edwin or Leon.");
+    if (saveData) this.helpText.setText("Loaded game. Player Phase. Click Edwin or Leon.");
   }
  
   createTopUI() {
@@ -1420,7 +1615,7 @@ class BattleScene extends Phaser.Scene {
       });
     });
  
-    const totalDuration = STANDARD_BATTLE_INTRO_DURATION + 250 + results.length * STANDARD_BATTLE_HIT_STEP_DURATION + STANDARD_BATTLE_OUTRO_DURATION;
+    const totalDuration = STANDARD_BATTLE_INTRO_DURATION + 350 + results.length * STANDARD_BATTLE_HIT_STEP_DURATION + STANDARD_BATTLE_END_HOLD_DURATION;
     this.time.delayedCall(totalDuration, () => {
       this.tweens.add({
         targets: this.standardBattleContainer,
@@ -1890,7 +2085,7 @@ class BattleScene extends Phaser.Scene {
     const saveButton = this.add.rectangle(-92, 48, 130, 40, 0x2563eb);
     saveButton.setStrokeStyle(2, 0x93c5fd);
     saveButton.setInteractive({ useHandCursor: true });
-    saveButton.on("pointerdown", () => this.saveChapterOne());
+    saveButton.on("pointerdown", () => this.showSaveSlotSelection());
     const saveButtonText = this.add.text(-92, 48, "Save", { fontSize: "18px", fontStyle: "bold", color: "#f7ecd3" }).setOrigin(0.5);
     const continueButton = this.add.rectangle(92, 48, 130, 40, 0x334155);
     continueButton.setStrokeStyle(2, 0x94a3b8);
@@ -2107,20 +2302,256 @@ class BattleScene extends Phaser.Scene {
   }
  
   saveChapterOne() {
-    const saveData = { chapter: 1, chapterName: "Prologue - Underpass", completed: true, completedAt: new Date().toISOString() };
+    this.showSaveSlotSelection();
+  }
+ 
+  showSaveSlotSelection() {
+    if (this.saveSlotContainer) this.saveSlotContainer.destroy();
+ 
+    this.savePromptContainer.setVisible(false);
+    this.saveSlotContainer = this.add.container(GAME_WIDTH / 2, GAME_HEIGHT / 2);
+ 
+    const panel = createBannerPanel(this, 0, 0, 560, 330, { innerInset: 16 });
+    const title = this.add.text(0, -132, "Choose Save Slot", {
+      fontSize: "28px",
+      fontStyle: "bold",
+      color: "#e8c98b",
+      stroke: "#0b0811",
+      strokeThickness: 4,
+    }).setOrigin(0.5);
+ 
+    const subtitle = this.add.text(0, -96, "Saving stores your units, stats, items, XP, and chapter progress.", {
+      fontSize: "13px",
+      color: "#d8c4f0",
+      align: "center",
+      wordWrap: { width: 500 },
+    }).setOrigin(0.5);
+ 
+    this.saveSlotStatusText = this.add.text(0, 116, "", {
+      fontSize: "13px",
+      color: "#86efac",
+      align: "center",
+      wordWrap: { width: 500 },
+    }).setOrigin(0.5);
+ 
+    this.saveSlotContainer.add([panel.container, title, subtitle, this.saveSlotStatusText]);
+ 
+    for (let slotNumber = 1; slotNumber <= SAVE_SLOT_COUNT; slotNumber += 1) {
+      const button = createBannerButton(this, 0, -48 + (slotNumber - 1) * 52, 500, 38, getSaveSlotLabel(slotNumber), () => {
+        this.saveChapterOneToSlot(slotNumber);
+      }, "13px");
+      this.saveSlotContainer.add(button.container);
+    }
+ 
+    const backButton = createBannerButton(this, -118, 156, 160, 34, "Back", () => {
+      if (this.saveSlotContainer) this.saveSlotContainer.destroy();
+      this.saveSlotContainer = null;
+      this.savePromptContainer.setVisible(true);
+    }, "15px");
+ 
+    const continueButton = createBannerButton(this, 118, 156, 160, 34, "Continue", () => this.finishChapterOne(), "15px");
+ 
+    this.saveSlotContainer.add([backButton.container, continueButton.container]);
+    this.postBattleContainer.add(this.saveSlotContainer);
+  }
+ 
+  saveChapterOneToSlot(slotNumber) {
+    const saveData = this.buildChapterSaveData(slotNumber);
+ 
     try {
-      window.localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
-      this.savePromptStatus.setText("Game saved.");
+      window.localStorage.setItem(getSaveSlotKey(slotNumber), JSON.stringify(saveData));
+      if (this.saveSlotStatusText) this.saveSlotStatusText.setText(`Saved to Slot ${slotNumber}. Moving to Chapter 2...`);
+      this.time.delayedCall(550, () => this.finishChapterOne());
     } catch (error) {
-      this.savePromptStatus.setText("Save failed in this browser preview.");
+      if (this.saveSlotStatusText) this.saveSlotStatusText.setText("Save failed in this browser preview.");
     }
   }
  
   finishChapterOne() {
-    this.phaseText.setText("Chapter 1 Complete");
+    if (this.saveSlotContainer) {
+      this.saveSlotContainer.destroy();
+      this.saveSlotContainer = null;
+    }
+ 
+    this.phaseText.setText("Chapter 2");
     this.phaseText.setColor("#fcd34d");
-    this.helpText.setText("Chapter 1 complete. Save data is stored locally in this browser preview.");
-    this.busy = false;
+    this.helpText.setText("Chapter 2: Owed an Explanation.");
+    this.busy = true;
+    this.showChapterTwoTitleCard();
+  }
+ 
+  createAllyDeathCutsceneUI() {
+    this.allyDeathContainer = this.add.container(0, 0).setVisible(false).setDepth(22000).setAlpha(0);
+    const dim = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.62);
+    dim.setInteractive();
+ 
+    const panel = createBannerPanel(this, GAME_WIDTH / 2, GAME_HEIGHT / 2, 780, 250, { innerInset: 16 });
+    this.allyDeathPortraitFrame = this.add.rectangle(196, 270, 128, 150, 0x1f2937, 1);
+    this.allyDeathPortraitFrame.setStrokeStyle(2, 0xe4d0a8, 0.9);
+    this.allyDeathPortrait = this.add.image(196, 270, "leonPortrait").setDisplaySize(118, 140);
+    this.allyDeathSpeakerText = this.add.text(286, 208, "", {
+      fontSize: "26px",
+      fontStyle: "bold",
+      color: "#f7ecd3",
+      stroke: "#0b0811",
+      strokeThickness: 4,
+    });
+    this.allyDeathLineText = this.add.text(286, 252, "", {
+      fontSize: "22px",
+      color: "#eadff7",
+      wordWrap: { width: 520 },
+      lineSpacing: 8,
+    });
+ 
+    const continueButton = createBannerButton(this, GAME_WIDTH / 2 + 250, GAME_HEIGHT / 2 + 84, 150, 36, "Continue", () => this.continueAllyDeathCutscene(), "16px");
+ 
+    this.allyDeathContainer.add([
+      dim,
+      panel.container,
+      this.allyDeathPortraitFrame,
+      this.allyDeathPortrait,
+      this.allyDeathSpeakerText,
+      this.allyDeathLineText,
+      continueButton.container,
+    ]);
+ 
+    this.uiLayer.add(this.allyDeathContainer);
+  }
+ 
+  showAllyDeathCutscene(unit, onContinue = null) {
+    if (!unit || !this.allyDeathContainer) {
+      if (typeof onContinue === "function") onContinue();
+      return;
+    }
+ 
+    this.pendingAllyDeathContinue = onContinue;
+    this.allyDeathSpeakerText.setText(unit.name || "Ally");
+    this.allyDeathLineText.setText(ALLIED_DEATH_LINES[unit.id] || "I have to fall back...");
+ 
+    if (unit.portraitKey && this.textures.exists(unit.portraitKey)) {
+      this.allyDeathPortrait.setTexture(unit.portraitKey).setDisplaySize(118, 140).setVisible(true);
+    } else {
+      this.allyDeathPortrait.setVisible(false);
+    }
+ 
+    this.allyDeathContainer.setVisible(true).setAlpha(0);
+    this.tweens.add({ targets: this.allyDeathContainer, alpha: 1, duration: 220, ease: "Quad.Out" });
+  }
+ 
+  continueAllyDeathCutscene() {
+    const onContinue = this.pendingAllyDeathContinue;
+    this.pendingAllyDeathContinue = null;
+ 
+    this.tweens.add({
+      targets: this.allyDeathContainer,
+      alpha: 0,
+      duration: 180,
+      ease: "Quad.Out",
+      onComplete: () => {
+        this.allyDeathContainer.setVisible(false);
+        if (typeof onContinue === "function") onContinue();
+      },
+    });
+  }
+ 
+  isChapterOneGameOverDeath(unit) {
+    return (this.currentChapterNumber || 1) === 1 && !!unit && CHAPTER_ONE_GAME_OVER_UNIT_IDS.includes(unit.id);
+  }
+ 
+  handleAllyUnitDeath(unit, onComplete = null) {
+    if (!unit) {
+      if (typeof onComplete === "function") onComplete();
+      return;
+    }
+ 
+    const isGameOverDeath = this.isChapterOneGameOverDeath(unit);
+    this.defeatedAllies = [...new Set([...(this.defeatedAllies || []), unit.id])];
+ 
+    this.showAllyDeathCutscene(unit, () => {
+      this.playUnitDeath(unit, () => {
+        this.removeUnitSpriteAndData(unit.id);
+ 
+        if (isGameOverDeath) {
+          this.triggerGameOverLoadScreen(unit);
+          return;
+        }
+ 
+        if (typeof onComplete === "function") onComplete();
+      });
+    });
+  }
+ 
+  triggerGameOverLoadScreen(unit) {
+    this.stopBattleMusic();
+    this.phase = "defeat";
+    this.phaseText.setText("Game Over");
+    this.phaseText.setColor("#f87171");
+    this.helpText.setText(`${unit?.name || "An ally"} has fallen. Loading save slots...`);
+    this.busy = true;
+    this.updateSelectedPanel();
+ 
+    this.time.delayedCall(850, () => {
+      this.scene.start("LoadGameScene", { fromGameOver: true, defeatedUnitName: unit?.name || "An ally" });
+    });
+  }
+ 
+  createChapterTransitionUI() {
+    this.chapterTransitionContainer = this.add.container(0, 0).setVisible(false).setDepth(23000).setAlpha(0);
+ 
+    const dim = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.9);
+    dim.setInteractive();
+    const panel = createBannerPanel(this, GAME_WIDTH / 2, GAME_HEIGHT / 2, 600, 240, { innerInset: 18 });
+ 
+    this.chapterTransitionChapterText = this.add.text(GAME_WIDTH / 2, 226, CHAPTER_TWO_TITLE.chapter, {
+      fontSize: "44px",
+      fontStyle: "bold",
+      color: "#f7ecd3",
+      stroke: "#0b0811",
+      strokeThickness: 6,
+    }).setOrigin(0.5);
+ 
+    this.chapterTransitionSubtitleText = this.add.text(GAME_WIDTH / 2, 284, CHAPTER_TWO_TITLE.subtitle, {
+      fontSize: "30px",
+      color: "#e8c98b",
+      stroke: "#0b0811",
+      strokeThickness: 4,
+    }).setOrigin(0.5);
+ 
+    this.chapterTransitionHintText = this.add.text(GAME_WIDTH / 2, 342, "Chapter 2 gameplay will begin here.", {
+      fontSize: "14px",
+      color: "#d8c4f0",
+      align: "center",
+    }).setOrigin(0.5);
+ 
+    this.chapterTransitionContainer.add([
+      dim,
+      panel.container,
+      this.chapterTransitionChapterText,
+      this.chapterTransitionSubtitleText,
+      this.chapterTransitionHintText,
+    ]);
+ 
+    this.uiLayer.add(this.chapterTransitionContainer);
+  }
+ 
+  showChapterTwoTitleCard(message = "") {
+    if (this.postBattleContainer) this.postBattleContainer.setVisible(false);
+    if (this.openingContainer) this.openingContainer.setVisible(false);
+    if (this.previewContainer) this.previewContainer.setVisible(false);
+ 
+    this.phase = "chapter2";
+    this.busy = true;
+    this.setObjectiveDisplayVisible(false);
+    this.phaseText.setText("Chapter 2");
+    this.phaseText.setColor("#fcd34d");
+    this.helpText.setText(message || "Chapter 2: Owed an Explanation.");
+ 
+    if (this.chapterTransitionHintText) {
+      this.chapterTransitionHintText.setText(message || "Chapter 2 gameplay will begin here.");
+    }
+ 
+    this.chapterTransitionContainer.setVisible(true).setAlpha(0);
+    this.tweens.add({ targets: this.chapterTransitionContainer, alpha: 1, duration: 420, ease: "Quad.Out" });
   }
  
   createOpeningUI() {
@@ -3059,7 +3490,7 @@ class BattleScene extends Phaser.Scene {
       this.playSkillTileEffects(unit, skill);
       let totalXp = 0;
       let defeatedFalan = false;
-      let defeatedEdwin = false;
+      const defeatedPlayerUnits = [];
       targetResults.forEach((entry, index) => {
         const target = entry.target;
         if (!target || target.hp <= 0) return;
@@ -3069,7 +3500,7 @@ class BattleScene extends Phaser.Scene {
         const didKill = entry.wasAlive && target.hp <= 0;
         if (didKill) {
           if (target.id === "falan") defeatedFalan = true;
-          if (target.id === "edwin") defeatedEdwin = true;
+          if (target.team === "player") defeatedPlayerUnits.push(target);
           if (unit.team === "player" && target.team === "enemy") totalXp += this.calculateXpGain(unit, target, true);
         }
       });
@@ -3079,6 +3510,9 @@ class BattleScene extends Phaser.Scene {
         if (!target) return;
         if (target.hp <= 0) {
           if (target.id === "falan") {
+            target.hp = 0;
+            this.refreshUnitSprite(target);
+          } else if (target.team === "player") {
             target.hp = 0;
             this.refreshUnitSprite(target);
           } else {
@@ -3096,12 +3530,17 @@ class BattleScene extends Phaser.Scene {
       this.updateSelectedPanel();
       const finishDelay = 760 + targetResults.length * 120;
       this.time.delayedCall(finishDelay, () => {
-        if (defeatedEdwin) {
-          this.stopBattleMusic();
-          this.phaseText.setText("Defeat");
-          this.phaseText.setColor("#f87171");
-          this.helpText.setText("Defeat! Edwin has fallen.");
-          this.busy = false;
+        if (defeatedPlayerUnits.length > 0) {
+          const gameOverUnit = defeatedPlayerUnits.find((target) => this.isChapterOneGameOverDeath(target)) || defeatedPlayerUnits[0];
+          this.handleAllyUnitDeath(gameOverUnit, () => {
+            this.busy = false;
+            if (typeof options.onComplete === "function") {
+              options.onComplete();
+              return;
+            }
+            this.clearSelection(`${unit.name} used ${skill.name}.`);
+            this.checkEndOfPlayerPhase();
+          });
           return;
         }
         if (defeatedFalan) {
@@ -3963,19 +4402,20 @@ Crit: Luck difference %. Critical hits deal x3 damage.${itemSummary}`
  
     const finishEnemyAttack = () => {
       if (defender.hp <= 0) {
-        const defeatedEdwin = defender.id === "edwin";
         defender.hp = 0;
-        this.playUnitDeath(defender, () => this.removeUnitSpriteAndData(defender.id));
  
-        if (defeatedEdwin) {
-          this.stopBattleMusic();
-          this.phaseText.setText("Defeat");
-          this.phaseText.setColor("#f87171");
-          this.helpText.setText("Defeat! Edwin has fallen.");
-          this.busy = false;
+        if (defender.team === "player") {
+          this.refreshUnitSprite(defender);
+          this.setUnitSpriteFrame(attacker, "idle", attacker.facing || "down");
           this.updateSelectedPanel();
+          this.handleAllyUnitDeath(defender, () => {
+            this.enemyIndex += 1;
+            this.time.delayedCall(550, () => this.runNextEnemy());
+          });
           return;
         }
+ 
+        this.playUnitDeath(defender, () => this.removeUnitSpriteAndData(defender.id));
       } else {
         this.refreshUnitSprite(defender);
         this.setUnitSpriteFrame(defender, "idle", defender.facing || "down");
@@ -4021,7 +4461,7 @@ const config = {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [TitleScene, MainMenuScene, LoadingScene, BattleScene],
+  scene: [TitleScene, MainMenuScene, LoadGameScene, LoadingScene, BattleScene],
 };
  
 new Phaser.Game(config);
