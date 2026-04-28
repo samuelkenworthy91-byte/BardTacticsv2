@@ -15,6 +15,10 @@ const PLAYER_ACTION_PAUSE = 450;
 const SKILL_BANNER_DURATION = 1250;
 const SKILL_IMPACT_DELAY = 520;
 const LEVEL_UP_PANEL_DEPTH = 20000;
+const STANDARD_BATTLE_PANEL_DEPTH = 15000;
+const STANDARD_BATTLE_INTRO_DURATION = 260;
+const STANDARD_BATTLE_HIT_STEP_DURATION = 700;
+const STANDARD_BATTLE_OUTRO_DURATION = 260;
  
 const SAVE_KEY = "bardsTacticsSave";
 const TITLE_SCREEN_KEY = "bardsTitleScreen";
@@ -945,6 +949,8 @@ class BattleScene extends Phaser.Scene {
     this.targetTileStroke = null;
     this.skillBannerContainer = null;
     this.skillBannerText = null;
+    this.standardBattleSceneOpen = false;
+    this.standardBattleContainer = null;
     this.battleMusic = null;
     this.battleMusicStarted = false;
     this.postBattleStep = 0;
@@ -971,6 +977,7 @@ class BattleScene extends Phaser.Scene {
     this.drawUnits();
     this.createSidePanel();
     this.createPreviewUI();
+    this.createStandardBattleSceneUI();
     this.createCombatXpPopup();
     this.createSkillBanner();
     this.createLevelUpAllocationUI();
@@ -1131,6 +1138,302 @@ class BattleScene extends Phaser.Scene {
     const cancelText = this.add.text(52, 39, "Cancel", { fontSize: "16px", fontStyle: "bold", color: "#f7ecd3" });
     this.previewContainer.add([panel, title, this.previewLeftName, this.previewLeftStats, this.previewRightName, this.previewRightStats, confirmButton, confirmText, cancelButton, cancelText]);
     this.uiLayer.add(this.previewContainer);
+  }
+ 
+ 
+  createStandardBattleSceneUI() {
+    this.standardBattleContainer = this.add.container(0, 0).setVisible(false).setDepth(STANDARD_BATTLE_PANEL_DEPTH).setAlpha(0);
+ 
+    const dim = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.74);
+    dim.setInteractive();
+ 
+    const panel = createBannerPanel(this, GAME_WIDTH / 2, GAME_HEIGHT / 2, 790, 404, { innerInset: 18 });
+ 
+    const arena = this.add.rectangle(GAME_WIDTH / 2, 226, 700, 210, 0x0b1020, 0.96).setOrigin(0.5);
+    arena.setStrokeStyle(2, 0xe4d0a8, 0.7);
+ 
+    const arenaGlow = this.add.rectangle(GAME_WIDTH / 2, 226, 682, 190, 0x1f1431, 0.72).setOrigin(0.5);
+    arenaGlow.setStrokeStyle(1, 0x5b3f87, 0.58);
+ 
+    const floorLine = this.add.rectangle(GAME_WIDTH / 2, 322, 650, 4, 0xb6925f, 0.55).setOrigin(0.5);
+    const title = this.add.text(GAME_WIDTH / 2, 84, "Standard Attack", {
+      fontSize: "20px",
+      fontStyle: "bold",
+      color: "#f7ecd3",
+      stroke: "#0b0811",
+      strokeThickness: 4,
+    }).setOrigin(0.5);
+ 
+    this.standardBattleWeaponText = this.add.text(GAME_WIDTH / 2, 110, "", {
+      fontSize: "13px",
+      color: "#d8c4f0",
+      align: "center",
+    }).setOrigin(0.5);
+ 
+    this.standardBattleAttackerName = this.add.text(176, 132, "", {
+      fontSize: "18px",
+      fontStyle: "bold",
+      color: "#93c5fd",
+      stroke: "#0b0811",
+      strokeThickness: 3,
+    }).setOrigin(0, 0.5);
+ 
+    this.standardBattleDefenderName = this.add.text(784, 132, "", {
+      fontSize: "18px",
+      fontStyle: "bold",
+      color: "#fca5a5",
+      stroke: "#0b0811",
+      strokeThickness: 3,
+    }).setOrigin(1, 0.5);
+ 
+    this.standardBattleAttackerShadow = this.add.ellipse(292, 326, 142, 20, 0x000000, 0.42);
+    this.standardBattleDefenderShadow = this.add.ellipse(668, 326, 142, 20, 0x000000, 0.42);
+ 
+    this.standardBattleAttackerSprite = this.add.image(292, 322, "edwin_idle_right").setOrigin(0.5, 1);
+    this.standardBattleDefenderSprite = this.add.image(668, 322, "falan_idle_left").setOrigin(0.5, 1);
+ 
+    this.standardBattleImpactFlash = this.add.rectangle(GAME_WIDTH / 2, 226, 700, 210, 0xffffff, 0).setOrigin(0.5);
+    this.standardBattleMessageText = this.add.text(GAME_WIDTH / 2, 182, "", {
+      fontSize: "34px",
+      fontStyle: "bold",
+      color: "#f7ecd3",
+      stroke: "#0b0811",
+      strokeThickness: 7,
+    }).setOrigin(0.5).setAlpha(0);
+ 
+    this.standardBattleAttackerHp = this.createBattleHpBar(228, 410, "#93c5fd");
+    this.standardBattleDefenderHp = this.createBattleHpBar(732, 410, "#fca5a5");
+ 
+    const hint = this.add.text(GAME_WIDTH / 2, 476, "Skills stay on the battle map. Standard attacks zoom in here.", {
+      fontSize: "12px",
+      color: "#cbd5e1",
+    }).setOrigin(0.5);
+ 
+    this.standardBattleContainer.add([
+      dim,
+      panel.container,
+      arena,
+      arenaGlow,
+      floorLine,
+      title,
+      this.standardBattleWeaponText,
+      this.standardBattleAttackerName,
+      this.standardBattleDefenderName,
+      this.standardBattleAttackerShadow,
+      this.standardBattleDefenderShadow,
+      this.standardBattleAttackerSprite,
+      this.standardBattleDefenderSprite,
+      this.standardBattleImpactFlash,
+      this.standardBattleMessageText,
+      this.standardBattleAttackerHp.container,
+      this.standardBattleDefenderHp.container,
+      hint,
+    ]);
+ 
+    this.uiLayer.add(this.standardBattleContainer);
+  }
+ 
+  createBattleHpBar(x, y, nameColor = "#f7ecd3") {
+    const container = this.add.container(x, y);
+    const bg = this.add.rectangle(0, 0, 284, 76, 0x090512, 0.94).setOrigin(0.5);
+    bg.setStrokeStyle(2, 0xb6925f, 0.9);
+ 
+    const nameText = this.add.text(-124, -26, "", {
+      fontSize: "17px",
+      fontStyle: "bold",
+      color: nameColor,
+      stroke: "#0b0811",
+      strokeThickness: 3,
+    }).setOrigin(0, 0.5);
+ 
+    const hpText = this.add.text(124, -26, "", {
+      fontSize: "14px",
+      fontStyle: "bold",
+      color: "#f7ecd3",
+      stroke: "#0b0811",
+      strokeThickness: 3,
+    }).setOrigin(1, 0.5);
+ 
+    const barBg = this.add.rectangle(-124, 16, 248, 16, 0x1f2937, 1).setOrigin(0, 0.5);
+    barBg.setStrokeStyle(1, 0xe4d0a8, 0.65);
+ 
+    const barFill = this.add.rectangle(-124, 16, 248, 16, 0xef4444, 1).setOrigin(0, 0.5);
+    barFill.displayWidth = 248;
+ 
+    container.add([bg, nameText, hpText, barBg, barFill]);
+    return { container, bg, nameText, hpText, barBg, barFill, width: 248 };
+  }
+ 
+  setBattleHpBar(bar, unit, hpValue = null) {
+    if (!bar || !unit) return;
+    bar.unit = unit;
+    bar.nameText.setText(unit.name || "Unit");
+    this.setBattleHpBarValue(bar, hpValue ?? unit.hp ?? 0);
+  }
+ 
+  setBattleHpBarValue(bar, hpValue) {
+    if (!bar || !bar.unit) return;
+    const maxHp = Math.max(1, bar.unit.maxHp || 1);
+    const shownHp = Phaser.Math.Clamp(Math.round(hpValue), 0, maxHp);
+    bar.hpText.setText(`HP ${shownHp}/${maxHp}`);
+    bar.barFill.displayWidth = bar.width * Phaser.Math.Clamp(shownHp / maxHp, 0, 1);
+  }
+ 
+  animateBattleHpBar(bar, fromHp, toHp, duration = 320) {
+    if (!bar) return;
+    this.tweens.addCounter({
+      from: fromHp,
+      to: toHp,
+      duration,
+      ease: "Quad.Out",
+      onUpdate: (tween) => this.setBattleHpBarValue(bar, tween.getValue()),
+      onComplete: () => this.setBattleHpBarValue(bar, toHp),
+    });
+  }
+ 
+  getBattleSpriteTextureKey(unit, state = "idle", direction = "down") {
+    if (!unit) return null;
+    const preferred = this.getIndividualSpriteEntry(unit, state, direction, 0);
+    if (preferred?.key && this.textures.exists(preferred.key)) return preferred.key;
+ 
+    const idle = this.getIndividualSpriteEntry(unit, "idle", direction, 0);
+    if (idle?.key && this.textures.exists(idle.key)) return idle.key;
+ 
+    const downIdle = this.getIndividualSpriteEntry(unit, "idle", "down", 0);
+    if (downIdle?.key && this.textures.exists(downIdle.key)) return downIdle.key;
+ 
+    if (unit.portraitKey && this.textures.exists(unit.portraitKey)) return unit.portraitKey;
+    return null;
+  }
+ 
+  setBattleSceneSprite(image, unit, state = "idle", direction = "down", maxHeight = 178, maxWidth = 240) {
+    if (!image || !unit) return false;
+ 
+    const textureKey = this.getBattleSpriteTextureKey(unit, state, direction);
+    if (!textureKey) {
+      image.setVisible(false);
+      return false;
+    }
+ 
+    image.setTexture(textureKey);
+    image.clearTint();
+    image.setAlpha(1);
+    image.setVisible(true);
+    image.setOrigin(0.5, 1);
+ 
+    const source = this.textures.get(textureKey)?.getSourceImage();
+    if (source?.width && source?.height) {
+      const scale = Math.min(maxWidth / source.width, maxHeight / source.height);
+      image.setScale(scale);
+    } else {
+      image.setDisplaySize(120, 160);
+    }
+ 
+    return true;
+  }
+ 
+  showBattleMessage(text, color = "#f7ecd3") {
+    if (!this.standardBattleMessageText) return;
+    this.tweens.killTweensOf(this.standardBattleMessageText);
+    this.standardBattleMessageText.setText(text).setColor(color).setAlpha(1).setScale(0.82);
+    this.tweens.add({
+      targets: this.standardBattleMessageText,
+      scale: 1.12,
+      alpha: 0,
+      duration: 520,
+      ease: "Quad.Out",
+    });
+  }
+ 
+  playStandardBattleScene(attacker, defender, weapon, sequence, defenderStartHp, onComplete = null) {
+    if (!this.standardBattleContainer || !attacker || !defender || !weapon || !sequence) {
+      if (typeof onComplete === "function") onComplete();
+      return;
+    }
+ 
+    this.standardBattleSceneOpen = true;
+    this.standardBattleContainer.setVisible(true).setAlpha(0);
+    this.standardBattleAttackerSprite.x = 292;
+    this.standardBattleDefenderSprite.x = 668;
+    this.standardBattleImpactFlash.setAlpha(0);
+    this.standardBattleMessageText.setAlpha(0);
+ 
+    this.standardBattleAttackerName.setText(attacker.name || "Attacker");
+    this.standardBattleDefenderName.setText(defender.name || "Defender");
+    this.standardBattleWeaponText.setText(`${attacker.name} uses ${weapon.name} (${weapon.damageType || "physical"}, range ${getWeaponRangeLabel(weapon)})`);
+ 
+    this.setBattleHpBar(this.standardBattleAttackerHp, attacker, attacker.hp);
+    this.setBattleHpBar(this.standardBattleDefenderHp, defender, defenderStartHp);
+    this.setBattleSceneSprite(this.standardBattleAttackerSprite, attacker, "idle", "right");
+    this.setBattleSceneSprite(this.standardBattleDefenderSprite, defender, "idle", "left");
+ 
+    this.tweens.add({ targets: this.standardBattleContainer, alpha: 1, duration: STANDARD_BATTLE_INTRO_DURATION });
+ 
+    const results = sequence.results && sequence.results.length > 0
+      ? sequence.results
+      : [{ hit: false, critical: false, damage: 0, baseDamage: 0 }];
+ 
+    let defenderDisplayHp = defenderStartHp;
+    const attackState = this.getAttackAnimationState(attacker, weapon);
+ 
+    results.forEach((result, index) => {
+      this.time.delayedCall(STANDARD_BATTLE_INTRO_DURATION + 150 + index * STANDARD_BATTLE_HIT_STEP_DURATION, () => {
+        this.standardBattleAttackerSprite.x = 292;
+        this.standardBattleDefenderSprite.x = 668;
+        this.setBattleSceneSprite(this.standardBattleAttackerSprite, attacker, attackState, "right");
+        this.setBattleSceneSprite(this.standardBattleDefenderSprite, defender, "idle", "left");
+ 
+        this.tweens.add({
+          targets: this.standardBattleAttackerSprite,
+          x: 348,
+          duration: 135,
+          ease: "Cubic.Out",
+          yoyo: true,
+          onComplete: () => this.setBattleSceneSprite(this.standardBattleAttackerSprite, attacker, "idle", "right"),
+        });
+ 
+        if (!result.hit) {
+          this.showBattleMessage("MISS", "#fef3c7");
+          return;
+        }
+ 
+        const nextHp = Math.max(0, defenderDisplayHp - result.damage);
+        const message = result.critical ? `CRITICAL! -${result.damage}` : `-${result.damage}`;
+        this.showBattleMessage(message, result.critical ? "#fde68a" : "#fca5a5");
+ 
+        this.time.delayedCall(120, () => {
+          this.setBattleSceneSprite(this.standardBattleDefenderSprite, defender, "hurt", "left");
+          this.standardBattleDefenderSprite.setTintFill(result.critical ? 0xfff1a8 : 0xff6666);
+          this.standardBattleImpactFlash.setAlpha(result.critical ? 0.32 : 0.2);
+          this.tweens.add({ targets: this.standardBattleImpactFlash, alpha: 0, duration: 180, ease: "Quad.Out" });
+          this.tweens.add({ targets: this.standardBattleDefenderSprite, x: 694, duration: 45, yoyo: true, repeat: result.critical ? 5 : 3 });
+          this.animateBattleHpBar(this.standardBattleDefenderHp, defenderDisplayHp, nextHp, 330);
+          defenderDisplayHp = nextHp;
+        });
+ 
+        this.time.delayedCall(520, () => {
+          this.standardBattleDefenderSprite.clearTint();
+          if (defenderDisplayHp > 0) {
+            this.setBattleSceneSprite(this.standardBattleDefenderSprite, defender, "idle", "left");
+          }
+        });
+      });
+    });
+ 
+    const totalDuration = STANDARD_BATTLE_INTRO_DURATION + 250 + results.length * STANDARD_BATTLE_HIT_STEP_DURATION + STANDARD_BATTLE_OUTRO_DURATION;
+    this.time.delayedCall(totalDuration, () => {
+      this.tweens.add({
+        targets: this.standardBattleContainer,
+        alpha: 0,
+        duration: STANDARD_BATTLE_OUTRO_DURATION,
+        ease: "Quad.Out",
+        onComplete: () => {
+          this.standardBattleContainer.setVisible(false);
+          this.standardBattleSceneOpen = false;
+          if (typeof onComplete === "function") onComplete();
+        },
+      });
+    });
   }
  
   createCombatXpPopup() {
@@ -3273,53 +3576,64 @@ class BattleScene extends Phaser.Scene {
     const attacker = this.units.find((u) => u.id === attackerId);
     const defender = this.units.find((u) => u.id === defenderId);
     if (!attacker || !defender) return;
+ 
     const weapon = getWeaponForTarget(attacker, defender);
     if (!weapon) return;
+ 
     this.closeActionMenu();
     this.pendingItemUse = null;
     delete attacker.pendingMoveOrigin;
     this.busy = true;
     this.faceUnitToward(attacker, defender);
     this.faceUnitToward(defender, attacker);
-    this.playUnitState(attacker, this.getAttackAnimationState(attacker, weapon), 420);
+ 
+    const defenderStartHp = defender.hp;
     const defenderWasAlive = defender.hp > 0;
     const sequence = this.resolveAttackSequence(attacker, defender, weapon);
-    sequence.results.forEach((result, index) => {
-      this.showCombatResultText(defender, result, index);
-      if (result.hit) this.time.delayedCall(index * 140, () => this.playUnitHurt(defender));
-    });
     const didKill = defenderWasAlive && defender.hp <= 0;
     const defeatedFalan = didKill && defender.id === "falan";
     const xpGain = this.calculateXpGain(attacker, defender, didKill);
-    if (xpGain > 0) this.awardXp(attacker, xpGain);
-    attacker.acted = true;
-    this.refreshUnitSprite(attacker);
-    if (defender.hp <= 0) {
-      defender.hp = 0;
-      if (defeatedFalan) {
-        this.refreshUnitSprite(defender);
-        this.playUnitHurt(defender);
-        this.clearSelection(`${attacker.name} defeated ${defender.name}!`);
+ 
+    const finishStandardAttack = () => {
+      if (xpGain > 0) this.awardXp(attacker, xpGain);
+ 
+      attacker.acted = true;
+      this.refreshUnitSprite(attacker);
+ 
+      if (defender.hp <= 0) {
+        defender.hp = 0;
+        if (defeatedFalan) {
+          this.refreshUnitSprite(defender);
+          this.playUnitHurt(defender);
+          this.clearSelection(`${attacker.name} defeated ${defender.name}!`);
+        } else {
+          this.playUnitDeath(defender, () => this.removeUnitSpriteAndData(defender.id));
+          this.clearSelection(`${attacker.name} defeated ${defender.name}!`);
+        }
       } else {
-        this.playUnitDeath(defender, () => this.removeUnitSpriteAndData(defender.id));
-        this.clearSelection(`${attacker.name} defeated ${defender.name}!`);
+        this.refreshUnitSprite(defender);
+        this.setUnitSpriteFrame(defender, "idle", defender.facing || "down");
+        this.clearSelection(`${attacker.name} attacked ${defender.name} with ${weapon.name}.`);
       }
-    } else {
-      this.refreshUnitSprite(defender);
-      this.clearSelection(`${attacker.name} attacked ${defender.name} with ${weapon.name}.`);
-    }
-    this.updateSelectedPanel();
-    if (defeatedFalan) {
-      this.time.delayedCall(650 + sequence.results.length * 140, () => {
+ 
+      this.setUnitSpriteFrame(attacker, "idle", attacker.facing || "down");
+      this.updateSelectedPanel();
+ 
+      if (defeatedFalan) {
+        this.time.delayedCall(650, () => {
+          this.busy = false;
+          this.startPostBattleScene();
+        });
+        return;
+      }
+ 
+      this.time.delayedCall(350, () => {
         this.busy = false;
-        this.startPostBattleScene();
+        this.checkEndOfPlayerPhase();
       });
-      return;
-    }
-    this.time.delayedCall(650 + sequence.results.length * 140, () => {
-      this.busy = false;
-      this.checkEndOfPlayerPhase();
-    });
+    };
+ 
+    this.playStandardBattleScene(attacker, defender, weapon, sequence, defenderStartHp, finishStandardAttack);
   }
  
   clearSelection(message = "Click Edwin or Leon to select a unit.") {
@@ -3637,36 +3951,43 @@ Crit: Luck difference %. Critical hits deal x3 damage.${itemSummary}`
       this.time.delayedCall(250, () => this.runNextEnemy());
       return;
     }
+ 
     this.selectedUnitId = attacker.id;
     this.updateSelectedPanel();
     this.helpText.setText(`${attacker.name} attacks ${defender.name}.`);
     this.faceUnitToward(attacker, defender);
     this.faceUnitToward(defender, attacker);
-    this.playUnitState(attacker, this.getAttackAnimationState(attacker, weapon), 620);
+ 
+    const defenderStartHp = defender.hp;
     const sequence = this.resolveAttackSequence(attacker, defender, weapon);
-    sequence.results.forEach((result, index) => {
-      this.time.delayedCall(index * 220, () => this.showCombatResultText(defender, result, 0));
-      if (result.hit) this.time.delayedCall(index * 220, () => this.playUnitHurt(defender, 420));
-    });
-    if (defender.hp <= 0) {
-      const defeatedEdwin = defender.id === "edwin";
-      defender.hp = 0;
-      this.playUnitDeath(defender, () => this.removeUnitSpriteAndData(defender.id));
-      if (defeatedEdwin) {
-        this.stopBattleMusic();
-        this.phaseText.setText("Defeat");
-        this.phaseText.setColor("#f87171");
-        this.helpText.setText("Defeat! Edwin has fallen.");
-        this.busy = false;
-        this.updateSelectedPanel();
-        return;
+ 
+    const finishEnemyAttack = () => {
+      if (defender.hp <= 0) {
+        const defeatedEdwin = defender.id === "edwin";
+        defender.hp = 0;
+        this.playUnitDeath(defender, () => this.removeUnitSpriteAndData(defender.id));
+ 
+        if (defeatedEdwin) {
+          this.stopBattleMusic();
+          this.phaseText.setText("Defeat");
+          this.phaseText.setColor("#f87171");
+          this.helpText.setText("Defeat! Edwin has fallen.");
+          this.busy = false;
+          this.updateSelectedPanel();
+          return;
+        }
+      } else {
+        this.refreshUnitSprite(defender);
+        this.setUnitSpriteFrame(defender, "idle", defender.facing || "down");
       }
-    } else {
-      this.refreshUnitSprite(defender);
-    }
-    this.updateSelectedPanel();
-    this.enemyIndex += 1;
-    this.time.delayedCall(900 + sequence.results.length * 220, () => this.runNextEnemy());
+ 
+      this.setUnitSpriteFrame(attacker, "idle", attacker.facing || "down");
+      this.updateSelectedPanel();
+      this.enemyIndex += 1;
+      this.time.delayedCall(550, () => this.runNextEnemy());
+    };
+ 
+    this.playStandardBattleScene(attacker, defender, weapon, sequence, defenderStartHp, finishEnemyAttack);
   }
  
   startPlayerPhase() {
