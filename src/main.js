@@ -104,6 +104,92 @@ function createDeathEntries(unitKey) {
   }));
 }
 
+function getSpriteSetAliases(unitKey) {
+  const aliases = [unitKey];
+
+  if (unitKey?.endsWith("_thug")) {
+    const weaponName = unitKey.replace("_thug", "");
+    aliases.push(`thug_${weaponName}`);
+    aliases.push("thug");
+  }
+
+  if (unitKey?.startsWith("thug_")) {
+    const weaponName = unitKey.replace("thug_", "");
+    aliases.push(`${weaponName}_thug`);
+    aliases.push("thug");
+  }
+
+  return [...new Set(aliases.filter(Boolean))];
+}
+
+function safeSpriteKeyPart(value) {
+  return String(value || "sprite").replace(/[^a-zA-Z0-9_]/g, "_");
+}
+
+function createDirectionalSpriteCandidateEntries(unitKey, state, direction) {
+  const aliases = getSpriteSetAliases(unitKey);
+  const entries = [];
+
+  aliases.forEach((alias, aliasIndex) => {
+    const aliasPart = safeSpriteKeyPart(alias);
+    entries.push({
+      key: `${unitKey}_${state}_${direction}_candidate_${aliasIndex}_${aliasPart}_directional`,
+      path: `/sprites/${alias}/${state}_${direction}.png`,
+    });
+    entries.push({
+      key: `${unitKey}_${state}_${direction}_candidate_${aliasIndex}_${aliasPart}_named_directional`,
+      path: `/sprites/${alias}/${alias}_${state}_${direction}.png`,
+    });
+    entries.push({
+      key: `${unitKey}_${state}_${direction}_candidate_${aliasIndex}_${aliasPart}_named_state`,
+      path: `/sprites/${alias}/${alias}_${state}.png`,
+    });
+    entries.push({
+      key: `${unitKey}_${state}_${direction}_candidate_${aliasIndex}_${aliasPart}_plain_state`,
+      path: `/sprites/${alias}/${state}.png`,
+    });
+  });
+
+  return entries;
+}
+
+function createDeathSpriteCandidateEntries(unitKey, frameIndex = 0) {
+  const frameNumber = Math.max(1, frameIndex + 1);
+  const aliases = getSpriteSetAliases(unitKey);
+  const entries = [];
+
+  aliases.forEach((alias, aliasIndex) => {
+    const aliasPart = safeSpriteKeyPart(alias);
+    entries.push({
+      key: `${unitKey}_death_${frameNumber}_candidate_${aliasIndex}_${aliasPart}_numbered`,
+      path: `/sprites/${alias}/death_${frameNumber}.png`,
+    });
+    entries.push({
+      key: `${unitKey}_death_${frameNumber}_candidate_${aliasIndex}_${aliasPart}_named_numbered`,
+      path: `/sprites/${alias}/${alias}_death_${frameNumber}.png`,
+    });
+    entries.push({
+      key: `${unitKey}_death_${frameNumber}_candidate_${aliasIndex}_${aliasPart}_named_state`,
+      path: `/sprites/${alias}/${alias}_death.png`,
+    });
+    entries.push({
+      key: `${unitKey}_death_${frameNumber}_candidate_${aliasIndex}_${aliasPart}_plain_state`,
+      path: `/sprites/${alias}/death.png`,
+    });
+  });
+
+  return entries;
+}
+
+function uniqueSpriteEntries(entries) {
+  const seen = new Set();
+  return entries.filter((entry) => {
+    if (!entry?.key || !entry?.path || seen.has(entry.key)) return false;
+    seen.add(entry.key);
+    return true;
+  });
+}
+
 const INDIVIDUAL_UNIT_SPRITE_SETS = {
   edwin: {
     idle: createDirectionalStateEntries("edwin", "idle"),
@@ -821,20 +907,26 @@ function queueBiomeTileAssets(scene, biomeKey) {
 
 function queueIndividualDirectionalSpriteAssets(scene) {
   const queuedKeys = new Set();
-  Object.values(INDIVIDUAL_UNIT_SPRITE_SETS).forEach((spriteSet) => {
-    Object.values(spriteSet).forEach((entry) => {
+
+  const queueEntry = (entry) => {
+    if (!entry?.key || !entry?.path || queuedKeys.has(entry.key)) return;
+    queueImage(scene, entry.key, entry.path);
+    queuedKeys.add(entry.key);
+  };
+
+  Object.entries(INDIVIDUAL_UNIT_SPRITE_SETS).forEach(([spriteSetKey, spriteSet]) => {
+    Object.entries(spriteSet).forEach(([state, entry]) => {
       if (Array.isArray(entry)) {
-        entry.forEach((frameEntry) => {
-          if (!frameEntry?.key || !frameEntry?.path || queuedKeys.has(frameEntry.key)) return;
-          queueImage(scene, frameEntry.key, frameEntry.path);
-          queuedKeys.add(frameEntry.key);
+        entry.forEach((frameEntry, frameIndex) => {
+          queueEntry(frameEntry);
+          uniqueSpriteEntries(createDeathSpriteCandidateEntries(spriteSetKey, frameIndex)).forEach(queueEntry);
         });
         return;
       }
-      Object.values(entry || {}).forEach((directionEntry) => {
-        if (!directionEntry?.key || !directionEntry?.path || queuedKeys.has(directionEntry.key)) return;
-        queueImage(scene, directionEntry.key, directionEntry.path);
-        queuedKeys.add(directionEntry.key);
+
+      Object.entries(entry || {}).forEach(([direction, directionEntry]) => {
+        queueEntry(directionEntry);
+        uniqueSpriteEntries(createDirectionalSpriteCandidateEntries(spriteSetKey, state, direction)).forEach(queueEntry);
       });
     });
   });
@@ -1406,7 +1498,7 @@ class BattleScene extends Phaser.Scene {
     this.portraitFrame.setStrokeStyle(2, 0x475569);
     this.portraitImage = this.add.image(innerX + 44, y + 76, "edwinPortrait").setVisible(false);
     this.portraitImage.setDisplaySize(88, 104);
-    this.portraitPlaceholder = this.add.text(innerX + 44, y + 76, "NO\nART", { fontSize: "18px", color: "#94a3b8", align: "center" }).setOrigin(0.5);
+    this.portraitPlaceholder = this.add.text(innerX + 44, y + 76, "NO ART", { fontSize: "18px", color: "#94a3b8", align: "center" }).setOrigin(0.5);
     this.unitNameText = this.add.text(innerX, y + 136, "None", { fontSize: "21px", fontStyle: "bold", color: "#f7ecd3" });
     this.unitClassText = this.add.text(innerX, y + 166, "", { fontSize: "12px", color: "#94a3b8", wordWrap: { width: 202 } });
     this.hpBarText = this.add.text(innerX, y + 198, "", { fontSize: "12px", color: "#fecaca" });
@@ -1629,14 +1721,18 @@ class BattleScene extends Phaser.Scene {
 
   getBattleSpriteTextureKey(unit, state = "idle", direction = "down") {
     if (!unit) return null;
-    const preferred = this.getIndividualSpriteEntry(unit, state, direction, 0);
-    if (preferred?.key && this.textures.exists(preferred.key)) return preferred.key;
 
-    const idle = this.getIndividualSpriteEntry(unit, "idle", direction, 0);
-    if (idle?.key && this.textures.exists(idle.key)) return idle.key;
+    const candidateGroups = [
+      this.getIndividualSpriteEntryCandidates(unit, state, direction, 0),
+      this.getIndividualSpriteEntryCandidates(unit, "idle", direction, 0),
+      this.getIndividualSpriteEntryCandidates(unit, "idle", "down", 0),
+    ];
 
-    const downIdle = this.getIndividualSpriteEntry(unit, "idle", "down", 0);
-    if (downIdle?.key && this.textures.exists(downIdle.key)) return downIdle.key;
+    for (const candidates of candidateGroups) {
+      for (const entry of candidates) {
+        if (entry?.key && this.textures.exists(entry.key)) return entry.key;
+      }
+    }
 
     if (unit.portraitKey && this.textures.exists(unit.portraitKey)) return unit.portraitKey;
     return null;
@@ -2275,7 +2371,7 @@ class BattleScene extends Phaser.Scene {
     this.postBattlePortraitFrame.setStrokeStyle(2, 0x64748b);
     this.postBattlePortrait = this.add.image(720, 160, "leonPortrait").setDisplaySize(110, 132);
     this.postBattleOverlapPortrait = this.add.image(682, 164, "heathPortrait").setDisplaySize(90, 108).setAlpha(0.9).setVisible(false);
-    this.postBattlePortraitPlaceholder = this.add.text(720, 160, "NO\nART", { fontSize: "20px", color: "#94a3b8", align: "center" }).setOrigin(0.5);
+    this.postBattlePortraitPlaceholder = this.add.text(720, 160, "NO ART", { fontSize: "20px", color: "#94a3b8", align: "center" }).setOrigin(0.5);
     this.postBattleTextBox = this.add.rectangle(480, 395, 800, 120, 0x1a0d2a, 0.98);
     this.postBattleTextBox.setStrokeStyle(2, 0xb6925f);
     this.postBattleSpeaker = this.add.text(90, 343, "", { fontSize: "24px", fontStyle: "bold", color: "#f7ecd3" });
@@ -2813,7 +2909,7 @@ class BattleScene extends Phaser.Scene {
     this.dialoguePortraitFrame = this.add.rectangle(720, 160, 120, 140, 0x24123a);
     this.dialoguePortraitFrame.setStrokeStyle(2, 0xe4d0a8);
     this.dialoguePortrait = this.add.image(720, 160, "edwinPortrait").setDisplaySize(110, 132);
-    this.dialoguePortraitPlaceholder = this.add.text(720, 160, "NO\nART", { fontSize: "20px", color: "#94a3b8", align: "center" }).setOrigin(0.5);
+    this.dialoguePortraitPlaceholder = this.add.text(720, 160, "NO ART", { fontSize: "20px", color: "#94a3b8", align: "center" }).setOrigin(0.5);
 
     this.impactContainer = this.add.container(0, 0).setVisible(false);
     const impactShadow = this.add.rectangle(480, 175, 560, 190, 0x020617, 0.82);
@@ -2822,14 +2918,14 @@ class BattleScene extends Phaser.Scene {
     this.impactAttackerFrame = this.add.rectangle(0, 0, 130, 150, 0x1f2937, 1);
     this.impactAttackerFrame.setStrokeStyle(2, 0x64748b);
     this.impactAttackerImage = this.add.image(0, -6, "edwinPortrait").setDisplaySize(112, 132);
-    this.impactAttackerPlaceholder = this.add.text(0, -6, "NO\nART", { fontSize: "20px", color: "#94a3b8", align: "center" }).setOrigin(0.5);
+    this.impactAttackerPlaceholder = this.add.text(0, -6, "NO ART", { fontSize: "20px", color: "#94a3b8", align: "center" }).setOrigin(0.5);
     this.impactAttackerName = this.add.text(0, 86, "", { fontSize: "16px", fontStyle: "bold", color: "#f7ecd3" }).setOrigin(0.5);
     this.impactAttackerSlot.add([this.impactAttackerFrame, this.impactAttackerImage, this.impactAttackerPlaceholder, this.impactAttackerName]);
     this.impactDefenderSlot = this.add.container(640, 175);
     this.impactDefenderFrame = this.add.rectangle(0, 0, 130, 150, 0x1f2937, 1);
     this.impactDefenderFrame.setStrokeStyle(2, 0x64748b);
     this.impactDefenderImage = this.add.image(0, -6, "edwinPortrait").setDisplaySize(112, 132);
-    this.impactDefenderPlaceholder = this.add.text(0, -6, "NO\nART", { fontSize: "20px", color: "#94a3b8", align: "center" }).setOrigin(0.5);
+    this.impactDefenderPlaceholder = this.add.text(0, -6, "NO ART", { fontSize: "20px", color: "#94a3b8", align: "center" }).setOrigin(0.5);
     this.impactDefenderName = this.add.text(0, 86, "", { fontSize: "16px", fontStyle: "bold", color: "#f7ecd3" }).setOrigin(0.5);
     this.impactDefenderSlot.add([this.impactDefenderFrame, this.impactDefenderImage, this.impactDefenderPlaceholder, this.impactDefenderName]);
     this.impactText = this.add.text(480, 175, "SMASH!", { fontSize: "28px", fontStyle: "bold", color: "#f8fafc", stroke: "#0f172a", strokeThickness: 6 }).setOrigin(0.5);
@@ -3420,6 +3516,25 @@ class BattleScene extends Phaser.Scene {
     return directionEntries?.[resolvedDirection] || directionEntries?.down || null;
   }
 
+
+  getIndividualSpriteEntryCandidates(unit, state = "idle", direction = "down", frameIndex = 0) {
+    if (!unit) return [];
+
+    const spriteSetKey = unit.spriteSet || unit.id;
+    const resolvedDirection = CARDINAL_DIRECTIONS.includes(direction) ? direction : "down";
+    const entries = [];
+    const primary = this.getIndividualSpriteEntry(unit, state, resolvedDirection, frameIndex);
+    if (primary) entries.push(primary);
+
+    if (state === "death") {
+      entries.push(...createDeathSpriteCandidateEntries(spriteSetKey, frameIndex));
+    } else {
+      entries.push(...createDirectionalSpriteCandidateEntries(spriteSetKey, state, resolvedDirection));
+    }
+
+    return uniqueSpriteEntries(entries);
+  }
+
   applyIndividualUnitSprite(unit, textureKey, state = "idle") {
     const sprite = this.unitSprites[unit.id];
     if (!sprite || !textureKey || !this.textures.exists(textureKey)) {
@@ -3468,9 +3583,22 @@ class BattleScene extends Phaser.Scene {
   setUnitSpriteFrame(unit, state = "idle", direction = null) {
     if (!unit) return false;
     const resolvedDirection = direction || unit.facing || "down";
-    const entry = this.getIndividualSpriteEntry(unit, state, resolvedDirection, 0);
     unit.spriteState = state;
-    if (entry?.key && this.textures.exists(entry.key)) return this.applyIndividualUnitSprite(unit, entry.key, state);
+
+    const candidateGroups = [this.getIndividualSpriteEntryCandidates(unit, state, resolvedDirection, 0)];
+    if (state !== "idle") {
+      candidateGroups.push(this.getIndividualSpriteEntryCandidates(unit, "idle", resolvedDirection, 0));
+      candidateGroups.push(this.getIndividualSpriteEntryCandidates(unit, "idle", "down", 0));
+    }
+
+    for (const candidates of candidateGroups) {
+      for (const entry of candidates) {
+        if (entry?.key && this.textures.exists(entry.key)) {
+          return this.applyIndividualUnitSprite(unit, entry.key, state);
+        }
+      }
+    }
+
     this.showUnitFallbackSprite(unit);
     return false;
   }
@@ -3478,8 +3606,13 @@ class BattleScene extends Phaser.Scene {
   setUnitDeathFrame(unit, frameIndex = 0) {
     if (!unit) return false;
     unit.spriteState = "death";
-    const entry = this.getIndividualSpriteEntry(unit, "death", unit.facing || "down", frameIndex);
-    if (entry?.key && this.textures.exists(entry.key)) return this.applyIndividualUnitSprite(unit, entry.key, "death");
+
+    for (const entry of this.getIndividualSpriteEntryCandidates(unit, "death", unit.facing || "down", frameIndex)) {
+      if (entry?.key && this.textures.exists(entry.key)) {
+        return this.applyIndividualUnitSprite(unit, entry.key, "death");
+      }
+    }
+
     this.showUnitFallbackSprite(unit);
     return false;
   }
@@ -3487,8 +3620,8 @@ class BattleScene extends Phaser.Scene {
   getAttackAnimationState(unit, weapon = null) {
     if (!unit) return "attack";
     if (weapon?.damageType === "magical") {
-      const magicEntry = this.getIndividualSpriteEntry(unit, "magic", unit.facing || "down", 0);
-      if (magicEntry?.key && this.textures.exists(magicEntry.key)) return "magic";
+      const magicEntries = this.getIndividualSpriteEntryCandidates(unit, "magic", unit.facing || "down", 0);
+      if (magicEntries.some((entry) => entry?.key && this.textures.exists(entry.key))) return "magic";
     }
     return "attack";
   }
@@ -3641,7 +3774,7 @@ class BattleScene extends Phaser.Scene {
     effect.setDepth(9997);
     this.overlayLayer.add(effect);
 
-    const isBrothersBligh = effectKey === BROTHERS_BLIGH_HIT_EFFECT_KEY;
+    const isBrothersBligh = textureKey === BROTHERS_BLIGH_HIT_EFFECT_KEY;
     const appearDuration = isBrothersBligh ? BROTHERS_BLIGH_HIT_APPEAR_DURATION : SKILL_TILE_EFFECT_APPEAR_DURATION;
     const holdDuration = isBrothersBligh ? BROTHERS_BLIGH_HIT_HOLD_DURATION : SKILL_TILE_EFFECT_HOLD_DURATION;
     const fadeDuration = isBrothersBligh ? BROTHERS_BLIGH_HIT_FADE_DURATION : SKILL_TILE_EFFECT_FADE_DURATION;
@@ -5313,4 +5446,3 @@ const config = {
 };
 
 new Phaser.Game(config);
-
