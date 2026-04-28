@@ -952,7 +952,7 @@ function queueChapterAssets(scene, levelData = LEVELS.chapter1) {
   queueImage(scene, "chapter2FuneralSplitScene", "/scenes/chapter2_funeral_split.jpg");
   queueImage(scene, "chapter2SigilScene", "/scenes/chapter2_sigil.jpg");
   queueImage(scene, "chapter2CalebExperimentScene", "/scenes/chapter2_caleb_experiment.jpg");
-  queueImage(scene, "chapter2EdwinGuildliteScene", "/scenes/chapter2_edwin_guildlite.jpg");
+  queueImage(scene, "chapter2EdwinGuildliteScene", "/scenes/chapter2_edwin_guildlites.jpg");
   queueImage(scene, "chapter2LeonShockedScene", "/scenes/chapter2_leon_shocked.jpg");
   queueImage(scene, ICE_OF_AGES_HIT_EFFECT_KEY, ICE_OF_AGES_HIT_EFFECT_PATH);
   queueImage(scene, BROTHERS_BLIGH_CUTIN_KEY, BROTHERS_BLIGH_CUTIN_PATH);
@@ -991,7 +991,9 @@ class LoadingScene extends Phaser.Scene {
       stroke: "#0b0811",
       strokeThickness: 5,
     }).setOrigin(0.5);
-    const hintText = this.add.text(0, -42, "Preparing Chapter 1: 4 Years Gone", { fontSize: "16px", color: "#d8c4f0" }).setOrigin(0.5);
+    const chapterNumber = this.nextSceneData?.saveData?.currentChapter || this.nextSceneData?.saveData?.chapter || (this.nextSceneData?.playChapterTwoOpening ? 2 : 1);
+    const chapterLabel = chapterNumber >= 2 ? "Preparing Chapter 2: Owed an Explanation" : "Preparing Chapter 1: 4 Years Gone";
+    const hintText = this.add.text(0, -42, chapterLabel, { fontSize: "16px", color: "#d8c4f0" }).setOrigin(0.5);
     panel.container.add([loadingText, hintText]);
     this.add.rectangle(barX + barWidth / 2, barY, barWidth, barHeight, 0x101828, 1).setStrokeStyle(2, 0xb6925f, 0.9);
     this.loadingTrail = this.add.rectangle(barX, barY, 1, barHeight, 0x38bdf8, 0.95).setOrigin(0, 0.5);
@@ -1021,7 +1023,8 @@ class LoadingScene extends Phaser.Scene {
     this.load.on("progress", (value) => this.updateLoadingDisplay(value, barX, barY, barWidth));
     this.load.once("complete", () => this.updateLoadingDisplay(1, barX, barY, barWidth));
     queueImage(this, LOADING_RUNNER_KEY, LOADING_RUNNER_PATH);
-    queueChapterAssets(this, LEVELS.chapter1);
+    const targetLevel = chapterNumber >= 2 ? LEVELS.chapter2 : LEVELS.chapter1;
+    queueChapterAssets(this, targetLevel);
   }
 
   sizeLoadingRunnerSprite(sprite) {
@@ -2845,7 +2848,7 @@ class BattleScene extends Phaser.Scene {
     this.uiLayer.add(this.chapterTransitionContainer);
   }
 
-sshowChapterTwoTitleCard(message) {
+  showChapterTwoTitleCard(message) {
     var displayMessage = message;
 
     if (!displayMessage) {
@@ -2920,7 +2923,7 @@ sshowChapterTwoTitleCard(message) {
 
     this.stopBattleMusic();
 
-    this.scene.start("BattleScene", {
+    this.scene.start("LoadingScene", {
       loadFromSave: true,
       saveData: saveData,
       slotNumber: slotNumber,
