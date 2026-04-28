@@ -952,7 +952,7 @@ function queueChapterAssets(scene, levelData = LEVELS.chapter1) {
   queueImage(scene, "chapter2FuneralSplitScene", "/scenes/chapter2_funeral_split.jpg");
   queueImage(scene, "chapter2SigilScene", "/scenes/chapter2_sigil.jpg");
   queueImage(scene, "chapter2CalebExperimentScene", "/scenes/chapter2_caleb_experiment.jpg");
-  queueImage(scene, "chapter2EdwinGuildliteScene", "/scenes/chapter2_edwin_guildlite.jpg");
+  queueImage(scene, "chapter2EdwinGuildliteScene", "/scenes/chapter2_edwin_guildlites.jpg");
   queueImage(scene, "chapter2LeonShockedScene", "/scenes/chapter2_leon_shocked.jpg");
   queueImage(scene, ICE_OF_AGES_HIT_EFFECT_KEY, ICE_OF_AGES_HIT_EFFECT_PATH);
   queueImage(scene, BROTHERS_BLIGH_CUTIN_KEY, BROTHERS_BLIGH_CUTIN_PATH);
