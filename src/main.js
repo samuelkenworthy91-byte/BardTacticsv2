@@ -1,12 +1,12 @@
 import Phaser from "phaser";
-
+ 
 const GAME_WIDTH = 960;
 const GAME_HEIGHT = 540;
-
+ 
 const TILE_SIZE = 64;
 const MAP_COLS = 8;
 const MAP_ROWS = 8;
-
+ 
 const UNIT_SPRITE_TARGET_SIZE = TILE_SIZE * 0.9;
 const ENEMY_MOVE_DURATION = 1400;
 const ENEMY_ACTION_PAUSE = 750;
@@ -15,13 +15,13 @@ const PLAYER_ACTION_PAUSE = 450;
 const SKILL_BANNER_DURATION = 1250;
 const SKILL_IMPACT_DELAY = 520;
 const LEVEL_UP_PANEL_DEPTH = 20000;
-
+ 
 const SAVE_KEY = "bardsTacticsSave";
 const TITLE_SCREEN_KEY = "bardsTitleScreen";
 const TITLE_SCREEN_PATH = "/ui/title_screen.png";
 const LOADING_RUNNER_KEY = "edwin_move_right";
 const LOADING_RUNNER_PATH = "/sprites/edwin/move_right.png";
-
+ 
 const CARDINAL_DIRECTIONS = ["down", "up", "left", "right"];
 const LEVEL_UP_STATS = [
   { key: "hp", label: "HP", description: "+1 max HP and current HP" },
@@ -32,7 +32,7 @@ const LEVEL_UP_STATS = [
   { key: "spd", label: "SPD", description: "+1 speed / extra attacks" },
   { key: "luck", label: "LUCK", description: "+1 crit chance and better level rolls" },
 ];
-
+ 
 function createDirectionalStateEntries(unitKey, state) {
   return {
     down: { key: `${unitKey}_${state}_down`, path: `/sprites/${unitKey}/${state}_down.png` },
@@ -41,14 +41,14 @@ function createDirectionalStateEntries(unitKey, state) {
     right: { key: `${unitKey}_${state}_right`, path: `/sprites/${unitKey}/${state}_right.png` },
   };
 }
-
+ 
 function createDeathEntries(unitKey) {
   return [1, 2, 3, 4].map((index) => ({
     key: `${unitKey}_death_${index}`,
     path: `/sprites/${unitKey}/death_${index}.png`,
   }));
 }
-
+ 
 const INDIVIDUAL_UNIT_SPRITE_SETS = {
   edwin: {
     idle: createDirectionalStateEntries("edwin", "idle"),
@@ -94,7 +94,7 @@ const INDIVIDUAL_UNIT_SPRITE_SETS = {
     death: createDeathEntries("chakram_thug"),
   },
 };
-
+ 
 const UNIT_SPRITE_RENDER = {
   default: {
     height: TILE_SIZE * 0.82,
@@ -147,7 +147,7 @@ const UNIT_SPRITE_RENDER = {
     shadowWidth: TILE_SIZE * 0.42,
   },
 };
-
+ 
 const MAP = [
   ["street", "cover", "street", "street", "street", "street", "gate", "street"],
   ["street", "street", "cover", "street", "street", "cover", "street", "street"],
@@ -158,7 +158,7 @@ const MAP = [
   ["street", "cover", "street", "street", "street", "street", "street", "street"],
   ["street", "street", "street", "street", "street", "street", "street", "street"],
 ];
-
+ 
 const BIOMES = {
   city: {
     terrainTextures: {
@@ -170,7 +170,7 @@ const BIOMES = {
     },
   },
 };
-
+ 
 const CHAPTER_OPENING = [
   {
     type: "title",
@@ -246,7 +246,7 @@ const CHAPTER_OPENING = [
     ],
   },
 ];
-
+ 
 const POST_BATTLE_SCENE = [
   {
     type: "mapDialogue",
@@ -305,7 +305,7 @@ const POST_BATTLE_SCENE = [
   { type: "fullScreenScene", sceneName: "Byron Farm", scene: "byronFarmScene", text: "Byron Farm" },
   { type: "savePrompt", title: "Chapter 1 Complete", text: "Save game?" },
 ];
-
+ 
 const UNITS = [
   {
     id: "edwin",
@@ -502,7 +502,7 @@ const UNITS = [
     color: 0xfb7185,
   },
 ];
-
+ 
 const LEVELS = {
   chapter1: {
     biome: "city",
@@ -512,7 +512,7 @@ const LEVELS = {
     objective: "Defeat Falan, the gang leader.",
   },
 };
-
+ 
 function tileColor(type) {
   if (type === "street") return 0x374151;
   if (type === "cover") return 0x475569;
@@ -520,7 +520,7 @@ function tileColor(type) {
   if (type === "wall") return 0x6b7280;
   return 0x1f2937;
 }
-
+ 
 function tileLabel(type) {
   if (type === "street") return "S";
   if (type === "cover") return "C";
@@ -528,15 +528,15 @@ function tileLabel(type) {
   if (type === "wall") return "W";
   return "?";
 }
-
+ 
 function tileKey(x, y) {
   return `${x},${y}`;
 }
-
+ 
 function distance(a, b) {
   return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 }
-
+ 
 function getWeaponForTarget(attacker, defender) {
   if (!attacker || !defender || !attacker.weapons) return null;
   const dist = distance(attacker, defender);
@@ -546,22 +546,22 @@ function getWeaponForTarget(attacker, defender) {
     return dist >= minRange && dist <= maxRange;
   }) || null;
 }
-
+ 
 function getDefaultWeapon(unit) {
   return unit?.weapons?.[0] || null;
 }
-
+ 
 function getWeaponRangeLabel(weapon) {
   if (!weapon) return "-";
   const minRange = weapon.minRange ?? weapon.range;
   const maxRange = weapon.maxRange ?? weapon.range;
   return minRange === maxRange ? `${minRange}` : `${minRange}-${maxRange}`;
 }
-
+ 
 function canAttack(attacker, defender) {
   return !!getWeaponForTarget(attacker, defender);
 }
-
+ 
 function fitImageToBounds(scene, image, textureKey, maxWidth, maxHeight, cover = false) {
   if (!scene?.textures?.exists(textureKey) || !image) return;
   const source = scene.textures.get(textureKey)?.getSourceImage();
@@ -571,7 +571,7 @@ function fitImageToBounds(scene, image, textureKey, maxWidth, maxHeight, cover =
     : Math.min(maxWidth / source.width, maxHeight / source.height);
   image.setDisplaySize(source.width * scale, source.height * scale);
 }
-
+ 
 function createBannerPanel(scene, x, y, width, height, options = {}) {
   const container = scene.add.container(x, y);
   const shadowOffset = options.shadowOffset ?? 5;
@@ -583,7 +583,7 @@ function createBannerPanel(scene, x, y, width, height, options = {}) {
   container.add([shadow, outer, inner]);
   return { container, shadow, outer, inner };
 }
-
+ 
 function createBannerButton(scene, x, y, width, height, label, onClick, fontSize = "22px") {
   const container = scene.add.container(x, y);
   const shadow = scene.add.rectangle(4, 4, width, height, 0x000000, 0.34).setOrigin(0.5);
@@ -617,19 +617,19 @@ function createBannerButton(scene, x, y, width, height, label, onClick, fontSize
   container.add([shadow, outer, inner, text, hit]);
   return { container, shadow, outer, inner, text, hit };
 }
-
+ 
 function queueImage(scene, key, path) {
   if (!scene || !key || !path) return;
   if (scene.textures.exists(key)) return;
   scene.load.image(key, path);
 }
-
+ 
 function queueAudio(scene, key, path) {
   if (!scene || !key || !path) return;
   if (scene.cache?.audio?.exists(key)) return;
   scene.load.audio(key, [path]);
 }
-
+ 
 function queueBiomeTileAssets(scene, biomeKey) {
   const biome = BIOMES[biomeKey];
   if (!biome) return;
@@ -640,7 +640,7 @@ function queueBiomeTileAssets(scene, biomeKey) {
     queuedKeys.add(entry.key);
   });
 }
-
+ 
 function queueIndividualDirectionalSpriteAssets(scene) {
   const queuedKeys = new Set();
   Object.values(INDIVIDUAL_UNIT_SPRITE_SETS).forEach((spriteSet) => {
@@ -661,7 +661,7 @@ function queueIndividualDirectionalSpriteAssets(scene) {
     });
   });
 }
-
+ 
 function queueChapterOneAssets(scene, levelData = LEVELS.chapter1) {
   queueImage(scene, "edwinPortrait", "/portraits/edwin.jpg");
   queueImage(scene, "leonPortrait", "/portraits/leon.jpg");
@@ -683,16 +683,16 @@ function queueChapterOneAssets(scene, levelData = LEVELS.chapter1) {
     queueAudio(scene, levelData.battleMusic.key, levelData.battleMusic.path);
   }
 }
-
+ 
 class LoadingScene extends Phaser.Scene {
   constructor() {
     super("LoadingScene");
   }
-
+ 
   init(data = {}) {
     this.nextSceneData = data || {};
   }
-
+ 
   preload() {
     this.cameras.main.setBackgroundColor("#06030b");
     const centerX = GAME_WIDTH / 2;
@@ -742,7 +742,7 @@ class LoadingScene extends Phaser.Scene {
     queueImage(this, LOADING_RUNNER_KEY, LOADING_RUNNER_PATH);
     queueChapterOneAssets(this, LEVELS.chapter1);
   }
-
+ 
   sizeLoadingRunnerSprite(sprite) {
     if (!sprite || !this.textures.exists(LOADING_RUNNER_KEY)) return;
     const source = this.textures.get(LOADING_RUNNER_KEY)?.getSourceImage();
@@ -751,7 +751,7 @@ class LoadingScene extends Phaser.Scene {
     const scale = sourceHeight > maxHeight ? maxHeight / sourceHeight : 1;
     sprite.setScale(scale);
   }
-
+ 
   updateLoadingDisplay(value, barX, barY, barWidth) {
     const progress = Phaser.Math.Clamp(value || 0, 0, 1);
     this.currentLoadingProgress = progress;
@@ -776,22 +776,22 @@ class LoadingScene extends Phaser.Scene {
       this.loadingPercentText.setText(`${percent}%`);
     }
   }
-
+ 
   create() {
     this.time.delayedCall(350, () => this.scene.start("BattleScene", this.nextSceneData || {}));
   }
 }
-
+ 
 class TitleScene extends Phaser.Scene {
   constructor() {
     super("TitleScene");
   }
-
+ 
   preload() {
     queueImage(this, TITLE_SCREEN_KEY, TITLE_SCREEN_PATH);
     queueImage(this, LOADING_RUNNER_KEY, LOADING_RUNNER_PATH);
   }
-
+ 
   create() {
     this.cameras.main.setBackgroundColor("#06030b");
     if (this.textures.exists(TITLE_SCREEN_KEY)) {
@@ -821,17 +821,17 @@ class TitleScene extends Phaser.Scene {
     this.input.once("pointerdown", () => this.scene.start("MainMenuScene"));
   }
 }
-
+ 
 class MainMenuScene extends Phaser.Scene {
   constructor() {
     super("MainMenuScene");
   }
-
+ 
   preload() {
     queueImage(this, TITLE_SCREEN_KEY, TITLE_SCREEN_PATH);
     queueImage(this, LOADING_RUNNER_KEY, LOADING_RUNNER_PATH);
   }
-
+ 
   getSaveData() {
     try {
       const raw = window.localStorage.getItem(SAVE_KEY);
@@ -840,7 +840,7 @@ class MainMenuScene extends Phaser.Scene {
       return null;
     }
   }
-
+ 
   create() {
     this.cameras.main.setBackgroundColor("#06030b");
     if (this.textures.exists(TITLE_SCREEN_KEY)) {
@@ -871,21 +871,21 @@ class MainMenuScene extends Phaser.Scene {
     panel.container.add([heading, subtitle, newGameButton.container, loadGameButton.container, this.statusText]);
   }
 }
-
+ 
 class BattleScene extends Phaser.Scene {
   constructor() {
     super("BattleScene");
   }
-
+ 
   init(data = {}) {
     this.loadFromSave = data.loadFromSave === true;
     this.loadedSaveData = data.saveData || null;
   }
-
+ 
   preload() {
     queueChapterOneAssets(this, this.getCurrentLevel());
   }
-
+ 
   create() {
     this.levelData = this.getCurrentLevel();
     this.currentBiomeKey = this.levelData.biome;
@@ -902,7 +902,7 @@ class BattleScene extends Phaser.Scene {
       skills: (unit.skills || []).map((skill) => ({ ...skill })),
       weapons: (unit.weapons || []).map((weapon) => ({ ...weapon })),
     }));
-
+ 
     this.selectedUnitId = null;
     this.moveTiles = [];
     this.targetTiles = [];
@@ -926,7 +926,7 @@ class BattleScene extends Phaser.Scene {
     this.currentLevelUpData = null;
     this.openingStep = 0;
     this.openingLine = 0;
-
+ 
     this.cameras.main.setBackgroundColor("#0f172a");
     this.boardWidth = this.mapCols * TILE_SIZE;
     this.boardHeight = this.mapRows * TILE_SIZE;
@@ -936,7 +936,7 @@ class BattleScene extends Phaser.Scene {
     this.overlayLayer = this.add.layer();
     this.unitLayer = this.add.layer();
     this.uiLayer = this.add.layer();
-
+ 
     this.createTopUI();
     this.drawBoard();
     this.drawUnits();
@@ -950,18 +950,18 @@ class BattleScene extends Phaser.Scene {
     this.setupInput();
     this.updateSelectedPanel();
     this.setObjectiveDisplayVisible(false);
-
+ 
     if (this.loadFromSave) {
       this.startLoadedBattle();
     } else {
       this.updateOpeningUI();
     }
   }
-
+ 
   getCurrentLevel() {
     return LEVELS.chapter1;
   }
-
+ 
   getSavedGameData() {
     if (this.loadedSaveData) return this.loadedSaveData;
     try {
@@ -971,7 +971,7 @@ class BattleScene extends Phaser.Scene {
       return null;
     }
   }
-
+ 
   startLoadedBattle() {
     this.openingContainer.setVisible(false);
     this.startPlayerPhase();
@@ -979,7 +979,7 @@ class BattleScene extends Phaser.Scene {
     this.updateSelectedPanel();
     if (this.getSavedGameData()) this.helpText.setText("Loaded game. Player Phase. Click Edwin or Leon.");
   }
-
+ 
   createTopUI() {
     const panel = createBannerPanel(this, 88, 92, 170, 170, { innerInset: 14 });
     this.topInfoPanel = panel.container;
@@ -1012,13 +1012,13 @@ class BattleScene extends Phaser.Scene {
     panel.container.add([this.objectiveHeader, this.objectiveText, this.phaseText, this.helpText]);
     this.uiLayer.add(panel.container);
   }
-
+ 
   setObjectiveDisplayVisible(visible) {
     const shouldShow = !!visible;
     if (this.objectiveHeader) this.objectiveHeader.setVisible(shouldShow);
     if (this.objectiveText) this.objectiveText.setVisible(shouldShow);
   }
-
+ 
   createSidePanel() {
     const x = 722;
     const y = 28;
@@ -1076,7 +1076,7 @@ class BattleScene extends Phaser.Scene {
     ];
     this.uiLayer.add(this.sidePanelParts);
   }
-
+ 
   createPreviewUI() {
     this.previewContainer = this.add.container(GAME_WIDTH / 2, 430).setVisible(false);
     const panel = this.add.rectangle(0, 0, 620, 150, 0x0f172a, 0.97);
@@ -1103,7 +1103,7 @@ class BattleScene extends Phaser.Scene {
     this.previewContainer.add([panel, title, this.previewLeftName, this.previewLeftStats, this.previewRightName, this.previewRightStats, confirmButton, confirmText, cancelButton, cancelText]);
     this.uiLayer.add(this.previewContainer);
   }
-
+ 
   createCombatXpPopup() {
     this.combatXpContainer = this.add.container(GAME_WIDTH / 2, GAME_HEIGHT - 68).setVisible(false).setDepth(9998).setAlpha(0);
     const bg = this.add.rectangle(0, 0, 320, 88, 0x020617, 0.96);
@@ -1118,7 +1118,7 @@ class BattleScene extends Phaser.Scene {
     this.combatXpContainer.add([bg, this.combatXpNameText, this.combatXpGainText, this.combatXpValueText, this.combatXpBarBg, this.combatXpBarFill]);
     this.uiLayer.add(this.combatXpContainer);
   }
-
+ 
   createSkillBanner() {
     this.skillBannerContainer = this.add.container(GAME_WIDTH / 2, 46).setDepth(10000).setVisible(false).setAlpha(0);
     const panel = createBannerPanel(this, 0, 0, 490, 60, { innerInset: 14 });
@@ -1133,11 +1133,16 @@ class BattleScene extends Phaser.Scene {
     this.skillBannerContainer.add(panel.container);
     this.uiLayer.add(this.skillBannerContainer);
   }
-
+ 
   createLevelUpAllocationUI() {
     this.levelUpContainer = this.add.container(GAME_WIDTH / 2, GAME_HEIGHT / 2).setVisible(false).setDepth(LEVEL_UP_PANEL_DEPTH);
+ 
     const dim = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.62).setInteractive();
     const panel = createBannerPanel(this, 0, 0, 620, 430, { innerInset: 18 });
+ 
+    // Add the dim layer and panel first so the stat rows and plus buttons are drawn above them.
+    this.levelUpContainer.add([dim, panel.container]);
+ 
     this.levelUpTitle = this.add.text(0, -182, "LEVEL UP!", {
       fontSize: "32px",
       fontStyle: "bold",
@@ -1154,6 +1159,14 @@ class BattleScene extends Phaser.Scene {
       stroke: "#0b0811",
       strokeThickness: 3,
     }).setOrigin(0.5);
+ 
+    this.levelUpContainer.add([
+      this.levelUpTitle,
+      this.levelUpSubtitle,
+      this.levelUpRollText,
+      this.levelUpPointsText,
+    ]);
+ 
     this.levelUpStatRows = [];
     LEVEL_UP_STATS.forEach((stat, index) => {
       const rowY = -52 + index * 36;
@@ -1161,21 +1174,24 @@ class BattleScene extends Phaser.Scene {
       const value = this.add.text(-184, rowY, "", { fontSize: "15px", color: "#e2e8f0" }).setOrigin(0, 0.5);
       const desc = this.add.text(-92, rowY, stat.description, { fontSize: "11px", color: "#bdaee0" }).setOrigin(0, 0.5);
       const plusButton = createBannerButton(this, 226, rowY, 42, 28, "+", () => this.allocatePendingLevelPoint(stat.key), "18px");
+ 
       this.levelUpContainer.add([label, value, desc, plusButton.container]);
       this.levelUpStatRows.push({ stat, label, value, desc, plusButton });
     });
+ 
     this.levelUpConfirmButton = createBannerButton(this, 0, 174, 220, 42, "Confirm", () => this.confirmLevelUpAllocation(), "20px");
     this.levelUpHint = this.add.text(0, 208, "Spend all points to continue.", { fontSize: "12px", color: "#cbd5e1" }).setOrigin(0.5);
-    this.levelUpContainer.add([dim, panel.container, this.levelUpTitle, this.levelUpSubtitle, this.levelUpRollText, this.levelUpPointsText, this.levelUpConfirmButton.container, this.levelUpHint]);
+ 
+    this.levelUpContainer.add([this.levelUpConfirmButton.container, this.levelUpHint]);
     this.uiLayer.add(this.levelUpContainer);
   }
-
+ 
   getLevelUpStatValue(unit, statKey) {
     if (!unit) return 0;
     if (statKey === "hp") return unit.maxHp || 0;
     return unit[statKey] || 0;
   }
-
+ 
   refreshLevelUpAllocationUI() {
     const data = this.currentLevelUpData;
     const unit = data ? this.units.find((candidate) => candidate.id === data.unitId) : null;
@@ -1192,7 +1208,7 @@ class BattleScene extends Phaser.Scene {
     this.levelUpConfirmButton.container.setAlpha(data.pointsRemaining === 0 ? 1 : 0.48);
     this.levelUpHint.setText(data.pointsRemaining === 0 ? "Ready. Confirm to finish the level up." : "Use the plus buttons to spend every point.");
   }
-
+ 
   allocatePendingLevelPoint(statKey) {
     const data = this.currentLevelUpData;
     if (!data || data.pointsRemaining <= 0) return;
@@ -1209,7 +1225,7 @@ class BattleScene extends Phaser.Scene {
     this.updateSelectedPanel();
     this.refreshLevelUpAllocationUI();
   }
-
+ 
   confirmLevelUpAllocation() {
     const data = this.currentLevelUpData;
     if (!data || data.pointsRemaining > 0) return;
@@ -1224,7 +1240,7 @@ class BattleScene extends Phaser.Scene {
     }
     this.processLevelUpQueue();
   }
-
+ 
   rollLevelUpPoints(unit) {
     const luck = Math.max(0, unit?.luck || 0);
     const faces = [1, 2, 3, 4, 5, 6];
@@ -1245,7 +1261,7 @@ class BattleScene extends Phaser.Scene {
     const chanceExtra = Phaser.Math.Between(1, 100) <= extraChance ? 1 : 0;
     return result + guaranteedExtras + chanceExtra;
   }
-
+ 
   queueLevelUpAllocation(unit, points) {
     if (!unit || unit.team !== "player") return;
     this.levelUpQueue.push({
@@ -1257,7 +1273,7 @@ class BattleScene extends Phaser.Scene {
       allocations: {},
     });
   }
-
+ 
   processLevelUpQueue() {
     if (this.levelUpAllocationOpen || this.levelUpQueue.length === 0) return;
     const next = this.levelUpQueue.shift();
@@ -1273,7 +1289,7 @@ class BattleScene extends Phaser.Scene {
     this.refreshLevelUpAllocationUI();
     this.tweens.add({ targets: this.levelUpContainer, alpha: 1, duration: 180 });
   }
-
+ 
   showSkillBanner(skillName) {
     if (!this.skillBannerContainer || !this.skillBannerText) return;
     this.tweens.killTweensOf(this.skillBannerContainer);
@@ -1301,7 +1317,7 @@ class BattleScene extends Phaser.Scene {
       },
     });
   }
-
+ 
   showCombatXpPopup(unit, amount, startLevel, startXp) {
     if (!this.combatXpContainer || !unit || amount <= 0) return;
     this.tweens.killTweensOf(this.combatXpContainer);
@@ -1348,7 +1364,7 @@ class BattleScene extends Phaser.Scene {
     };
     animateChunk();
   }
-
+ 
   getTerrainDefenseBonus(unit) {
     if (!unit) return 0;
     const terrain = this.getTerrainAt(unit.x, unit.y);
@@ -1356,22 +1372,22 @@ class BattleScene extends Phaser.Scene {
     if (terrain === "gate") return 5;
     return 0;
   }
-
+ 
   getWeaponSpeedBonus(unit, weapon) {
     if (!unit || !weapon) return 0;
     return weapon.speedBonus || 0;
   }
-
+ 
   getEffectiveSpeed(unit, weapon = null) {
     return (unit?.spd || 0) + this.getWeaponSpeedBonus(unit, weapon);
   }
-
+ 
   getDefenseForAttack(defender, weapon) {
     if (!defender || !weapon) return 0;
     if (weapon.damageType === "magical") return defender.res || 0;
     return (defender.def || 0) + this.getTerrainDefenseBonus(defender);
   }
-
+ 
   calculateBaseDamage(attacker, defender, weapon) {
     if (!attacker || !defender || !weapon) return 0;
     const attackStatName = weapon.stat || "str";
@@ -1380,21 +1396,21 @@ class BattleScene extends Phaser.Scene {
     const defense = this.getDefenseForAttack(defender, weapon);
     return Math.max(0, baseDamage + attackStat - defense);
   }
-
+ 
   calculateDamage(attacker, defender, weapon) {
     return this.calculateBaseDamage(attacker, defender, weapon);
   }
-
+ 
   calculateCriticalChance(attacker, defender) {
     if (!attacker || !defender) return 0;
     return Phaser.Math.Clamp((attacker.luck || 0) - (defender.luck || 0), 0, 100);
   }
-
+ 
   rollCritical(attacker, defender) {
     const critChance = this.calculateCriticalChance(attacker, defender);
     return Phaser.Math.Between(1, 100) <= critChance;
   }
-
+ 
   calculateAttackCount(attacker, defender, weapon) {
     if (!attacker || !defender) return 1;
     const attackerSpeed = this.getEffectiveSpeed(attacker, weapon);
@@ -1403,11 +1419,11 @@ class BattleScene extends Phaser.Scene {
     const speedGap = attackerSpeed - defenderSpeed;
     return Math.max(1, 1 + Math.floor(speedGap / 5));
   }
-
+ 
   rollHit(weapon) {
     return Phaser.Math.Between(1, 100) <= (weapon?.hitRate ?? 100);
   }
-
+ 
   resolveAttackSequence(attacker, defender, weapon) {
     const attackCount = this.calculateAttackCount(attacker, defender, weapon);
     const results = [];
@@ -1433,7 +1449,7 @@ class BattleScene extends Phaser.Scene {
     }
     return { attackCount, results, totalDamage, didKill };
   }
-
+ 
   showCombatResultText(unit, result, index = 0) {
     const text = !result.hit ? "MISS" : result.critical ? `CRIT -${result.damage}` : `-${result.damage}`;
     const color = !result.hit ? "#fef3c7" : result.critical ? "#fde68a" : "#fca5a5";
@@ -1441,7 +1457,7 @@ class BattleScene extends Phaser.Scene {
       this.showFloatingText(this.boardX + unit.x * TILE_SIZE + TILE_SIZE / 2, this.boardY + unit.y * TILE_SIZE + 8, text, color);
     });
   }
-
+ 
   calculateXpGain(attacker, defender, didKill) {
     if (!attacker || attacker.team !== "player") return 0;
     if (!defender || defender.team !== "enemy") return 0;
@@ -1455,7 +1471,7 @@ class BattleScene extends Phaser.Scene {
     xp = Math.round(xp * (attacker.xpRate || 1));
     return Math.max(1, xp);
   }
-
+ 
   awardXp(unit, amount) {
     if (!unit || unit.team !== "player" || amount <= 0) return;
     unit.level = unit.level || 1;
@@ -1475,13 +1491,13 @@ class BattleScene extends Phaser.Scene {
       this.time.delayedCall(900, () => this.processLevelUpQueue());
     }
   }
-
+ 
   levelUpUnit(unit) {
     unit.level += 1;
     const points = this.rollLevelUpPoints(unit);
     this.queueLevelUpAllocation(unit, points);
   }
-
+ 
   showFloatingText(x, y, text, color = "#ffffff") {
     const floating = this.add.text(x, y, text, {
       fontSize: "18px",
@@ -1494,7 +1510,7 @@ class BattleScene extends Phaser.Scene {
     this.tweens.add({ targets: floating, y: y - 28, alpha: 0, duration: 900, ease: "Cubic.easeOut", onComplete: () => floating.destroy() });
     return floating;
   }
-
+ 
   fitImageInBox(image, textureKey, maxWidth, maxHeight) {
     if (!image) return;
     if (textureKey && this.textures.exists(textureKey)) image.setTexture(textureKey);
@@ -1506,7 +1522,7 @@ class BattleScene extends Phaser.Scene {
     const scale = Math.min(maxWidth / source.width, maxHeight / source.height);
     image.setDisplaySize(source.width * scale, source.height * scale);
   }
-
+ 
   createPostBattleUI() {
     this.postBattleContainer = this.add.container(0, 0).setVisible(false).setDepth(9997);
     this.postBattleDim = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.18);
@@ -1572,7 +1588,7 @@ class BattleScene extends Phaser.Scene {
     ]);
     this.uiLayer.add(this.postBattleContainer);
   }
-
+ 
   setPostBattlePortrait(portraitKey, overlapPortraitKey = null) {
     this.postBattleOverlapPortrait.setVisible(false);
     if (!portraitKey) {
@@ -1596,7 +1612,7 @@ class BattleScene extends Phaser.Scene {
       this.postBattleOverlapPortrait.setDepth(this.postBattlePortrait.depth + 1);
     }
   }
-
+ 
   startPostBattleScene() {
     if (this.postBattleStarted) return;
     this.closeActionMenu();
@@ -1620,7 +1636,7 @@ class BattleScene extends Phaser.Scene {
     this.postBattleContainer.setVisible(true).setAlpha(0);
     this.tweens.add({ targets: this.postBattleContainer, alpha: 1, duration: 250, onComplete: () => this.updatePostBattleUI() });
   }
-
+ 
   playPostBattleUnitDeath(unitId, autoAdvanceDelay = 1400) {
     if (this.postBattleActionSteps.has(this.postBattleStep)) return;
     this.postBattleActionSteps.add(this.postBattleStep);
@@ -1641,7 +1657,7 @@ class BattleScene extends Phaser.Scene {
       this.updatePostBattleUI();
     });
   }
-
+ 
   updatePostBattleUI() {
     const line = POST_BATTLE_SCENE[this.postBattleStep];
     if (!line) {
@@ -1722,7 +1738,7 @@ class BattleScene extends Phaser.Scene {
     this.postBattleText.setText(line.text || "");
     this.setPostBattlePortrait(line.portrait, line.overlapPortrait);
   }
-
+ 
   advancePostBattle() {
     if (this.phase !== "postbattle") return;
     this.postBattleStep += 1;
@@ -1732,7 +1748,7 @@ class BattleScene extends Phaser.Scene {
     }
     this.updatePostBattleUI();
   }
-
+ 
   showSavePrompt(line = null) {
     this.postBattleDim.setAlpha(1);
     this.postBattleFullSceneImage.setVisible(false);
@@ -1757,7 +1773,7 @@ class BattleScene extends Phaser.Scene {
     this.savePromptStatus.setText("");
     this.savePromptContainer.setVisible(true);
   }
-
+ 
   saveChapterOne() {
     const saveData = { chapter: 1, chapterName: "Prologue - Underpass", completed: true, completedAt: new Date().toISOString() };
     try {
@@ -1767,14 +1783,14 @@ class BattleScene extends Phaser.Scene {
       this.savePromptStatus.setText("Save failed in this browser preview.");
     }
   }
-
+ 
   finishChapterOne() {
     this.phaseText.setText("Chapter 1 Complete");
     this.phaseText.setColor("#fcd34d");
     this.helpText.setText("Chapter 1 complete. Save data is stored locally in this browser preview.");
     this.busy = false;
   }
-
+ 
   createOpeningUI() {
     this.openingContainer = this.add.container(0, 0);
     this.openingFade = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.88);
@@ -1790,7 +1806,7 @@ class BattleScene extends Phaser.Scene {
     titleContinueButton.on("pointerdown", () => this.advanceOpening());
     const titleContinueText = this.add.text(GAME_WIDTH / 2, 370, "Continue", { fontSize: "18px", fontStyle: "bold", color: "#f7ecd3" }).setOrigin(0.5);
     this.titleCard.add([titleBg, this.titleChapter, this.titleSubtitle, this.titleTag, titleContinueButton, titleContinueText]);
-
+ 
     this.dialogueCard = this.add.container(0, 0);
     const mainPanel = this.add.rectangle(480, 250, 860, 430, 0x12081d, 0.95);
     mainPanel.setStrokeStyle(3, 0xb6925f);
@@ -1805,7 +1821,7 @@ class BattleScene extends Phaser.Scene {
     this.dialoguePortraitFrame.setStrokeStyle(2, 0xe4d0a8);
     this.dialoguePortrait = this.add.image(720, 160, "edwinPortrait").setDisplaySize(110, 132);
     this.dialoguePortraitPlaceholder = this.add.text(720, 160, "NO\nART", { fontSize: "20px", color: "#94a3b8", align: "center" }).setOrigin(0.5);
-
+ 
     this.impactContainer = this.add.container(0, 0).setVisible(false);
     const impactShadow = this.add.rectangle(480, 175, 560, 190, 0x020617, 0.82);
     impactShadow.setStrokeStyle(2, 0x64748b);
@@ -1825,7 +1841,7 @@ class BattleScene extends Phaser.Scene {
     this.impactDefenderSlot.add([this.impactDefenderFrame, this.impactDefenderImage, this.impactDefenderPlaceholder, this.impactDefenderName]);
     this.impactText = this.add.text(480, 175, "SMASH!", { fontSize: "28px", fontStyle: "bold", color: "#f8fafc", stroke: "#0f172a", strokeThickness: 6 }).setOrigin(0.5);
     this.impactContainer.add([impactShadow, this.impactAttackerSlot, this.impactDefenderSlot, this.impactText]);
-
+ 
     const textBox = this.add.rectangle(480, 395, 800, 120, 0x1a0d2a, 0.98);
     textBox.setStrokeStyle(2, 0xb6925f);
     this.dialogueSpeaker = this.add.text(90, 343, "", { fontSize: "24px", fontStyle: "bold", color: "#f7ecd3" });
@@ -1868,7 +1884,7 @@ class BattleScene extends Phaser.Scene {
     this.openingContainer.add([this.openingFade, this.titleCard, this.dialogueCard]);
     this.uiLayer.add(this.openingContainer);
   }
-
+ 
   setImpactPortrait(image, placeholder, nameText, name, portraitKey) {
     nameText.setText(name || "");
     if (portraitKey && this.textures.exists(portraitKey)) {
@@ -1879,7 +1895,7 @@ class BattleScene extends Phaser.Scene {
       placeholder.setVisible(true);
     }
   }
-
+ 
   playImpactBeat(line) {
     if (line.defender === "Kayley") this.startBattleMusic();
     this.setImpactPortrait(this.impactAttackerImage, this.impactAttackerPlaceholder, this.impactAttackerName, line.attacker, line.attackerPortrait);
@@ -1920,7 +1936,7 @@ class BattleScene extends Phaser.Scene {
       },
     });
   }
-
+ 
   updateOpeningUI() {
     const step = CHAPTER_OPENING[this.openingStep];
     if (step.type === "title") {
@@ -1969,7 +1985,7 @@ class BattleScene extends Phaser.Scene {
     const lastLine = this.openingLine === step.lines.length - 1;
     this.openingNextLabel.setText(lastStep && lastLine ? "Start" : "Next");
   }
-
+ 
   goOpeningBack() {
     if (this.openingStep === 0) return;
     if (CHAPTER_OPENING[this.openingStep].type === "scene" && this.openingLine > 0) {
@@ -1981,7 +1997,7 @@ class BattleScene extends Phaser.Scene {
     }
     this.updateOpeningUI();
   }
-
+ 
   advanceOpening() {
     const step = CHAPTER_OPENING[this.openingStep];
     if (step.type === "title") {
@@ -2003,16 +2019,16 @@ class BattleScene extends Phaser.Scene {
     }
     this.finishOpening();
   }
-
+ 
   skipOpening() {
     this.finishOpening();
   }
-
+ 
   finishOpening() {
     this.openingContainer.setVisible(false);
     this.startPlayerPhase();
   }
-
+ 
   startBattleMusic() {
     const musicConfig = this.levelData?.battleMusic;
     if (!musicConfig?.key || this.battleMusicStarted) return;
@@ -2029,7 +2045,7 @@ class BattleScene extends Phaser.Scene {
     if (this.sound.locked) this.sound.once(Phaser.Sound.Events.UNLOCKED, playMusic);
     else playMusic();
   }
-
+ 
   stopBattleMusic() {
     if (!this.battleMusic) {
       this.battleMusicStarted = false;
@@ -2040,20 +2056,20 @@ class BattleScene extends Phaser.Scene {
     this.battleMusic = null;
     this.battleMusicStarted = false;
   }
-
+ 
   getCurrentBiome() {
     return BIOMES[this.currentBiomeKey] || null;
   }
-
+ 
   isInBounds(x, y) {
     return x >= 0 && y >= 0 && x < this.mapCols && y < this.mapRows;
   }
-
+ 
   getTerrainAt(x, y) {
     if (!this.isInBounds(x, y)) return null;
     return this.map[y][x];
   }
-
+ 
   getTerrainTextureKey(x, y) {
     const terrain = this.getTerrainAt(x, y);
     const biome = this.getCurrentBiome();
@@ -2061,7 +2077,7 @@ class BattleScene extends Phaser.Scene {
     const entry = biome.terrainTextures[terrain] || biome.terrainTextures.default;
     return entry ? entry.key : null;
   }
-
+ 
   drawBoard() {
     this.tileLayer.removeAll(true);
     for (let row = 0; row < this.mapRows; row += 1) {
@@ -2087,7 +2103,7 @@ class BattleScene extends Phaser.Scene {
       }
     }
   }
-
+ 
   drawUnits() {
     for (const unit of this.units) {
       const sprite = this.createUnitSprite(unit);
@@ -2097,7 +2113,7 @@ class BattleScene extends Phaser.Scene {
       this.setUnitSpriteFrame(unit, "idle", unit.facing || "down");
     }
   }
-
+ 
   createUnitSprite(unit) {
     const marker = this.add.circle(0, 0, 18, unit.color, 0.22);
     marker.setStrokeStyle(2, 0xffffff);
@@ -2118,7 +2134,7 @@ class BattleScene extends Phaser.Scene {
     const container = this.add.container(0, 0, [marker, label, shadow, image, hpText]);
     return { container, marker, label, shadow, hpText, image };
   }
-
+ 
   refreshUnitSprite(unit) {
     const sprite = this.unitSprites[unit.id];
     if (!sprite) return;
@@ -2127,16 +2143,16 @@ class BattleScene extends Phaser.Scene {
     sprite.hpText.setText(`HP ${unit.hp}`);
     sprite.container.alpha = unit.team === "player" && unit.acted ? 0.55 : 1;
   }
-
+ 
   getUnitSpriteRenderConfig(unit) {
     return { ...(UNIT_SPRITE_RENDER.default || {}), ...(unit ? UNIT_SPRITE_RENDER[unit.spriteSet] || UNIT_SPRITE_RENDER[unit.id] || {} : {}) };
   }
-
+ 
   getIndividualSpriteSet(unit) {
     if (!unit) return null;
     return INDIVIDUAL_UNIT_SPRITE_SETS[unit.spriteSet] || INDIVIDUAL_UNIT_SPRITE_SETS[unit.id] || null;
   }
-
+ 
   getIndividualSpriteEntry(unit, state = "idle", direction = "down", frameIndex = 0) {
     const spriteSet = this.getIndividualSpriteSet(unit);
     if (!spriteSet) return null;
@@ -2149,7 +2165,7 @@ class BattleScene extends Phaser.Scene {
     const resolvedDirection = CARDINAL_DIRECTIONS.includes(direction) ? direction : "down";
     return directionEntries?.[resolvedDirection] || directionEntries?.down || null;
   }
-
+ 
   applyIndividualUnitSprite(unit, textureKey, state = "idle") {
     const sprite = this.unitSprites[unit.id];
     if (!sprite || !textureKey || !this.textures.exists(textureKey)) {
@@ -2182,7 +2198,7 @@ class BattleScene extends Phaser.Scene {
     sprite.hpText.setPosition(0, render.hpY ?? TILE_SIZE * 0.22);
     return true;
   }
-
+ 
   showUnitFallbackSprite(unit) {
     const sprite = this.unitSprites[unit.id];
     if (!sprite) return;
@@ -2194,7 +2210,7 @@ class BattleScene extends Phaser.Scene {
     sprite.label.setVisible(true);
     sprite.hpText.setPosition(0, 16);
   }
-
+ 
   setUnitSpriteFrame(unit, state = "idle", direction = null) {
     if (!unit) return false;
     const resolvedDirection = direction || unit.facing || "down";
@@ -2204,7 +2220,7 @@ class BattleScene extends Phaser.Scene {
     this.showUnitFallbackSprite(unit);
     return false;
   }
-
+ 
   setUnitDeathFrame(unit, frameIndex = 0) {
     if (!unit) return false;
     unit.spriteState = "death";
@@ -2213,7 +2229,7 @@ class BattleScene extends Phaser.Scene {
     this.showUnitFallbackSprite(unit);
     return false;
   }
-
+ 
   getAttackAnimationState(unit, weapon = null) {
     if (!unit) return "attack";
     if (weapon?.damageType === "magical") {
@@ -2222,24 +2238,24 @@ class BattleScene extends Phaser.Scene {
     }
     return "attack";
   }
-
+ 
   getDirectionFromDelta(dx, dy, fallback = "down") {
     if (Math.abs(dx) > Math.abs(dy)) return dx > 0 ? "right" : "left";
     if (Math.abs(dy) > 0) return dy > 0 ? "down" : "up";
     return fallback;
   }
-
+ 
   getDirectionToward(fromUnit, toUnit) {
     if (!fromUnit || !toUnit) return "down";
     return this.getDirectionFromDelta(toUnit.x - fromUnit.x, toUnit.y - fromUnit.y, fromUnit.facing || "down");
   }
-
+ 
   faceUnitToward(unit, target) {
     if (!unit || !target) return;
     unit.facing = this.getDirectionToward(unit, target);
     this.setUnitSpriteFrame(unit, unit.spriteState || "idle", unit.facing);
   }
-
+ 
   playUnitState(unit, state, duration = 320) {
     if (!unit) return;
     this.setUnitSpriteFrame(unit, state, unit.facing || "down");
@@ -2249,7 +2265,7 @@ class BattleScene extends Phaser.Scene {
       });
     }
   }
-
+ 
   playUnitHurt(unit, duration = 360) {
     if (!unit) return;
     const sprite = this.unitSprites[unit.id];
@@ -2266,7 +2282,7 @@ class BattleScene extends Phaser.Scene {
       });
     }
   }
-
+ 
   playUnitDeath(unit, onComplete = null) {
     if (!unit) {
       if (onComplete) onComplete();
@@ -2293,7 +2309,7 @@ class BattleScene extends Phaser.Scene {
       this.tweens.add({ targets: sprite.container, alpha: 0, duration: 650, ease: "Quad.Out", onComplete });
     });
   }
-
+ 
   removeUnitSpriteAndData(unitId) {
     const sprite = this.unitSprites[unitId];
     if (sprite) {
@@ -2302,14 +2318,14 @@ class BattleScene extends Phaser.Scene {
     }
     this.units = this.units.filter((unit) => unit.id !== unitId);
   }
-
+ 
   closeActionMenu() {
     if (this.actionMenuContainer) this.actionMenuContainer.destroy();
     this.actionMenuContainer = null;
     this.actionMenuOpen = false;
     this.actionMenuUnitId = null;
   }
-
+ 
   showActionMenu(unit, message = null) {
     if (!unit || unit.team !== "player" || unit.acted || unit.hp <= 0) return;
     this.closeActionMenu();
@@ -2344,7 +2360,7 @@ class BattleScene extends Phaser.Scene {
     this.uiLayer.add(container);
     this.helpText.setText(message || `${unit.name} is ready. Choose an action.`);
   }
-
+ 
   chooseActionAttack(unitId) {
     const unit = this.units.find((u) => u.id === unitId);
     if (!unit || unit.team !== "player" || unit.acted) return;
@@ -2361,7 +2377,7 @@ class BattleScene extends Phaser.Scene {
     this.updateSelectedPanel();
     this.helpText.setText(`Choose an enemy for ${unit.name} to attack.`);
   }
-
+ 
   chooseActionSkill(unitId) {
     const unit = this.units.find((u) => u.id === unitId);
     if (!unit || unit.team !== "player" || unit.acted) return;
@@ -2381,16 +2397,16 @@ class BattleScene extends Phaser.Scene {
     }
     this.useSkill(unit.id, skill.id, { endTurn: true });
   }
-
+ 
   getSkillById(unit, skillId) {
     return (unit?.skills || []).find((skill) => skill.id === skillId) || null;
   }
-
+ 
   canUseSkill(unit, skill) {
     if (!unit || !skill) return false;
     return (unit.sigilPoints ?? 0) >= (skill.cost ?? 0);
   }
-
+ 
   getSkillTargetsAt(unit, skill, x = unit.x, y = unit.y) {
     if (!unit || !skill) return [];
     if (skill.type === "adjacentSquare") {
@@ -2403,14 +2419,14 @@ class BattleScene extends Phaser.Scene {
     }
     return [];
   }
-
+ 
   calculateSkillDamage(unit, target, skill) {
     if (!unit || !skill) return 0;
     if (skill.damageFormula === "mag") return Math.max(0, unit.mag || 0);
     if (skill.damageFormula === "strPlusSpd") return Math.max(0, (unit.str || 0) + (unit.spd || 0));
     return Math.max(0, skill.baseDamage || 0);
   }
-
+ 
   useSkill(unitId, skillId, options = {}) {
     const unit = this.units.find((u) => u.id === unitId);
     const skill = this.getSkillById(unit, skillId);
@@ -2495,13 +2511,13 @@ class BattleScene extends Phaser.Scene {
     });
     return true;
   }
-
+ 
   chooseActionItem(unitId) {
     const unit = this.units.find((u) => u.id === unitId);
     if (!unit || unit.team !== "player" || unit.acted) return;
     this.helpText.setText("Items will be added later. Choose another action.");
   }
-
+ 
   waitUnit(unitId) {
     const unit = this.units.find((u) => u.id === unitId);
     if (!unit || unit.team !== "player" || unit.acted) return;
@@ -2511,7 +2527,7 @@ class BattleScene extends Phaser.Scene {
     this.clearSelection(`${unit.name} waits.`);
     this.checkEndOfPlayerPhase();
   }
-
+ 
   setupInput() {
     this.input.on("pointerdown", (pointer) => {
       if (this.phase !== "player" || this.busy || this.previewOpen || this.actionMenuOpen || this.levelUpAllocationOpen) return;
@@ -2553,27 +2569,27 @@ class BattleScene extends Phaser.Scene {
       this.clearSelection();
     });
   }
-
+ 
   pointerToTile(pointerX, pointerY) {
     const localX = pointerX - this.boardX;
     const localY = pointerY - this.boardY;
     if (localX < 0 || localY < 0 || localX >= this.boardWidth || localY >= this.boardHeight) return null;
     return { x: Math.floor(localX / TILE_SIZE), y: Math.floor(localY / TILE_SIZE) };
   }
-
+ 
   getSelectedUnit() {
     return this.units.find((unit) => unit.id === this.selectedUnitId) || null;
   }
-
+ 
   getUnitAt(x, y) {
     return this.units.find((unit) => unit.x === x && unit.y === y && unit.hp > 0) || null;
   }
-
+ 
   isWalkable(x, y) {
     if (!this.isInBounds(x, y)) return false;
     return this.getTerrainAt(x, y) !== "wall";
   }
-
+ 
   reachableTiles(unit) {
     const queue = [{ x: unit.x, y: unit.y, steps: 0 }];
     const visited = new Set([tileKey(unit.x, unit.y)]);
@@ -2597,19 +2613,19 @@ class BattleScene extends Phaser.Scene {
     }
     return reachable;
   }
-
+ 
   attackableEnemies(unit) {
     return this.units.filter((other) => other.team !== unit.team && other.hp > 0 && canAttack(unit, other));
   }
-
+ 
   isMoveTile(x, y) {
     return (this.moveTiles || []).some((tile) => typeof tile === "string" ? tile === tileKey(x, y) : tile.x === x && tile.y === y);
   }
-
+ 
   isTargetTile(x, y) {
     return this.targetTiles.some((unit) => unit.x === x && unit.y === y);
   }
-
+ 
   openPreview(attacker, defender) {
     this.closeActionMenu();
     const attackerWeapon = getWeaponForTarget(attacker, defender);
@@ -2634,7 +2650,7 @@ class BattleScene extends Phaser.Scene {
     this.previewContainer.setVisible(true);
     this.helpText.setText("Confirm or cancel the attack. Critical hits deal triple damage.");
   }
-
+ 
   closePreview() {
     this.previewOpen = false;
     this.previewData = null;
@@ -2648,7 +2664,7 @@ class BattleScene extends Phaser.Scene {
     }
     this.helpText.setText("Attack cancelled.");
   }
-
+ 
   confirmPreviewAttack() {
     if (!this.previewData) return;
     this.closeActionMenu();
@@ -2658,7 +2674,7 @@ class BattleScene extends Phaser.Scene {
     this.previewContainer.setVisible(false);
     this.attackEnemy(attackerId, defenderId);
   }
-
+ 
   moveUnit(unitId, x, y) {
     const unit = this.units.find((u) => u.id === unitId);
     const sprite = this.unitSprites[unitId];
@@ -2692,7 +2708,7 @@ class BattleScene extends Phaser.Scene {
       },
     });
   }
-
+ 
   attackEnemy(attackerId, defenderId) {
     const attacker = this.units.find((u) => u.id === attackerId);
     const defender = this.units.find((u) => u.id === defenderId);
@@ -2743,7 +2759,7 @@ class BattleScene extends Phaser.Scene {
       this.checkEndOfPlayerPhase();
     });
   }
-
+ 
   clearSelection(message = "Click Edwin or Leon to select a unit.") {
     this.closeActionMenu();
     this.selectedUnitId = null;
@@ -2753,7 +2769,7 @@ class BattleScene extends Phaser.Scene {
     this.updateSelectedPanel();
     this.helpText.setText(message);
   }
-
+ 
   redrawSelection() {
     this.overlayLayer.removeAll(true);
     for (const unit of this.units) {
@@ -2780,7 +2796,7 @@ class BattleScene extends Phaser.Scene {
       this.overlayLayer.add(overlay);
     }
   }
-
+ 
   updateSelectedPanel() {
     const unit = this.units.find((u) => u.id === this.selectedUnitId);
     if (!unit) {
@@ -2837,12 +2853,12 @@ class BattleScene extends Phaser.Scene {
         : "Weapon: None"
     );
   }
-
+ 
   checkEndOfPlayerPhase() {
     const remaining = this.units.filter((u) => u.team === "player" && !u.acted && u.hp > 0);
     if (remaining.length === 0) this.startEnemyPhase();
   }
-
+ 
   startEnemyPhase() {
     this.closeActionMenu();
     this.phase = "enemy";
@@ -2855,7 +2871,7 @@ class BattleScene extends Phaser.Scene {
     this.enemyTurnOrder = this.units.filter((u) => u.team === "enemy");
     this.time.delayedCall(ENEMY_ACTION_PAUSE, () => this.runNextEnemy());
   }
-
+ 
   runNextEnemy() {
     if (this.enemyIndex >= this.enemyTurnOrder.length) {
       this.startPlayerPhase();
@@ -2890,7 +2906,7 @@ class BattleScene extends Phaser.Scene {
     }
     this.moveEnemyTo(enemy, plan.move, afterMove);
   }
-
+ 
   executeEnemyAction(enemy, action) {
     if (!enemy || enemy.hp <= 0 || !action) {
       this.enemyIndex += 1;
@@ -2911,7 +2927,7 @@ class BattleScene extends Phaser.Scene {
     this.enemyIndex += 1;
     this.time.delayedCall(ENEMY_ACTION_PAUSE, () => this.runNextEnemy());
   }
-
+ 
   moveEnemyTo(enemy, moveTarget, onComplete) {
     const sprite = this.unitSprites[enemy.id];
     if (!enemy || !sprite || !moveTarget) {
@@ -2938,17 +2954,17 @@ class BattleScene extends Phaser.Scene {
       },
     });
   }
-
+ 
   getLivingOpponents(unit) {
     return this.units.filter((other) => other.team !== unit.team && other.hp > 0);
   }
-
+ 
   getNearestOpponent(unit) {
     const opponents = this.getLivingOpponents(unit);
     if (!opponents.length) return null;
     return opponents.reduce((best, opponent) => distance(unit, opponent) < distance(unit, best) ? opponent : best, opponents[0]);
   }
-
+ 
   getWeaponForPosition(attacker, defender, x, y) {
     if (!attacker || !defender || !attacker.weapons) return null;
     const dist = Math.abs(x - defender.x) + Math.abs(y - defender.y);
@@ -2958,7 +2974,7 @@ class BattleScene extends Phaser.Scene {
       return dist >= minRange && dist <= maxRange;
     }) || null;
   }
-
+ 
   calculateAttackScoreAt(attacker, defender, weapon) {
     if (!attacker || !defender || !weapon) return null;
     const damagePerHit = this.calculateDamage(attacker, defender, weapon);
@@ -2970,7 +2986,7 @@ class BattleScene extends Phaser.Scene {
     const canKill = totalDamage >= defender.hp || expectedDamage >= defender.hp;
     return { canKill, totalDamage, expectedDamage, score: (canKill ? 100000 : 0) + expectedDamage * 100 + totalDamage };
   }
-
+ 
   evaluateEnemyActionAt(enemy, x, y) {
     const opponents = this.getLivingOpponents(enemy);
     const actions = [];
@@ -3005,7 +3021,7 @@ class BattleScene extends Phaser.Scene {
     });
     return actions[0];
   }
-
+ 
   chooseEnemyPlan(enemy) {
     const options = [{ x: enemy.x, y: enemy.y }, ...this.reachableTiles(enemy)];
     const nearest = this.getNearestOpponent(enemy);
@@ -3025,7 +3041,7 @@ class BattleScene extends Phaser.Scene {
     const enRouteAction = this.evaluateEnemyActionAt(enemy, move.x, move.y);
     return { move, action: enRouteAction, score: bestPlan?.score || 0 };
   }
-
+ 
   chooseEnemyMoveToward(enemy, target) {
     const options = this.reachableTiles(enemy);
     if (!options.length) return null;
@@ -3040,7 +3056,7 @@ class BattleScene extends Phaser.Scene {
     }
     return best;
   }
-
+ 
   enemyAttack(attacker, defender) {
     const weapon = getWeaponForTarget(attacker, defender);
     if (!weapon) {
@@ -3079,7 +3095,7 @@ class BattleScene extends Phaser.Scene {
     this.enemyIndex += 1;
     this.time.delayedCall(900 + sequence.results.length * 220, () => this.runNextEnemy());
   }
-
+ 
   startPlayerPhase() {
     this.phase = "player";
     this.phaseText.setText("Player Phase");
@@ -3096,7 +3112,7 @@ class BattleScene extends Phaser.Scene {
     this.busy = false;
   }
 }
-
+ 
 const config = {
   type: Phaser.AUTO,
   parent: "app",
@@ -3109,7 +3125,5 @@ const config = {
   },
   scene: [TitleScene, MainMenuScene, LoadingScene, BattleScene],
 };
-
+ 
 new Phaser.Game(config);
-
-
