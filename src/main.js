@@ -33,6 +33,12 @@ const LEVEL_UP_STATS = [
   { key: "luck", label: "LUCK", description: "+1 crit chance and better level rolls" },
 ];
  
+const TARGET_HIGHLIGHT = {
+  attack: { fill: 0xef4444, stroke: 0xfda4af },
+  skill: { fill: 0xa78bfa, stroke: 0xddd6fe },
+  item: { fill: 0x22c55e, stroke: 0xbbf7d0 },
+};
+ 
 function createDirectionalStateEntries(unitKey, state) {
   return {
     down: { key: `${unitKey}_${state}_down`, path: `/sprites/${unitKey}/${state}_down.png` },
@@ -366,6 +372,16 @@ const UNITS = [
     spd: 7,
     luck: 5,
     weapons: [{ name: "Fists", baseDamage: 1, range: 1, damageType: "physical", stat: "str", hitRate: 100 }],
+    items: [
+      {
+        id: "greggsSausageRoll",
+        name: "Gregg's Sausage Roll",
+        heal: 10,
+        uses: 1,
+        targetType: "selfOrAdjacentAlly",
+        description: "Restore 10 HP to Leon or an adjacent ally.",
+      },
+    ],
     acted: false,
     color: 0x38bdf8,
   },
@@ -901,6 +917,7 @@ class BattleScene extends Phaser.Scene {
       maxSigilPoints: unit.maxSigilPoints ?? 3,
       skills: (unit.skills || []).map((skill) => ({ ...skill })),
       weapons: (unit.weapons || []).map((weapon) => ({ ...weapon })),
+      items: (unit.items || []).map((item) => ({ ...item })),
     }));
  
     this.selectedUnitId = null;
@@ -914,6 +931,13 @@ class BattleScene extends Phaser.Scene {
     this.actionMenuOpen = false;
     this.actionMenuUnitId = null;
     this.actionMenuContainer = null;
+    this.selectionMenuOpen = false;
+    this.selectionMenuType = null;
+    this.selectionMenuContainer = null;
+    this.selectionMenuSummaryText = null;
+    this.pendingItemUse = null;
+    this.targetTileColor = null;
+    this.targetTileStroke = null;
     this.skillBannerContainer = null;
     this.skillBannerText = null;
     this.battleMusic = null;
@@ -2319,19 +2343,38 @@ class BattleScene extends Phaser.Scene {
     this.units = this.units.filter((unit) => unit.id !== unitId);
   }
  
+  closeSelectionMenu(redraw = true) {
+    if (this.selectionMenuContainer) {
+      this.selectionMenuContainer.destroy();
+    }
+ 
+    this.selectionMenuContainer = null;
+    this.selectionMenuOpen = false;
+    this.selectionMenuType = null;
+    this.selectionMenuSummaryText = null;
+ 
+    if (redraw) {
+      this.redrawSelection();
+    }
+  }
+ 
   closeActionMenu() {
     if (this.actionMenuContainer) this.actionMenuContainer.destroy();
     this.actionMenuContainer = null;
     this.actionMenuOpen = false;
     this.actionMenuUnitId = null;
+    this.closeSelectionMenu(false);
   }
  
   showActionMenu(unit, message = null) {
     if (!unit || unit.team !== "player" || unit.acted || unit.hp <= 0) return;
     this.closeActionMenu();
+    this.pendingItemUse = null;
     this.selectedUnitId = unit.id;
     this.moveTiles = [];
     this.targetTiles = [];
+    this.targetTileColor = null;
+    this.targetTileStroke = null;
     this.redrawSelection();
     this.updateSelectedPanel();
     const centerX = this.boardX + unit.x * TILE_SIZE + TILE_SIZE / 2;
@@ -2358,7 +2401,8 @@ class BattleScene extends Phaser.Scene {
     this.actionMenuOpen = true;
     this.actionMenuUnitId = unit.id;
     this.uiLayer.add(container);
-    this.helpText.setText(message || `${unit.name} is ready. Choose an action.`);
+    const cancelHint = unit.pendingMoveOrigin ? " Space cancels the move." : " Space goes back.";
+    this.helpText.setText(message || `${unit.name} is ready. Choose an action.${cancelHint}`);
   }
  
   chooseActionAttack(unitId) {
@@ -2370,32 +2414,185 @@ class BattleScene extends Phaser.Scene {
       return;
     }
     this.closeActionMenu();
+    this.pendingItemUse = null;
     this.selectedUnitId = unit.id;
     this.moveTiles = [];
     this.targetTiles = targets;
+    this.targetTileColor = TARGET_HIGHLIGHT.attack.fill;
+    this.targetTileStroke = TARGET_HIGHLIGHT.attack.stroke;
     this.redrawSelection();
     this.updateSelectedPanel();
-    this.helpText.setText(`Choose an enemy for ${unit.name} to attack.`);
+    this.helpText.setText(`Choose an enemy for ${unit.name} to attack. Press Space to cancel.`);
   }
  
   chooseActionSkill(unitId) {
     const unit = this.units.find((u) => u.id === unitId);
     if (!unit || unit.team !== "player" || unit.acted) return;
-    const skill = (unit.skills || [])[0];
-    if (!skill) {
+    const skills = unit.skills || [];
+    if (skills.length === 0) {
       this.helpText.setText(`${unit.name} has no skills yet. Choose another action.`);
       return;
     }
-    if (!this.canUseSkill(unit, skill)) {
-      this.helpText.setText(`${skill.name} needs ${skill.cost} Sigil Points.`);
+    this.showSkillMenu(unit);
+  }
+ 
+  showSkillMenu(unit) {
+    this.showChoiceMenu(unit, {
+      type: "skill",
+      title: "Skills",
+      entries: unit.skills || [],
+      emptyText: `${unit.name} has no skills yet.`,
+      getLabel: (skill) => `${skill.name} (${skill.cost || 0} SP)`,
+      getSummary: (skill) => this.getSkillSummary(unit, skill),
+      getTargets: (skill) => this.getSkillTargetsAt(unit, skill, unit.x, unit.y),
+      canChoose: (skill) => this.canUseSkill(unit, skill),
+      disabledText: (skill) => `${skill.name} needs ${skill.cost} Sigil Points.`,
+      onChoose: (skill) => {
+        if (!this.canUseSkill(unit, skill)) {
+          this.helpText.setText(`${skill.name} needs ${skill.cost} Sigil Points.`);
+          return;
+        }
+        const targets = this.getSkillTargetsAt(unit, skill, unit.x, unit.y);
+        if (targets.length === 0) {
+          this.helpText.setText(`No units are in range for ${skill.name}. Choose another action.`);
+          return;
+        }
+        this.closeSelectionMenu(false);
+        this.useSkill(unit.id, skill.id, { endTurn: true });
+      },
+    });
+  }
+ 
+  showChoiceMenu(unit, config) {
+    if (!unit || !config) return;
+    const entries = config.entries || [];
+    if (entries.length === 0) {
+      this.helpText.setText(config.emptyText || "Nothing available.");
       return;
     }
+ 
+    this.closeActionMenu();
+    this.closeSelectionMenu(false);
+    this.pendingItemUse = null;
+    this.selectedUnitId = unit.id;
+    this.moveTiles = [];
+    this.targetTiles = [];
+    this.targetTileColor = null;
+    this.targetTileStroke = null;
+    this.redrawSelection();
+    this.updateSelectedPanel();
+ 
+    const centerX = this.boardX + unit.x * TILE_SIZE + TILE_SIZE / 2;
+    const centerY = this.boardY + unit.y * TILE_SIZE + TILE_SIZE / 2;
+    const menuWidth = 310;
+    const rowHeight = 42;
+    const menuHeight = Phaser.Math.Clamp(132 + entries.length * rowHeight, 210, 430);
+    const maxRightBeforeSidePanel = 708;
+    const x = Phaser.Math.Clamp(centerX + TILE_SIZE * 1.1, menuWidth / 2 + 8, maxRightBeforeSidePanel - menuWidth / 2);
+    const y = Phaser.Math.Clamp(centerY, menuHeight / 2 + 8, GAME_HEIGHT - menuHeight / 2 - 8);
+    const container = this.add.container(x, y).setDepth(9999);
+    const panel = createBannerPanel(this, 0, 0, menuWidth, menuHeight, { innerInset: 12 });
+    const title = this.add.text(0, -menuHeight / 2 + 26, config.title || "Menu", {
+      fontSize: "18px",
+      fontStyle: "bold",
+      color: "#f7ecd3",
+      stroke: "#0b0811",
+      strokeThickness: 3,
+    }).setOrigin(0.5);
+ 
+    this.selectionMenuSummaryText = this.add.text(-menuWidth / 2 + 18, menuHeight / 2 - 58, "Hover an option to preview it.", {
+      fontSize: "11px",
+      color: "#d8c4f0",
+      wordWrap: { width: menuWidth - 36 },
+      lineSpacing: 2,
+    });
+ 
+    const backText = this.add.text(0, menuHeight / 2 - 18, "Space: back", {
+      fontSize: "11px",
+      color: "#cbd5e1",
+    }).setOrigin(0.5);
+ 
+    container.add([panel.container, title, this.selectionMenuSummaryText, backText]);
+ 
+    entries.forEach((entry, index) => {
+      const rowY = -menuHeight / 2 + 66 + index * rowHeight;
+      const label = config.getLabel ? config.getLabel(entry) : entry.name;
+      const canChoose = config.canChoose ? config.canChoose(entry) : true;
+      const button = createBannerButton(this, 0, rowY, menuWidth - 26, 32, label, () => {
+        if (!canChoose) {
+          this.helpText.setText(config.disabledText ? config.disabledText(entry) : "That option cannot be used now.");
+          return;
+        }
+        if (typeof config.onChoose === "function") config.onChoose(entry);
+      }, "14px");
+ 
+      button.container.setAlpha(canChoose ? 1 : 0.45);
+      button.hit.on("pointerover", () => {
+        const targets = config.getTargets ? config.getTargets(entry) : [];
+        const highlight = TARGET_HIGHLIGHT[config.type] || TARGET_HIGHLIGHT.skill;
+        this.showTargetHighlightsForUnits(targets, highlight.fill, highlight.stroke);
+        if (this.selectionMenuSummaryText) {
+          this.selectionMenuSummaryText.setText(config.getSummary ? config.getSummary(entry) : "");
+        }
+      });
+      button.hit.on("pointerout", () => {
+        if (this.selectionMenuSummaryText) {
+          this.selectionMenuSummaryText.setText(config.getSummary ? config.getSummary(entry) : "");
+        }
+      });
+      container.add(button.container);
+    });
+ 
+    this.selectionMenuContainer = container;
+    this.selectionMenuOpen = true;
+    this.selectionMenuType = config.type || "menu";
+    this.uiLayer.add(container);
+ 
+    const firstEntry = entries[0];
+    if (firstEntry) {
+      const targets = config.getTargets ? config.getTargets(firstEntry) : [];
+      const highlight = TARGET_HIGHLIGHT[config.type] || TARGET_HIGHLIGHT.skill;
+      this.showTargetHighlightsForUnits(targets, highlight.fill, highlight.stroke);
+      if (this.selectionMenuSummaryText) {
+        this.selectionMenuSummaryText.setText(config.getSummary ? config.getSummary(firstEntry) : "");
+      }
+    }
+ 
+    this.helpText.setText(`${config.title || "Menu"}: choose an option, or press Space to go back.`);
+  }
+ 
+  showTargetHighlightsForUnits(targets, fillColor = 0xa78bfa, strokeColor = 0xddd6fe) {
+    this.overlayLayer.removeAll(true);
+ 
+    for (const unit of this.units) {
+      const sprite = this.unitSprites[unit.id];
+      if (sprite) sprite.marker.setStrokeStyle(2, 0xffffff);
+    }
+ 
+    const selectedUnit = this.getSelectedUnit();
+    const selectedSprite = selectedUnit ? this.unitSprites[selectedUnit.id] : null;
+    if (selectedSprite) selectedSprite.marker.setStrokeStyle(4, 0xfde68a);
+ 
+    (targets || []).forEach((target) => {
+      if (!target) return;
+      const x = this.boardX + target.x * TILE_SIZE;
+      const y = this.boardY + target.y * TILE_SIZE;
+      const overlay = this.add.rectangle(x + TILE_SIZE / 2, y + TILE_SIZE / 2, TILE_SIZE - 10, TILE_SIZE - 10, fillColor, 0.42);
+      overlay.setStrokeStyle(2, strokeColor, 0.95);
+      this.overlayLayer.add(overlay);
+    });
+  }
+ 
+  getSkillSummary(unit, skill) {
+    if (!unit || !skill) return "";
     const targets = this.getSkillTargetsAt(unit, skill, unit.x, unit.y);
-    if (targets.length === 0) {
-      this.helpText.setText(`No units are in range for ${skill.name}. Choose another action.`);
-      return;
+    let effect = "Uses a special technique.";
+    if (skill.damageFormula === "mag") {
+      effect = `Deals ${unit.mag || 0} damage to every unit in the squares around ${unit.name}.`;
+    } else if (skill.damageFormula === "strPlusSpd") {
+      effect = `Deals ${(unit.str || 0) + (unit.spd || 0)} damage to every unit in the squares around ${unit.name}.`;
     }
-    this.useSkill(unit.id, skill.id, { endTurn: true });
+    return `${skill.name}: costs ${skill.cost || 0} Sigil Point${(skill.cost || 0) === 1 ? "" : "s"}. ${effect} Targets now: ${targets.length}.`;
   }
  
   getSkillById(unit, skillId) {
@@ -2434,10 +2631,15 @@ class BattleScene extends Phaser.Scene {
     const targets = this.getSkillTargetsAt(unit, skill, unit.x, unit.y);
     if (targets.length === 0) return false;
     this.closeActionMenu();
+    this.closeSelectionMenu(false);
+    this.pendingItemUse = null;
+    delete unit.pendingMoveOrigin;
     this.busy = true;
     this.selectedUnitId = unit.id;
     this.moveTiles = [];
     this.targetTiles = [];
+    this.targetTileColor = null;
+    this.targetTileStroke = null;
     this.redrawSelection();
     this.updateSelectedPanel();
     unit.sigilPoints = Math.max(0, (unit.sigilPoints ?? 0) - (skill.cost ?? 0));
@@ -2515,13 +2717,120 @@ class BattleScene extends Phaser.Scene {
   chooseActionItem(unitId) {
     const unit = this.units.find((u) => u.id === unitId);
     if (!unit || unit.team !== "player" || unit.acted) return;
-    this.helpText.setText("Items will be added later. Choose another action.");
+    const items = unit.items || [];
+    if (items.length === 0) {
+      this.helpText.setText(`${unit.name} has no items yet. Choose another action.`);
+      return;
+    }
+    this.showItemMenu(unit);
+  }
+ 
+  showItemMenu(unit) {
+    this.showChoiceMenu(unit, {
+      type: "item",
+      title: "Items",
+      entries: unit.items || [],
+      emptyText: `${unit.name} has no items yet.`,
+      getLabel: (item) => `${item.name}${item.uses ? ` x${item.uses}` : ""}`,
+      getSummary: (item) => this.getItemSummary(unit, item),
+      getTargets: (item) => this.getItemTargetsAt(unit, item, unit.x, unit.y),
+      canChoose: (item) => (item.uses ?? 1) > 0,
+      disabledText: (item) => `${item.name} has no uses left.`,
+      onChoose: (item) => this.beginItemTargetSelection(unit, item),
+    });
+  }
+ 
+  getItemTargetsAt(unit, item, x = unit.x, y = unit.y) {
+    if (!unit || !item) return [];
+    if (item.targetType === "selfOrAdjacentAlly") {
+      return this.units.filter((other) => {
+        if (!other || other.team !== unit.team || other.hp <= 0) return false;
+        const dx = Math.abs(other.x - x);
+        const dy = Math.abs(other.y - y);
+        return other.id === unit.id || (dx <= 1 && dy <= 1);
+      });
+    }
+    return [unit];
+  }
+ 
+  getItemSummary(unit, item) {
+    if (!unit || !item) return "";
+    const targets = this.getItemTargetsAt(unit, item, unit.x, unit.y);
+    if (item.heal) {
+      return `${item.name}: restores ${item.heal} HP to the consumer. Can target ${unit.name} or an adjacent ally. Targets now: ${targets.length}.`;
+    }
+    return item.description || `${item.name}: item effect will be added later.`;
+  }
+ 
+  beginItemTargetSelection(unit, item) {
+    if (!unit || !item) return;
+    if ((item.uses ?? 1) <= 0) {
+      this.helpText.setText(`${item.name} has no uses left.`);
+      return;
+    }
+    const targets = this.getItemTargetsAt(unit, item, unit.x, unit.y);
+    if (targets.length === 0) {
+      this.helpText.setText(`No valid target for ${item.name}.`);
+      return;
+    }
+    this.closeSelectionMenu(false);
+    this.selectedUnitId = unit.id;
+    this.pendingItemUse = { unitId: unit.id, itemId: item.id };
+    this.moveTiles = [];
+    this.targetTiles = targets;
+    this.targetTileColor = TARGET_HIGHLIGHT.item.fill;
+    this.targetTileStroke = TARGET_HIGHLIGHT.item.stroke;
+    this.redrawSelection();
+    this.updateSelectedPanel();
+    this.helpText.setText(`Choose who eats ${item.name}. Press Space to cancel.`);
+  }
+ 
+  useItem(unitId, itemId, targetId) {
+    const unit = this.units.find((u) => u.id === unitId);
+    const target = this.units.find((u) => u.id === targetId);
+    const item = (unit?.items || []).find((candidate) => candidate.id === itemId);
+    if (!unit || !target || !item || unit.acted || unit.hp <= 0) return false;
+    const targets = this.getItemTargetsAt(unit, item, unit.x, unit.y);
+    if (!targets.some((candidate) => candidate.id === target.id)) {
+      this.helpText.setText(`${target.name} is not in range for ${item.name}.`);
+      return false;
+    }
+    if (item.heal) {
+      const missingHp = Math.max(0, (target.maxHp || 0) - (target.hp || 0));
+      if (missingHp <= 0) {
+        this.helpText.setText(`${target.name} is already at full HP.`);
+        return false;
+      }
+      const healed = Math.min(item.heal, missingHp);
+      target.hp = Math.min(target.maxHp, target.hp + healed);
+      this.showFloatingText(this.boardX + target.x * TILE_SIZE + TILE_SIZE / 2, this.boardY + target.y * TILE_SIZE + 8, `+${healed} HP`, "#86efac");
+    }
+    item.uses = (item.uses ?? 1) - 1;
+    if (item.uses <= 0) {
+      unit.items = (unit.items || []).filter((candidate) => candidate.id !== item.id);
+    }
+    delete unit.pendingMoveOrigin;
+    this.pendingItemUse = null;
+    this.closeActionMenu();
+    this.closeSelectionMenu(false);
+    this.targetTiles = [];
+    this.targetTileColor = null;
+    this.targetTileStroke = null;
+    this.redrawSelection();
+    unit.acted = true;
+    this.refreshUnitSprite(unit);
+    this.refreshUnitSprite(target);
+    this.updateSelectedPanel();
+    this.clearSelection(`${target.name} ate ${item.name}.`);
+    this.checkEndOfPlayerPhase();
+    return true;
   }
  
   waitUnit(unitId) {
     const unit = this.units.find((u) => u.id === unitId);
     if (!unit || unit.team !== "player" || unit.acted) return;
     this.closeActionMenu();
+    delete unit.pendingMoveOrigin;
     unit.acted = true;
     this.refreshUnitSprite(unit);
     this.clearSelection(`${unit.name} waits.`);
@@ -2529,24 +2838,42 @@ class BattleScene extends Phaser.Scene {
   }
  
   setupInput() {
+    this.input.keyboard?.on("keydown-SPACE", (event) => {
+      if (event?.preventDefault) event.preventDefault();
+      this.handleSpaceCancel();
+    });
+ 
     this.input.on("pointerdown", (pointer) => {
-      if (this.phase !== "player" || this.busy || this.previewOpen || this.actionMenuOpen || this.levelUpAllocationOpen) return;
+      if (this.phase !== "player" || this.busy || this.previewOpen || this.actionMenuOpen || this.selectionMenuOpen || this.levelUpAllocationOpen) return;
       const tile = this.pointerToTile(pointer.x, pointer.y);
       if (!tile) return;
       const clickedUnit = this.getUnitAt(tile.x, tile.y);
       const selectedUnit = this.getSelectedUnit();
+ 
+      if (this.pendingItemUse) {
+        if (clickedUnit && this.isTargetTile(clickedUnit.x, clickedUnit.y)) {
+          this.useItem(this.pendingItemUse.unitId, this.pendingItemUse.itemId, clickedUnit.id);
+          return;
+        }
+        this.helpText.setText("Choose one of the highlighted item targets, or press Space to cancel.");
+        return;
+      }
+ 
       if (clickedUnit && selectedUnit && clickedUnit.id === selectedUnit.id && selectedUnit.team === "player" && !selectedUnit.acted) {
         this.showActionMenu(selectedUnit, `${selectedUnit.name} holds position. Choose an action.`);
         return;
       }
       if (clickedUnit && clickedUnit.team === "player" && !clickedUnit.acted) {
         this.closeActionMenu();
+        this.pendingItemUse = null;
         this.selectedUnitId = clickedUnit.id;
         this.moveTiles = this.reachableTiles(clickedUnit);
         this.targetTiles = [];
+        this.targetTileColor = null;
+        this.targetTileStroke = null;
         this.redrawSelection();
         this.updateSelectedPanel();
-        this.helpText.setText(`Selected ${clickedUnit.name}. Choose a tile to move to, or click them again to act here.`);
+        this.helpText.setText(`Selected ${clickedUnit.name}. Choose a tile to move to, click them again to act here, or press Space to cancel.`);
         return;
       }
       if (selectedUnit && clickedUnit && clickedUnit.team === "enemy" && this.isTargetTile(clickedUnit.x, clickedUnit.y)) {
@@ -2557,6 +2884,8 @@ class BattleScene extends Phaser.Scene {
         this.selectedUnitId = clickedUnit.id;
         this.moveTiles = [];
         this.targetTiles = [];
+        this.targetTileColor = null;
+        this.targetTileStroke = null;
         this.redrawSelection();
         this.updateSelectedPanel();
         this.helpText.setText(`${clickedUnit.name}: ${clickedUnit.title}`);
@@ -2566,7 +2895,130 @@ class BattleScene extends Phaser.Scene {
         this.moveUnit(selectedUnit.id, tile.x, tile.y);
         return;
       }
+      if (selectedUnit && selectedUnit.team === "player" && this.targetTiles.length > 0) {
+        this.targetTiles = [];
+        this.targetTileColor = null;
+        this.targetTileStroke = null;
+        this.redrawSelection();
+        this.showActionMenu(selectedUnit, "Cancelled. Choose another action.");
+        return;
+      }
       this.clearSelection();
+    });
+  }
+ 
+  handleSpaceCancel() {
+    if (this.levelUpAllocationOpen || this.busy) return;
+ 
+    if (this.previewOpen) {
+      this.closePreview();
+      return;
+    }
+ 
+    const selectedUnit = this.getSelectedUnit();
+ 
+    if (this.pendingItemUse) {
+      const unit = this.units.find((candidate) => candidate.id === this.pendingItemUse.unitId) || selectedUnit;
+      this.pendingItemUse = null;
+      this.targetTiles = [];
+      this.targetTileColor = null;
+      this.targetTileStroke = null;
+      this.redrawSelection();
+      if (unit && unit.team === "player" && !unit.acted) {
+        this.showActionMenu(unit, "Item cancelled. Choose another action.");
+      }
+      return;
+    }
+ 
+    if (this.selectionMenuOpen) {
+      const unit = selectedUnit;
+      this.closeSelectionMenu(false);
+      this.targetTiles = [];
+      this.targetTileColor = null;
+      this.targetTileStroke = null;
+      this.redrawSelection();
+      if (unit && unit.team === "player" && !unit.acted) {
+        this.showActionMenu(unit, "Cancelled. Choose another action.");
+      }
+      return;
+    }
+ 
+    if (this.actionMenuOpen) {
+      const unit = this.units.find((candidate) => candidate.id === this.actionMenuUnitId) || selectedUnit;
+      if (unit?.pendingMoveOrigin) {
+        this.undoPendingMove(unit);
+        return;
+      }
+      this.closeActionMenu();
+      if (unit && unit.team === "player" && !unit.acted) {
+        this.selectedUnitId = unit.id;
+        this.moveTiles = this.reachableTiles(unit);
+        this.targetTiles = [];
+        this.targetTileColor = null;
+        this.targetTileStroke = null;
+        this.redrawSelection();
+        this.updateSelectedPanel();
+        this.helpText.setText(`${unit.name} returned to movement selection.`);
+      }
+      return;
+    }
+ 
+    if (selectedUnit && selectedUnit.team === "player" && this.targetTiles.length > 0) {
+      this.targetTiles = [];
+      this.targetTileColor = null;
+      this.targetTileStroke = null;
+      this.redrawSelection();
+      this.showActionMenu(selectedUnit, "Cancelled. Choose another action.");
+      return;
+    }
+ 
+    if (selectedUnit && selectedUnit.team === "player" && this.moveTiles.length > 0) {
+      this.clearSelection("Selection cancelled.");
+    }
+  }
+ 
+  undoPendingMove(unit) {
+    if (!unit?.pendingMoveOrigin) return;
+    const sprite = this.unitSprites[unit.id];
+    const origin = unit.pendingMoveOrigin;
+    this.closeActionMenu();
+    this.closeSelectionMenu(false);
+    this.pendingItemUse = null;
+    this.moveTiles = [];
+    this.targetTiles = [];
+    this.targetTileColor = null;
+    this.targetTileStroke = null;
+    this.busy = true;
+ 
+    unit.x = origin.x;
+    unit.y = origin.y;
+    unit.facing = origin.facing || unit.facing || "down";
+    delete unit.pendingMoveOrigin;
+    this.playUnitState(unit, "move", 420);
+ 
+    const finishUndo = () => {
+      this.setUnitSpriteFrame(unit, "idle", unit.facing || "down");
+      this.selectedUnitId = unit.id;
+      this.moveTiles = this.reachableTiles(unit);
+      this.targetTiles = [];
+      this.redrawSelection();
+      this.updateSelectedPanel();
+      this.busy = false;
+      this.helpText.setText(`${unit.name}'s move was cancelled. Choose a new tile or click them to act here.`);
+    };
+ 
+    if (!sprite) {
+      finishUndo();
+      return;
+    }
+ 
+    this.tweens.add({
+      targets: sprite.container,
+      x: this.boardX + unit.x * TILE_SIZE + TILE_SIZE / 2,
+      y: this.boardY + unit.y * TILE_SIZE + TILE_SIZE / 2,
+      duration: 420,
+      ease: "Sine.easeInOut",
+      onComplete: finishUndo,
     });
   }
  
@@ -2658,6 +3110,8 @@ class BattleScene extends Phaser.Scene {
     const unit = this.getSelectedUnit();
     if (unit && unit.team === "player" && !unit.acted) {
       this.targetTiles = [];
+      this.targetTileColor = null;
+      this.targetTileStroke = null;
       this.redrawSelection();
       this.showActionMenu(unit, "Attack cancelled. Choose another action.");
       return;
@@ -2683,7 +3137,9 @@ class BattleScene extends Phaser.Scene {
     this.busy = true;
     const oldX = unit.x;
     const oldY = unit.y;
-    unit.facing = this.getDirectionFromDelta(x - oldX, y - oldY, unit.facing || "down");
+    const oldFacing = unit.facing || "down";
+    unit.pendingMoveOrigin = { x: oldX, y: oldY, facing: oldFacing };
+    unit.facing = this.getDirectionFromDelta(x - oldX, y - oldY, oldFacing);
     this.playUnitState(unit, "move", PLAYER_MOVE_DURATION + PLAYER_ACTION_PAUSE);
     unit.x = x;
     unit.y = y;
@@ -2716,6 +3172,8 @@ class BattleScene extends Phaser.Scene {
     const weapon = getWeaponForTarget(attacker, defender);
     if (!weapon) return;
     this.closeActionMenu();
+    this.pendingItemUse = null;
+    delete attacker.pendingMoveOrigin;
     this.busy = true;
     this.faceUnitToward(attacker, defender);
     this.faceUnitToward(defender, attacker);
@@ -2762,9 +3220,12 @@ class BattleScene extends Phaser.Scene {
  
   clearSelection(message = "Click Edwin or Leon to select a unit.") {
     this.closeActionMenu();
+    this.pendingItemUse = null;
     this.selectedUnitId = null;
     this.moveTiles = [];
     this.targetTiles = [];
+    this.targetTileColor = null;
+    this.targetTileStroke = null;
     this.redrawSelection();
     this.updateSelectedPanel();
     this.helpText.setText(message);
@@ -2788,11 +3249,13 @@ class BattleScene extends Phaser.Scene {
       overlay.setStrokeStyle(2, 0x7dd3fc, 0.95);
       this.overlayLayer.add(overlay);
     }
+    const targetFill = this.targetTileColor || TARGET_HIGHLIGHT.attack.fill;
+    const targetStroke = this.targetTileStroke || TARGET_HIGHLIGHT.attack.stroke;
     for (const unit of this.targetTiles) {
       const x = this.boardX + unit.x * TILE_SIZE;
       const y = this.boardY + unit.y * TILE_SIZE;
-      const overlay = this.add.rectangle(x + TILE_SIZE / 2, y + TILE_SIZE / 2, TILE_SIZE - 10, TILE_SIZE - 10, 0xef4444, 0.35);
-      overlay.setStrokeStyle(2, 0xfda4af, 0.95);
+      const overlay = this.add.rectangle(x + TILE_SIZE / 2, y + TILE_SIZE / 2, TILE_SIZE - 10, TILE_SIZE - 10, targetFill, 0.35);
+      overlay.setStrokeStyle(2, targetStroke, 0.95);
       this.overlayLayer.add(overlay);
     }
   }
@@ -2847,10 +3310,16 @@ class BattleScene extends Phaser.Scene {
       orb.setStrokeStyle(2, active ? 0xddd6fe : 0x6d28d9);
     });
     this.unitStatsText.setText(`HP ${unit.hp}/${unit.maxHp}\nSTR ${unit.str}\nMAG ${unit.mag}\n${defLine}\nRES ${unit.res}\n${spdLine}\nLUCK ${unit.luck || 0}\nMOV ${unit.move}`);
+    const itemSummary = (unit.items || []).length > 0
+      ? `
+Items: ${(unit.items || []).map((item) => `${item.name}${item.uses ? ` x${item.uses}` : ""}`).join(", ")}`
+      : "";
+ 
     this.weaponText.setText(
       weapon
-        ? `Weapon: ${weapon.name} | Base ${weapon.baseDamage ?? weapon.damage ?? 0} | ${weapon.damageType || "physical"} | Hit ${weapon.hitRate ?? 100}% | Range ${getWeaponRangeLabel(weapon)}\nCrit: Luck difference %. Critical hits deal x3 damage.`
-        : "Weapon: None"
+        ? `Weapon: ${weapon.name} | Base ${weapon.baseDamage ?? weapon.damage ?? 0} | ${weapon.damageType || "physical"} | Hit ${weapon.hitRate ?? 100}% | Range ${getWeaponRangeLabel(weapon)}
+Crit: Luck difference %. Critical hits deal x3 damage.${itemSummary}`
+        : `Weapon: None${itemSummary}`
     );
   }
  
@@ -3097,6 +3566,9 @@ class BattleScene extends Phaser.Scene {
   }
  
   startPlayerPhase() {
+    this.pendingItemUse = null;
+    this.targetTileColor = null;
+    this.targetTileStroke = null;
     this.phase = "player";
     this.phaseText.setText("Player Phase");
     this.phaseText.setColor("#c4b5fd");
@@ -3104,6 +3576,7 @@ class BattleScene extends Phaser.Scene {
     for (const unit of this.units) {
       if (unit.team === "player") {
         unit.acted = false;
+        delete unit.pendingMoveOrigin;
         this.refreshUnitSprite(unit);
         this.setUnitSpriteFrame(unit, "idle", unit.facing || "down");
       }
