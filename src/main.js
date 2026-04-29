@@ -414,8 +414,10 @@ const CHAPTER_TWO_OPENING = [
         defenderPortrait: "edwinPortrait",
         impactText: "SMACK!",
         soundKey: SMACK_SFX_KEY,
-        text: "*sobbing* You don’t get to swan back into my life and act cool about it. We thought you were dead. We had a funeral for you! Mum and dad gave up years looking for you! I…I was alone Edwin.",
+        text: "*sobbing* You don’t get to swan back into my life and act cool about it.",
       },
+      { speaker: "Leon", portrait: "leonPortrait", text: "We thought you were dead. We had a funeral for you." },
+      { speaker: "Leon", portrait: "leonPortrait", text: "Mum and Dad spent years looking for you. I…I was alone, Edwin." },
       { type: "fullScreenScene", scene: "chapter2FuneralSplitScene", speaker: "Edwin", text: "I know… I’m sorry." },
       { speaker: "Leon", portrait: "leonPortrait", text: "Why? Why did you?" },
       { speaker: "Edwin", portrait: "edwinPortrait", text: "I did it to protect you all. I failed at that…. mum and dad… I couldn't save all of you." },
@@ -4118,10 +4120,12 @@ class BattleScene extends Phaser.Scene {
 
   setOpeningDialogueText(text) {
     const lineText = text || "";
-    const longLine = lineText.length > 150;
-    this.dialogueText.setFontSize(longLine ? "16px" : "18px");
-    this.dialogueText.setLineSpacing(longLine ? 4 : 6);
-    this.dialogueText.setWordWrapWidth(790, true);
+    const lineLength = lineText.length;
+    const compactLine = lineLength > 170;
+    const longLine = lineLength > 120;
+    this.dialogueText.setFontSize(compactLine ? "15px" : longLine ? "16px" : "18px");
+    this.dialogueText.setLineSpacing(compactLine ? 2 : longLine ? 4 : 6);
+    this.dialogueText.setWordWrapWidth(compactLine ? 760 : longLine ? 775 : 790, true);
     this.dialogueText.setText(lineText);
   }
 
