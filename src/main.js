@@ -4410,6 +4410,20 @@ class BattleScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     container.add([panel.container, title, this.selectionMenuSummaryText, backText]);
+    let allyPreviewPortrait = null;
+    let allyPreviewStats = null;
+    if (config.type === "allyPick") {
+      const previewFrame = this.add.rectangle(menuWidth / 2 + 118, -8, 210, 252, 0x1e1030, 1);
+      previewFrame.setStrokeStyle(2, 0xe4d0a8);
+      allyPreviewPortrait = this.add.image(menuWidth / 2 + 118, -56, "leonPortrait").setDisplaySize(108, 132);
+      allyPreviewStats = this.add.text(menuWidth / 2 + 118, 38, "", {
+        fontSize: "13px",
+        color: "#eadff7",
+        align: "center",
+        lineSpacing: 4,
+      }).setOrigin(0.5, 0);
+      container.add([previewFrame, allyPreviewPortrait, allyPreviewStats]);
+    }
 
     entries.forEach((entry, index) => {
       const rowY = -menuHeight / 2 + 66 + index * rowHeight;
@@ -4430,6 +4444,11 @@ class BattleScene extends Phaser.Scene {
         this.showTargetHighlightsForUnits(previewTiles, highlight.fill, highlight.stroke);
         if (this.selectionMenuSummaryText) {
           this.selectionMenuSummaryText.setText(config.getSummary ? config.getSummary(entry) : "");
+        }
+        if (config.type === "allyPick" && allyPreviewPortrait && allyPreviewStats) {
+          const portraitKey = entry.portraitKey && this.textures.exists(entry.portraitKey) ? entry.portraitKey : "leonPortrait";
+          allyPreviewPortrait.setTexture(portraitKey).setVisible(true);
+          allyPreviewStats.setText(`Lv 2 ${entry.className}\nHP ${entry.maxHp}  STR ${entry.str}  MAG ${entry.mag}\nDEF ${entry.def}  RES ${entry.res}  SPD ${entry.spd}`);
         }
       });
       button.hit.on("pointerout", () => {
@@ -4452,6 +4471,11 @@ class BattleScene extends Phaser.Scene {
       this.showTargetHighlightsForUnits(previewTiles, highlight.fill, highlight.stroke);
       if (this.selectionMenuSummaryText) {
         this.selectionMenuSummaryText.setText(config.getSummary ? config.getSummary(firstEntry) : "");
+      }
+      if (config.type === "allyPick" && allyPreviewPortrait && allyPreviewStats) {
+        const portraitKey = firstEntry.portraitKey && this.textures.exists(firstEntry.portraitKey) ? firstEntry.portraitKey : "leonPortrait";
+        allyPreviewPortrait.setTexture(portraitKey).setVisible(true);
+        allyPreviewStats.setText(`Lv 2 ${firstEntry.className}\nHP ${firstEntry.maxHp}  STR ${firstEntry.str}  MAG ${firstEntry.mag}\nDEF ${firstEntry.def}  RES ${firstEntry.res}  SPD ${firstEntry.spd}`);
       }
     }
 
