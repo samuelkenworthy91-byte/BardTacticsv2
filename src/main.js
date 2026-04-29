@@ -3231,8 +3231,8 @@ class BattleScene extends Phaser.Scene {
     if (isFullScreen) {
       const fullSceneKey = line.scene || step.background || "prologueScene";
       if (this.textures.exists(fullSceneKey)) {
-        this.openingFullSceneImage.setTexture(fullSceneKey);
         fitImageToBounds(this, this.openingFullSceneImage, fullSceneKey, GAME_WIDTH - 36, GAME_HEIGHT - 36, false);
+        this.openingFullSceneImage.setTexture(fullSceneKey);
       }
     }
 
@@ -4141,10 +4141,8 @@ class BattleScene extends Phaser.Scene {
     if (!leon) return;
     this.chapterTwoSetupDone = true;
     this.busy = true;
-    this.helpText.setText("Edwin: Right, you're up against our resident recon man, Shade.");
-    this.time.delayedCall(1200, () => this.helpText.setText("Edwin: Capture all four forts. Easy, right?"));
-    this.time.delayedCall(2400, () => this.helpText.setText("Edwin: Shade's only one guy. I'll let you take one more gang member."));
-    this.time.delayedCall(3200, () => this.showChoiceMenu(leon, {
+    this.helpText.setText("Edwin: Right you're up against our resident recon man Shade. Just capture all four forts. Easy right, Shade's only one guy, I'll even let you take another member of the gang with you!");
+    this.showChoiceMenu(leon, {
       type: "allyPick",
       title: "Pick 1 Ally",
       entries: CHAPTER_TWO_ALLY_OPTIONS
@@ -4153,7 +4151,7 @@ class BattleScene extends Phaser.Scene {
       getLabel: (unit) => unit.name,
       getSummary: (unit) => `${unit.name} • ${unit.className}\nHP ${unit.maxHp} STR ${unit.str} MAG ${unit.mag} DEF ${unit.def} RES ${unit.res} SPD ${unit.spd}`,
       onChoose: (unit) => this.completeChapterTwoSetup(unit),
-    }));
+    });
   }
 
   completeChapterTwoSetup(chosenAlly) {
@@ -4180,6 +4178,12 @@ class BattleScene extends Phaser.Scene {
     const leaderTile = forts[0];
     this.spawnShadeAt(leaderTile.x, leaderTile.y, 4, "shade_leader");
     this.helpText.setText("Shade: well I can't be outnumbered now can I?");
+    this.time.delayedCall(800, () => {
+      forts.forEach((tile, index) => this.spawnShadeAt(tile.x, tile.y, 2, `shade_clone_fort_${index + 1}`));
+      this.spawnShadeAt(2, 4, 2, "shade_clone_low_1");
+      this.spawnShadeAt(5, 5, 2, "shade_clone_low_2");
+      this.helpText.setText("Shade: better");
+    });
   }
 
   spawnShadeAt(x, y, level = 2, shadeId = null) {
