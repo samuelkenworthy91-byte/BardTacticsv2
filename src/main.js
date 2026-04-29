@@ -421,11 +421,15 @@ const CHAPTER_TWO_OPENING = [
       { speaker: "Edwin", portrait: "edwinPortrait", text: "I did it to protect you all. I failed at that…. mum and dad… I couldn't save all of you." },
       { speaker: "Leon", portrait: "leonPortrait", text: "They’re…? Who were those guys?" },
       { speaker: "Edwin", portrait: "edwinPortrait", text: "You've heard of Guildlites? Run by Caleb Guildlite?" },
-      { speaker: "Leon", portrait: "leonPortrait", text: "I don't live under a rock… everyone has heard of them, they are the biggest tech company outside of silicon valley, not to mention all the charity work." },
+      { speaker: "Leon", portrait: "leonPortrait", text: "I don’t live under a rock. Everyone has heard of them." },
+      { speaker: "Leon", portrait: "leonPortrait", text: "They’re the biggest tech company outside Silicon Valley, plus all the charity work." },
       { speaker: "Edwin", portrait: "edwinPortrait", text: "Well Caleb is an evil mastermind bent on revenge against the world and most of those charitable organisations are fronts for that… sooo yeah." },
       { speaker: "Leon", portrait: "leonPortrait", text: "Going to need a bit more than that, won't lie." },
-      { type: "fullScreenScene", scene: "chapter2SigilScene", speaker: "Edwin", text: "You saw what I can do, what we can all do. A weird evolutionary quirk, magic or something else—we have no idea. We call them sigils. They grant the wielder power over something. Mine’s ice. Yours looks like it might be plants or earth maybe? Heath, you met, he’s water, Izzy wind. Caleb’s is light." },
-      { type: "fullScreenScene", scene: "chapter2CalebExperimentScene", speaker: "Edwin", text: "I don’t know why but Caleb feels we are superior to other humans and wants to exterminate those without powers. All the children’s homes he’s set up… they are exclusively to test children for sigils, awaken them through torture and brainwash them into his own army." },
+      { type: "fullScreenScene", scene: "chapter2SigilScene", speaker: "Edwin", text: "You saw what I can do—and what we can all do. We call them sigils." },
+      { type: "fullScreenScene", scene: "chapter2SigilScene", speaker: "Edwin", text: "Each sigil grants power over something. Mine is ice. Yours looks like plants or earth." },
+      { type: "fullScreenScene", scene: "chapter2SigilScene", speaker: "Edwin", text: "Heath controls water. Izzy controls wind. Caleb controls light." },
+      { type: "fullScreenScene", scene: "chapter2CalebExperimentScene", speaker: "Edwin", text: "Caleb thinks sigil users are superior and wants everyone else gone." },
+      { type: "fullScreenScene", scene: "chapter2CalebExperimentScene", speaker: "Edwin", text: "Those children’s homes are fronts—he tests children, awakens sigils through torture, then brainwashes them into his army." },
       { speaker: "Leon", portrait: "leonPortrait", text: "And he’s looking to murder your entire family becauuuuuse?" },
       { type: "fullScreenScene", scene: "chapter2EdwinGuildliteScene", speaker: "Edwin", text: "I used to work for him." },
       { type: "fullScreenScene", scene: "chapter2LeonShockedScene", speaker: "Leon", text: "You’d work for someone… like that?" },
@@ -695,13 +699,13 @@ const UNITS = [
 ];
 
 const CHAPTER_TWO_MAP = [
-  ["field", "field", "field", "field", "field", "field", "field", "field"],
-  ["field", "cover", "field", "field", "field", "field", "field", "field"],
   ["field", "field", "field", "field", "fence", "fort", "fort", "field"],
-  ["field", "cover", "field", "field", "fence", "fort", "fort", "field"],
+  ["field", "field", "field", "field", "fence", "fort", "fort", "field"],
+  ["field", "field", "cover", "field", "fence", "field", "fence", "field"],
+  ["field", "cover", "field", "field", "fence", "field", "fence", "field"],
   ["field", "field", "field", "cover", "field", "field", "field", "field"],
-  ["field", "field", "field", "field", "field", "field", "cover", "field"],
-  ["field", "cover", "field", "field", "field", "field", "field", "field"],
+  ["field", "cover", "field", "field", "field", "field", "cover", "field"],
+  ["field", "field", "cover", "field", "field", "field", "field", "field"],
   ["field", "field", "field", "field", "field", "field", "field", "field"],
 ];
 
@@ -722,6 +726,14 @@ const CHAPTER_TWO_UNITS = ["edwin", "leon"].map((unitId, index) => {
   };
 });
 
+const CHAPTER_TWO_ALLY_OPTIONS = ["izzy", "heath", "grimmy", "kane"];
+const CHAPTER_TWO_ALLY_SELECTION_LINES = {
+  izzy: "*grunt* of course, you know a powerhouse when you see one.",
+  heath: "well I was kinda hoping to take a nap but *cracks neck* I 'spose I can show you how it's done.",
+  grimmy: "Oooh pick me, pick me! If you're the bosses brother you must be super strong.",
+  kane: "Bout time I saw some action. Stand back, or you might get burnt.",
+};
+
 const LEVELS = {
   chapter1: {
     biome: "city",
@@ -734,7 +746,7 @@ const LEVELS = {
     biome: "farm",
     map: CHAPTER_TWO_MAP,
     units: CHAPTER_TWO_UNITS,
-    objective: "Training at Byron Farm.",
+    objective: "Capture all four forts. Fence tiles are impassable.",
   },
 };
 
@@ -952,7 +964,7 @@ function queueChapterAssets(scene, levelData = LEVELS.chapter1) {
   queueImage(scene, "chapter2FuneralSplitScene", "/scenes/chapter2_funeral_split.jpg");
   queueImage(scene, "chapter2SigilScene", "/scenes/chapter2_sigil.jpg");
   queueImage(scene, "chapter2CalebExperimentScene", "/scenes/chapter2_caleb_experiment.jpg");
-  queueImage(scene, "chapter2EdwinGuildliteScene", "/scenes/chapter2_edwin_guildlite.jpg");
+  queueImage(scene, "chapter2EdwinGuildliteScene", "/scenes/chapter2_edwin_guildlites.jpg");
   queueImage(scene, "chapter2LeonShockedScene", "/scenes/chapter2_leon_shocked.jpg");
   queueImage(scene, ICE_OF_AGES_HIT_EFFECT_KEY, ICE_OF_AGES_HIT_EFFECT_PATH);
   queueImage(scene, BROTHERS_BLIGH_CUTIN_KEY, BROTHERS_BLIGH_CUTIN_PATH);
@@ -991,7 +1003,9 @@ class LoadingScene extends Phaser.Scene {
       stroke: "#0b0811",
       strokeThickness: 5,
     }).setOrigin(0.5);
-    const hintText = this.add.text(0, -42, "Preparing Chapter 1: 4 Years Gone", { fontSize: "16px", color: "#d8c4f0" }).setOrigin(0.5);
+    const chapterNumber = this.nextSceneData?.saveData?.currentChapter || this.nextSceneData?.saveData?.chapter || (this.nextSceneData?.playChapterTwoOpening ? 2 : 1);
+    const chapterLabel = chapterNumber >= 2 ? "Preparing Chapter 2: Owed an Explanation" : "Preparing Chapter 1: 4 Years Gone";
+    const hintText = this.add.text(0, -42, chapterLabel, { fontSize: "16px", color: "#d8c4f0" }).setOrigin(0.5);
     panel.container.add([loadingText, hintText]);
     this.add.rectangle(barX + barWidth / 2, barY, barWidth, barHeight, 0x101828, 1).setStrokeStyle(2, 0xb6925f, 0.9);
     this.loadingTrail = this.add.rectangle(barX, barY, 1, barHeight, 0x38bdf8, 0.95).setOrigin(0, 0.5);
@@ -1021,7 +1035,8 @@ class LoadingScene extends Phaser.Scene {
     this.load.on("progress", (value) => this.updateLoadingDisplay(value, barX, barY, barWidth));
     this.load.once("complete", () => this.updateLoadingDisplay(1, barX, barY, barWidth));
     queueImage(this, LOADING_RUNNER_KEY, LOADING_RUNNER_PATH);
-    queueChapterAssets(this, LEVELS.chapter1);
+    const targetLevel = chapterNumber >= 2 ? LEVELS.chapter2 : LEVELS.chapter1;
+    queueChapterAssets(this, targetLevel);
   }
 
   sizeLoadingRunnerSprite(sprite) {
@@ -1254,6 +1269,9 @@ class BattleScene extends Phaser.Scene {
     }));
 
     this.defeatedAllies = [];
+    this.capturedForts = new Set();
+    this.chapterTwoTurns = 0;
+    this.chapterTwoSetupDone = false;
     this.applyLoadedSaveData(this.loadedSaveData);
 
     this.selectedUnitId = null;
@@ -2189,11 +2207,11 @@ class BattleScene extends Phaser.Scene {
     animateChunk();
   }
 
-  getTerrainDefenseBonus(unit) {
+  getTerrainDefenseBonus(unit, weapon = null) {
     if (!unit) return 0;
     const terrain = this.getTerrainAt(unit.x, unit.y);
-    if (terrain === "cover") return 2;
-    if (terrain === "fort") return 3;
+    if (terrain === "cover") return 5;
+    if (terrain === "fort") return 5;
     if (terrain === "gate") return 5;
     return 0;
   }
@@ -2209,8 +2227,8 @@ class BattleScene extends Phaser.Scene {
 
   getDefenseForAttack(defender, weapon) {
     if (!defender || !weapon) return 0;
-    if (weapon.damageType === "magical") return defender.res || 0;
-    return (defender.def || 0) + this.getTerrainDefenseBonus(defender);
+    if (weapon.damageType === "magical") return (defender.res || 0) + ((this.getTerrainAt(defender.x, defender.y) === "fort") ? 5 : 0);
+    return (defender.def || 0) + this.getTerrainDefenseBonus(defender, weapon);
   }
 
   calculateBaseDamage(attacker, defender, weapon) {
@@ -2845,7 +2863,7 @@ class BattleScene extends Phaser.Scene {
     this.uiLayer.add(this.chapterTransitionContainer);
   }
 
-sshowChapterTwoTitleCard(message) {
+  showChapterTwoTitleCard(message) {
     var displayMessage = message;
 
     if (!displayMessage) {
@@ -2920,7 +2938,7 @@ sshowChapterTwoTitleCard(message) {
 
     this.stopBattleMusic();
 
-    this.scene.start("BattleScene", {
+    this.scene.start("LoadingScene", {
       loadFromSave: true,
       saveData: saveData,
       slotNumber: slotNumber,
@@ -3083,20 +3101,20 @@ sshowChapterTwoTitleCard(message) {
     this.impactText = this.add.text(480, 175, "SMASH!", { fontSize: "28px", fontStyle: "bold", color: "#f8fafc", stroke: "#0f172a", strokeThickness: 6 }).setOrigin(0.5);
     this.impactContainer.add([impactShadow, this.impactAttackerSlot, this.impactDefenderSlot, this.impactText]);
 
-    this.openingTextBox = this.add.rectangle(480, 395, 800, 120, 0x1a0d2a, 0.98);
+    this.openingTextBox = this.add.rectangle(480, 395, 840, 150, 0x1a0d2a, 0.98);
     this.openingTextBox.setStrokeStyle(2, 0xb6925f);
-    this.dialogueSpeaker = this.add.text(90, 343, "", { fontSize: "24px", fontStyle: "bold", color: "#f7ecd3" });
-    this.dialogueText = this.add.text(90, 378, "", { fontSize: "20px", color: "#eadff7", wordWrap: { width: 660 }, lineSpacing: 8 });
-    this.openingBackButton = this.add.rectangle(700, 460, 118, 36, 0x1a0d2a);
+    this.dialogueSpeaker = this.add.text(78, 334, "", { fontSize: "24px", fontStyle: "bold", color: "#f7ecd3" });
+    this.dialogueText = this.add.text(78, 368, "", { fontSize: "18px", color: "#eadff7", wordWrap: { width: 790 }, lineSpacing: 6 });
+    this.openingBackButton = this.add.rectangle(700, 468, 118, 36, 0x1a0d2a);
     this.openingBackButton.setStrokeStyle(2, 0xb6925f);
     this.openingBackButton.setInteractive({ useHandCursor: true });
     this.openingBackButton.on("pointerdown", () => this.goOpeningBack());
-    const backText = this.add.text(668, 449, "Back", { fontSize: "16px", fontStyle: "bold", color: "#f7ecd3" });
-    this.openingNextButton = this.add.rectangle(820, 460, 118, 36, 0x1a0d2a);
+    const backText = this.add.text(668, 457, "Back", { fontSize: "16px", fontStyle: "bold", color: "#f7ecd3" });
+    this.openingNextButton = this.add.rectangle(820, 468, 118, 36, 0x1a0d2a);
     this.openingNextButton.setStrokeStyle(2, 0xb6925f);
     this.openingNextButton.setInteractive({ useHandCursor: true });
     this.openingNextButton.on("pointerdown", () => this.advanceOpening());
-    this.openingNextLabel = this.add.text(785, 449, "Next", { fontSize: "16px", fontStyle: "bold", color: "#f7ecd3" });
+    this.openingNextLabel = this.add.text(785, 457, "Next", { fontSize: "16px", fontStyle: "bold", color: "#f7ecd3" });
     this.openingSkipButton = this.add.rectangle(810, 50, 118, 32, 0x1a0d2a);
     this.openingSkipButton.setStrokeStyle(2, 0xb6925f);
     this.openingSkipButton.setInteractive({ useHandCursor: true });
@@ -3213,8 +3231,8 @@ sshowChapterTwoTitleCard(message) {
     if (isFullScreen) {
       const fullSceneKey = line.scene || step.background || "prologueScene";
       if (this.textures.exists(fullSceneKey)) {
-        fitImageToBounds(this, this.openingFullSceneImage, fullSceneKey, GAME_WIDTH, GAME_HEIGHT, true);
         this.openingFullSceneImage.setTexture(fullSceneKey);
+        fitImageToBounds(this, this.openingFullSceneImage, fullSceneKey, GAME_WIDTH - 36, GAME_HEIGHT - 36, false);
       }
     }
 
@@ -3232,13 +3250,13 @@ sshowChapterTwoTitleCard(message) {
 
     if (isImpact) {
       this.dialogueSpeaker.setText("");
-      this.dialogueText.setText(line.text || "");
+      this.setOpeningDialogueText(line.text || "");
       this.dialoguePortrait.setVisible(false);
       this.dialoguePortraitPlaceholder.setVisible(false);
       this.playImpactBeat(line);
     } else {
       this.dialogueSpeaker.setText(line.speaker || "");
-      this.dialogueText.setText(line.text || "");
+      this.setOpeningDialogueText(line.text || "");
       if (!isFullScreen && line.portrait && this.textures.exists(line.portrait)) {
         this.dialoguePortraitPanel.setVisible(true);
         this.dialoguePortraitFrame.setVisible(true);
@@ -4063,6 +4081,9 @@ sshowChapterTwoTitleCard(message) {
     if (this.isEscapeTile(unit.x, unit.y)) {
       actions.unshift({ label: "Escape", handler: () => this.escapeUnit(unit.id) });
     }
+    if ((this.currentChapterNumber || 1) >= 2 && this.getTerrainAt(unit.x, unit.y) === "fort") {
+      actions.unshift({ label: "Capture", handler: () => this.captureFort(unit.id) });
+    }
 
     const menuWidth = 152;
     const menuHeight = 52 + actions.length * 40 + 36;
@@ -4093,6 +4114,123 @@ sshowChapterTwoTitleCard(message) {
     const escapeHint = this.isEscapeTile(unit.x, unit.y) ? " Escape is available." : "";
     const cancelHint = unit.pendingMoveOrigin ? " Space cancels the move." : " Space goes back.";
     this.helpText.setText(message || `${unit.name} is ready. Choose an action.${escapeHint}${cancelHint}`);
+  }
+
+  setOpeningDialogueText(text) {
+    const lineText = text || "";
+    const longLine = lineText.length > 150;
+    this.dialogueText.setFontSize(longLine ? "16px" : "18px");
+    this.dialogueText.setLineSpacing(longLine ? 4 : 6);
+    this.dialogueText.setWordWrapWidth(790, true);
+    this.dialogueText.setText(lineText);
+  }
+
+  getChapterTwoFortTiles() {
+    const forts = [];
+    for (let y = 0; y < this.mapRows; y += 1) {
+      for (let x = 0; x < this.mapCols; x += 1) {
+        if (this.map[y]?.[x] === "fort") forts.push({ x, y });
+      }
+    }
+    return forts;
+  }
+
+  beginChapterTwoSetupIfNeeded() {
+    if ((this.currentChapterNumber || 1) < 2 || this.chapterTwoSetupDone) return;
+    const leon = this.units.find((u) => u.id === "leon" && u.team === "player");
+    if (!leon) return;
+    this.chapterTwoSetupDone = true;
+    this.busy = true;
+    this.helpText.setText("Edwin: Right, you're up against our resident recon man, Shade.");
+    this.time.delayedCall(1200, () => this.helpText.setText("Edwin: Capture all four forts. Easy, right?"));
+    this.time.delayedCall(2400, () => this.helpText.setText("Edwin: Shade's only one guy. I'll let you take one more gang member."));
+    this.time.delayedCall(3200, () => this.showChoiceMenu(leon, {
+      type: "allyPick",
+      title: "Pick 1 Ally",
+      entries: CHAPTER_TWO_ALLY_OPTIONS
+        .map((id) => this.units.find((u) => u.id === id) || UNITS.find((u) => u.id === id))
+        .filter(Boolean),
+      getLabel: (unit) => unit.name,
+      getSummary: (unit) => `${unit.name} • ${unit.className}\nHP ${unit.maxHp} STR ${unit.str} MAG ${unit.mag} DEF ${unit.def} RES ${unit.res} SPD ${unit.spd}`,
+      onChoose: (unit) => this.completeChapterTwoSetup(unit),
+    }));
+  }
+
+  completeChapterTwoSetup(chosenAlly) {
+    if (!chosenAlly) return;
+    const allyId = chosenAlly.id;
+    const allyLine = CHAPTER_TWO_ALLY_SELECTION_LINES[allyId] || "Let's do this.";
+    const alreadyOnMap = this.units.some((u) => u.id === allyId && u.team === "player");
+    if (!alreadyOnMap) {
+      const spawn = { ...chosenAlly, team: "player", x: 3, y: 6, acted: false, hp: chosenAlly.maxHp || chosenAlly.hp };
+      this.units.push(spawn);
+      this.drawUnits();
+    }
+    this.closeSelectionMenu(false);
+    this.helpText.setText(`${chosenAlly.name}: ${allyLine}`);
+    this.time.delayedCall(900, () => {
+      this.spawnShadeWaveIntro();
+      this.busy = false;
+    });
+  }
+
+  spawnShadeWaveIntro() {
+    const forts = this.getChapterTwoFortTiles();
+    if (forts.length === 0) return;
+    const leaderTile = forts[0];
+    this.spawnShadeAt(leaderTile.x, leaderTile.y, 4, "shade_leader");
+    this.helpText.setText("Shade: well I can't be outnumbered now can I?");
+  }
+
+  spawnShadeAt(x, y, level = 2, shadeId = null) {
+    if (!this.isInBounds(x, y) || this.getUnitAt(x, y)) return;
+    const thug = UNITS.find((u) => u.id === "thug1");
+    if (!thug) return;
+    const id = shadeId || `shade_${Date.now()}_${Math.floor(Math.random() * 9999)}`;
+    const scale = level >= 4 ? 1 : 0.75;
+    const unit = {
+      ...thug,
+      id,
+      name: "Shade",
+      title: level >= 4 ? "Recon Man" : "Shade Clone",
+      className: "Assassin",
+      team: "enemy",
+      level,
+      maxHp: Math.max(6, Math.round((thug.maxHp || 8) * scale)),
+      hp: Math.max(6, Math.round((thug.maxHp || 8) * scale)),
+      str: Math.max(2, Math.round((thug.str || 3) * scale)),
+      def: Math.max(1, Math.round((thug.def || 1) * scale)),
+      res: Math.max(0, Math.round((thug.res || 0) * scale)),
+      spd: Math.max(3, Math.round((thug.spd || 4) * scale)),
+      x, y, acted: false,
+    };
+    this.units.push(unit);
+    this.drawUnits();
+  }
+
+  captureFort(unitId) {
+    const unit = this.units.find((u) => u.id === unitId);
+    if (!unit || unit.team !== "player") return;
+    if (this.getTerrainAt(unit.x, unit.y) !== "fort") {
+      this.showActionMenu(unit, "Capture can only be used on a fort tile.");
+      return;
+    }
+    const fortKey = tileKey(unit.x, unit.y);
+    this.capturedForts = this.capturedForts || new Set();
+    this.capturedForts.add(fortKey);
+    unit.acted = true;
+    this.refreshUnitSprite(unit);
+    this.closeActionMenu();
+    const capturedCount = this.capturedForts.size;
+    this.helpText.setText(`${unit.name} captured a fort (${capturedCount}/4).`);
+    if (capturedCount >= 4) {
+      this.helpText.setText("All forts captured! Training objective complete.");
+      this.phaseText.setText("Victory");
+      this.phaseText.setColor("#86efac");
+      this.busy = true;
+      return;
+    }
+    this.checkEndOfPlayerPhase();
   }
 
   chooseActionAttack(unitId) {
@@ -4268,6 +4406,20 @@ sshowChapterTwoTitleCard(message) {
     }).setOrigin(0.5);
 
     container.add([panel.container, title, this.selectionMenuSummaryText, backText]);
+    let allyPreviewPortrait = null;
+    let allyPreviewStats = null;
+    if (config.type === "allyPick") {
+      const previewFrame = this.add.rectangle(menuWidth / 2 + 118, -8, 210, 252, 0x1e1030, 1);
+      previewFrame.setStrokeStyle(2, 0xe4d0a8);
+      allyPreviewPortrait = this.add.image(menuWidth / 2 + 118, -56, "leonPortrait").setDisplaySize(108, 132);
+      allyPreviewStats = this.add.text(menuWidth / 2 + 118, 38, "", {
+        fontSize: "13px",
+        color: "#eadff7",
+        align: "center",
+        lineSpacing: 4,
+      }).setOrigin(0.5, 0);
+      container.add([previewFrame, allyPreviewPortrait, allyPreviewStats]);
+    }
 
     entries.forEach((entry, index) => {
       const rowY = -menuHeight / 2 + 66 + index * rowHeight;
@@ -4288,6 +4440,11 @@ sshowChapterTwoTitleCard(message) {
         this.showTargetHighlightsForUnits(previewTiles, highlight.fill, highlight.stroke);
         if (this.selectionMenuSummaryText) {
           this.selectionMenuSummaryText.setText(config.getSummary ? config.getSummary(entry) : "");
+        }
+        if (config.type === "allyPick" && allyPreviewPortrait && allyPreviewStats) {
+          const portraitKey = entry.portraitKey && this.textures.exists(entry.portraitKey) ? entry.portraitKey : "leonPortrait";
+          allyPreviewPortrait.setTexture(portraitKey).setVisible(true);
+          allyPreviewStats.setText(`Lv 2 ${entry.className}\nHP ${entry.maxHp}  STR ${entry.str}  MAG ${entry.mag}\nDEF ${entry.def}  RES ${entry.res}  SPD ${entry.spd}`);
         }
       });
       button.hit.on("pointerout", () => {
@@ -4310,6 +4467,11 @@ sshowChapterTwoTitleCard(message) {
       this.showTargetHighlightsForUnits(previewTiles, highlight.fill, highlight.stroke);
       if (this.selectionMenuSummaryText) {
         this.selectionMenuSummaryText.setText(config.getSummary ? config.getSummary(firstEntry) : "");
+      }
+      if (config.type === "allyPick" && allyPreviewPortrait && allyPreviewStats) {
+        const portraitKey = firstEntry.portraitKey && this.textures.exists(firstEntry.portraitKey) ? firstEntry.portraitKey : "leonPortrait";
+        allyPreviewPortrait.setTexture(portraitKey).setVisible(true);
+        allyPreviewStats.setText(`Lv 2 ${firstEntry.className}\nHP ${firstEntry.maxHp}  STR ${firstEntry.str}  MAG ${firstEntry.mag}\nDEF ${firstEntry.def}  RES ${firstEntry.res}  SPD ${firstEntry.spd}`);
       }
     }
 
@@ -5579,7 +5741,9 @@ Crit: Luck difference %. Critical hits deal x3 damage.${itemSummary}`
         this.setUnitSpriteFrame(unit, "idle", unit.facing || "down");
       }
     }
-    this.helpText.setText("Player Phase. Reach the glowing gate tile and choose Escape.");
+    this.helpText.setText((this.currentChapterNumber || 1) >= 2
+      ? "Player Phase. Capture all four forts. Fences block movement."
+      : "Player Phase. Reach the glowing gate tile and choose Escape.");
     this.busy = false;
   }
 }
@@ -5598,3 +5762,24 @@ const config = {
 };
 
 new Phaser.Game(config);
+    if ((this.currentChapterNumber || 1) >= 2) {
+      this.chapterTwoTurns = (this.chapterTwoTurns || 0) + 1;
+      if (!this.chapterTwoSetupDone) this.beginChapterTwoSetupIfNeeded();
+      if (this.chapterTwoSetupDone && this.chapterTwoTurns % 2 === 0) {
+        const captured = this.capturedForts || new Set();
+        const forts = this.getChapterTwoFortTiles().filter((tile) => !captured.has(tileKey(tile.x, tile.y)));
+        if (forts.length > 0) {
+          const fort = Phaser.Utils.Array.GetRandom(forts);
+          const spawnCandidates = [
+            { x: fort.x, y: fort.y + 1 },
+            { x: fort.x - 1, y: fort.y },
+            { x: fort.x + 1, y: fort.y },
+          ].filter((tile) => this.isInBounds(tile.x, tile.y) && this.isWalkable(tile.x, tile.y) && !this.getUnitAt(tile.x, tile.y));
+          if (spawnCandidates.length > 0) {
+            const spawnTile = Phaser.Utils.Array.GetRandom(spawnCandidates);
+            this.spawnShadeAt(spawnTile.x, spawnTile.y, 2);
+            this.helpText.setText("A Shade clone appears near an uncaptured fort!");
+          }
+        }
+      }
+    }
