@@ -4141,7 +4141,7 @@ class BattleScene extends Phaser.Scene {
     if (!leon) return;
     this.chapterTwoSetupDone = true;
     this.busy = true;
-    this.helpText.setText("Edwin: Right you're up against our resident recon man Shade. Just capture all four forts. Easy right, Shade's only one guy, I'll even let you take another member of the gang with you!");
+    this.helpText.setText("Choose one ally for this training map.");
     this.showChoiceMenu(leon, {
       type: "allyPick",
       title: "Pick 1 Ally",
@@ -4165,10 +4165,40 @@ class BattleScene extends Phaser.Scene {
       this.drawUnits();
     }
     this.closeSelectionMenu(false);
-    this.helpText.setText(`${chosenAlly.name}: ${allyLine}`);
-    this.time.delayedCall(900, () => {
+    this.presentChapterTwoBattleBriefing(chosenAlly, allyLine);
+  }
+
+  presentChapterTwoBattleBriefing(chosenAlly, allyLine) {
+    const leon = this.units.find((u) => u.id === "leon" && u.team === "player");
+    const anchorUnit = leon || chosenAlly;
+    if (!anchorUnit) {
       this.spawnShadeWaveIntro();
       this.busy = false;
+      return;
+    }
+
+    const edwinLine = "Right, you're up against our recon man Shade. Capture all four forts. Easy, right? I'll let you bring one more ally.";
+    this.showChoiceMenu(anchorUnit, {
+      type: "briefing",
+      title: "Edwin",
+      entries: [{ id: "continue" }],
+      getLabel: () => "Continue",
+      getSummary: () => edwinLine,
+      onChoose: () => {
+        this.closeSelectionMenu(false);
+        this.showChoiceMenu(anchorUnit, {
+          type: "briefing",
+          title: chosenAlly.name,
+          entries: [{ id: "ready" }],
+          getLabel: () => "Ready",
+          getSummary: () => allyLine,
+          onChoose: () => {
+            this.closeSelectionMenu(false);
+            this.spawnShadeWaveIntro();
+            this.busy = false;
+          },
+        });
+      },
     });
   }
 
