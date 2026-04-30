@@ -61,6 +61,7 @@ import {
   POST_BATTLE_SCENE,
 } from "../../chapters/chapter1.js";
 import {
+  CHAPTER_TWO_ALLY_UNITS,
   CHAPTER_TWO_ALLY_OPTIONS,
   CHAPTER_TWO_ALLY_SELECTION_LINES,
   CHAPTER_TWO_OPENING,
@@ -94,22 +95,98 @@ export const chapterSetupMethods = {
     return forts;
   },
 
+  showChapterTwoSetupDialogue({ speaker, portrait, text, onContinue }) {
+    if (this.chapterSetupDialogueContainer) this.chapterSetupDialogueContainer.destroy(true);
+
+    const container = this.add.container(0, 0).setDepth(10000);
+    const blocker = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.18)
+      .setOrigin(0)
+      .setInteractive();
+    const panel = createBannerPanel(this, GAME_WIDTH / 2, GAME_HEIGHT - 96, 820, 156, { innerInset: 14 });
+    const portraitFrame = this.add.rectangle(120, GAME_HEIGHT - 100, 100, 112, 0x24123a, 1);
+    portraitFrame.setStrokeStyle(2, 0xe4d0a8);
+
+    const portraitImage = this.add.image(120, GAME_HEIGHT - 100, portrait || "edwinPortrait").setDisplaySize(82, 98);
+    portraitImage.setVisible(!!portrait && this.textures.exists(portrait));
+    const portraitFallback = this.add.text(120, GAME_HEIGHT - 100, speaker || "", {
+      fontSize: "14px",
+      color: "#f7ecd3",
+      align: "center",
+      wordWrap: { width: 82 },
+    }).setOrigin(0.5).setVisible(!portraitImage.visible);
+
+    const speakerText = this.add.text(184, GAME_HEIGHT - 154, speaker || "", {
+      fontSize: "20px",
+      fontStyle: "bold",
+      color: "#f7ecd3",
+      stroke: "#0b0811",
+      strokeThickness: 3,
+    });
+    const bodyText = this.add.text(184, GAME_HEIGHT - 124, text || "", {
+      fontSize: text?.length > 135 ? "15px" : "17px",
+      color: "#eadff7",
+      lineSpacing: 4,
+      wordWrap: { width: 600 },
+    });
+    const continueButton = createBannerButton(this, GAME_WIDTH - 168, GAME_HEIGHT - 58, 132, 32, "Continue", () => {
+      this.closeChapterTwoSetupDialogue();
+      if (typeof onContinue === "function") onContinue();
+    }, "14px");
+
+    blocker.on("pointerdown", () => {
+      this.closeChapterTwoSetupDialogue();
+      if (typeof onContinue === "function") onContinue();
+    });
+
+    container.add([
+      blocker,
+      panel.container,
+      portraitFrame,
+      portraitImage,
+      portraitFallback,
+      speakerText,
+      bodyText,
+      continueButton.container,
+    ]);
+    this.chapterSetupDialogueContainer = container;
+    this.uiLayer.add(container);
+  },
+
+  closeChapterTwoSetupDialogue() {
+    if (!this.chapterSetupDialogueContainer) return;
+    this.chapterSetupDialogueContainer.destroy(true);
+    this.chapterSetupDialogueContainer = null;
+  },
+
   beginChapterTwoSetupIfNeeded() {
     if (!isChapterTwoOrLater(this.currentChapterNumber) || this.chapterTwoSetupDone) return;
     const leon = this.units.find((u) => u.id === "leon" && u.team === "player");
     if (!leon) return;
     this.chapterTwoSetupDone = true;
     this.busy = true;
-    this.helpText.setText("Edwin: Right you're up against our resident recon man Shade. Just capture all four forts. Easy right, Shade's only one guy, I'll even let you take another member of the gang with you!");
-    this.showChoiceMenu(leon, {
-      type: "allyPick",
-      title: "Pick 1 Ally",
-      entries: CHAPTER_TWO_ALLY_OPTIONS
-        .map((id) => this.units.find((u) => u.id === id) || UNITS.find((u) => u.id === id))
-        .filter(Boolean),
-      getLabel: (unit) => unit.name,
-      getSummary: (unit) => `${unit.name} • ${unit.className}\nHP ${unit.maxHp} STR ${unit.str} MAG ${unit.mag} DEF ${unit.def} RES ${unit.res} SPD ${unit.spd}`,
-      onChoose: (unit) => this.completeChapterTwoSetup(unit),
+    this.helpText.setText("Choose one gang member to support Leon.");
+    this.showChapterTwoSetupDialogue({
+      speaker: "Edwin",
+      portrait: "edwinPortrait",
+      text: "Today you'll be up against our resident spec ops, Shade. One guy, so much easier than the underpass. In fact I'll even let you have one of the gang to help out",
+      onContinue: () => {
+        this.showChoiceMenu(leon, {
+          type: "allyPick",
+          title: "Pick 1 Ally",
+          entries: CHAPTER_TWO_ALLY_OPTIONS
+            .map((id) => CHAPTER_TWO_ALLY_UNITS.find((u) => u.id === id))
+            .filter(Boolean),
+          getLabel: (unit) => unit.name,
+          getSummary: (unit) => {
+            const weapon = unit.weapons?.[0];
+            const minRange = weapon?.minRange ?? weapon?.range ?? "-";
+            const maxRange = weapon?.maxRange ?? weapon?.range ?? "-";
+            const range = minRange === maxRange ? minRange : `${minRange}-${maxRange}`;
+            return `${unit.title} | ${weapon?.name || "Unarmed"} | Rng ${range}`;
+          },
+          onChoose: (unit) => this.completeChapterTwoSetup(unit),
+        });
+      },
     });
   },
 
@@ -119,15 +196,32 @@ export const chapterSetupMethods = {
     const allyLine = CHAPTER_TWO_ALLY_SELECTION_LINES[allyId] || "Let's do this.";
     const alreadyOnMap = this.units.some((u) => u.id === allyId && u.team === "player");
     if (!alreadyOnMap) {
-      const spawn = { ...chosenAlly, team: "player", x: 3, y: 6, acted: false, hp: chosenAlly.maxHp || chosenAlly.hp };
+      const spawn = {
+        ...chosenAlly,
+        team: "player",
+        x: 3,
+        y: 6,
+        facing: chosenAlly.facing || "up",
+        acted: false,
+        hp: chosenAlly.maxHp || chosenAlly.hp,
+        sigilPoints: chosenAlly.maxSigilPoints ?? chosenAlly.sigilPoints ?? 3,
+        weapons: (chosenAlly.weapons || []).map((weapon) => ({ ...weapon })),
+        skills: (chosenAlly.skills || []).map((skill) => ({ ...skill })),
+        items: (chosenAlly.items || []).map((item) => ({ ...item })),
+        spriteState: "idle",
+      };
       this.units.push(spawn);
       this.drawUnits();
     }
     this.closeSelectionMenu(false);
-    this.helpText.setText(`${chosenAlly.name}: ${allyLine}`);
-    this.time.delayedCall(900, () => {
-      this.spawnShadeWaveIntro();
-      this.busy = false;
+    this.showChapterTwoSetupDialogue({
+      speaker: chosenAlly.name,
+      portrait: chosenAlly.portraitKey,
+      text: allyLine,
+      onContinue: () => {
+        this.spawnShadeWaveIntro();
+        this.busy = false;
+      },
     });
   },
 

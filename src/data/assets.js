@@ -293,6 +293,8 @@ export function queueChapterAssets(scene, levelData = LEVELS.chapter1) {
   queueImage(scene, "thugPortrait", "/portraits/thug.jpg");
   queueImage(scene, "heathPortrait", "/portraits/heath.jpg");
   queueImage(scene, "izzyPortrait", "/portraits/izzy.jpg");
+  queueImage(scene, "grimmyPortrait", "/portraits/grimmy.jpg");
+  queueImage(scene, "kanePortrait", "/portraits/kane.jpg");
   queueImage(scene, "prologueScene", "/scenes/prologue.jpg");
   queueImage(scene, "leonsHouseScene", "/scenes/leons_house.jpg");
   queueImage(scene, "walkToSchoolScene", "/scenes/walk_to_school.jpg");

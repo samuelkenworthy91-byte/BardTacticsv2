@@ -446,5 +446,26 @@ export const enemyAiMethods = {
       ? "Player Phase. Capture all four forts. Fences block movement."
       : "Player Phase. Reach the glowing gate tile and choose Escape.");
     this.busy = false;
+    if (isChapterTwoOrLater(this.currentChapterNumber)) {
+      this.chapterTwoTurns = (this.chapterTwoTurns || 0) + 1;
+      if (!this.chapterTwoSetupDone) this.beginChapterTwoSetupIfNeeded();
+      if (this.chapterTwoSetupDone && this.chapterTwoTurns % 2 === 0) {
+        const captured = this.capturedForts || new Set();
+        const forts = this.getChapterTwoFortTiles().filter((tile) => !captured.has(tileKey(tile.x, tile.y)));
+        if (forts.length > 0) {
+          const fort = Phaser.Utils.Array.GetRandom(forts);
+          const spawnCandidates = [
+            { x: fort.x, y: fort.y + 1 },
+            { x: fort.x - 1, y: fort.y },
+            { x: fort.x + 1, y: fort.y },
+          ].filter((tile) => this.isInBounds(tile.x, tile.y) && this.isWalkable(tile.x, tile.y) && !this.getUnitAt(tile.x, tile.y));
+          if (spawnCandidates.length > 0) {
+            const spawnTile = Phaser.Utils.Array.GetRandom(spawnCandidates);
+            this.spawnShadeAt(spawnTile.x, spawnTile.y, 2);
+            this.helpText.setText("A Shade clone appears near an uncaptured fort!");
+          }
+        }
+      }
+    }
   }
 };

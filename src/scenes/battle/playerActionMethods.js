@@ -212,16 +212,21 @@ export const playerActionMethods = {
 
     const centerX = this.boardX + unit.x * TILE_SIZE + TILE_SIZE / 2;
     const centerY = this.boardY + unit.y * TILE_SIZE + TILE_SIZE / 2;
+    const isAllyPick = config.type === "allyPick";
     const rowHeight = config.layout === "leftPanel" ? 38 : 42;
-    const menuWidth = config.layout === "leftPanel" ? 184 : 310;
+    const menuWidth = isAllyPick ? 250 : (config.layout === "leftPanel" ? 184 : 310);
     const menuHeight = config.layout === "leftPanel"
       ? Phaser.Math.Clamp(142 + entries.length * rowHeight, 214, 330)
       : Phaser.Math.Clamp(132 + entries.length * rowHeight, 210, 430);
     const maxRightBeforeSidePanel = 708;
-    const x = config.layout === "leftPanel"
+    const x = isAllyPick
+      ? GAME_WIDTH / 2 + 142
+      : config.layout === "leftPanel"
       ? 92
       : Phaser.Math.Clamp(centerX + TILE_SIZE * 1.1, menuWidth / 2 + 8, maxRightBeforeSidePanel - menuWidth / 2);
-    const y = config.layout === "leftPanel"
+    const y = isAllyPick
+      ? GAME_HEIGHT / 2
+      : config.layout === "leftPanel"
       ? Phaser.Math.Clamp(190 + menuHeight / 2, menuHeight / 2 + 8, GAME_HEIGHT - menuHeight / 2 - 8)
       : Phaser.Math.Clamp(centerY, menuHeight / 2 + 8, GAME_HEIGHT - menuHeight / 2 - 8);
     const container = this.add.container(x, y).setDepth(9999);
@@ -247,17 +252,32 @@ export const playerActionMethods = {
     }).setOrigin(0.5);
 
     container.add([panel.container, title, this.selectionMenuSummaryText, backText]);
+    const getAllyPreviewText = (entry) => {
+      const weapon = entry.weapons?.[0];
+      const minRange = weapon?.minRange ?? weapon?.range ?? "-";
+      const maxRange = weapon?.maxRange ?? weapon?.range ?? "-";
+      const range = minRange === maxRange ? minRange : `${minRange}-${maxRange}`;
+      return [
+        `Lv ${entry.level ?? 1} ${entry.className}`,
+        weapon ? `${weapon.name}  Rng ${range}` : "Unarmed",
+        `HP ${entry.maxHp}  SP ${entry.maxSigilPoints ?? entry.sigilPoints ?? 0}`,
+        `STR ${entry.str}  MAG ${entry.mag}`,
+        `DEF ${entry.def}  RES ${entry.res}`,
+        `SPD ${entry.spd}`,
+      ].join("\n");
+    };
     let allyPreviewPortrait = null;
     let allyPreviewStats = null;
-    if (config.type === "allyPick") {
-      const previewFrame = this.add.rectangle(menuWidth / 2 + 118, -8, 210, 252, 0x1e1030, 1);
+    if (isAllyPick) {
+      const previewX = -menuWidth / 2 - 126;
+      const previewFrame = this.add.rectangle(previewX, -4, 230, 292, 0x1e1030, 1);
       previewFrame.setStrokeStyle(2, 0xe4d0a8);
-      allyPreviewPortrait = this.add.image(menuWidth / 2 + 118, -56, "leonPortrait").setDisplaySize(108, 132);
-      allyPreviewStats = this.add.text(menuWidth / 2 + 118, 38, "", {
-        fontSize: "13px",
+      allyPreviewPortrait = this.add.image(previewX, -78, "leonPortrait").setDisplaySize(106, 126);
+      allyPreviewStats = this.add.text(previewX, 0, "", {
+        fontSize: "12px",
         color: "#eadff7",
         align: "center",
-        lineSpacing: 4,
+        lineSpacing: 3,
       }).setOrigin(0.5, 0);
       container.add([previewFrame, allyPreviewPortrait, allyPreviewStats]);
     }
@@ -282,10 +302,10 @@ export const playerActionMethods = {
         if (this.selectionMenuSummaryText) {
           this.selectionMenuSummaryText.setText(config.getSummary ? config.getSummary(entry) : "");
         }
-        if (config.type === "allyPick" && allyPreviewPortrait && allyPreviewStats) {
+        if (isAllyPick && allyPreviewPortrait && allyPreviewStats) {
           const portraitKey = entry.portraitKey && this.textures.exists(entry.portraitKey) ? entry.portraitKey : "leonPortrait";
           allyPreviewPortrait.setTexture(portraitKey).setVisible(true);
-          allyPreviewStats.setText(`Lv 2 ${entry.className}\nHP ${entry.maxHp}  STR ${entry.str}  MAG ${entry.mag}\nDEF ${entry.def}  RES ${entry.res}  SPD ${entry.spd}`);
+          allyPreviewStats.setText(getAllyPreviewText(entry));
         }
       });
       button.hit.on("pointerout", () => {
@@ -309,10 +329,10 @@ export const playerActionMethods = {
       if (this.selectionMenuSummaryText) {
         this.selectionMenuSummaryText.setText(config.getSummary ? config.getSummary(firstEntry) : "");
       }
-      if (config.type === "allyPick" && allyPreviewPortrait && allyPreviewStats) {
+      if (isAllyPick && allyPreviewPortrait && allyPreviewStats) {
         const portraitKey = firstEntry.portraitKey && this.textures.exists(firstEntry.portraitKey) ? firstEntry.portraitKey : "leonPortrait";
         allyPreviewPortrait.setTexture(portraitKey).setVisible(true);
-        allyPreviewStats.setText(`Lv 2 ${firstEntry.className}\nHP ${firstEntry.maxHp}  STR ${firstEntry.str}  MAG ${firstEntry.mag}\nDEF ${firstEntry.def}  RES ${firstEntry.res}  SPD ${firstEntry.spd}`);
+        allyPreviewStats.setText(getAllyPreviewText(firstEntry));
       }
     }
 
