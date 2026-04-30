@@ -1155,8 +1155,8 @@ export const playerActionMethods = {
     const unit = this.units.find((u) => u.id === this.selectedUnitId);
     if (!unit) {
       this.portraitImage.setVisible(false);
-      this.portraitPlaceholder.setVisible(true);
-      this.unitNameText.setText("None");
+      this.portraitPlaceholder.setText("No unit").setVisible(true);
+      this.unitNameText.setText("No unit");
       this.unitClassText.setText("");
       this.hpBarText.setText("");
       this.hpBarFill.displayWidth = 0;
@@ -1165,7 +1165,7 @@ export const playerActionMethods = {
       this.sigilText.setText("Sigil");
       this.sigilOrbs.forEach((orb) => orb.setFillStyle(0x2e1065, 0.35));
       this.unitStatsText.setText("");
-      this.weaponText.setText("Select Edwin or Leon. Luck now affects crit chance and level-up point rolls.");
+      this.weaponText.setText("");
       return;
     }
     if (unit.portraitKey && this.textures.exists(unit.portraitKey)) {
@@ -1173,6 +1173,7 @@ export const playerActionMethods = {
       this.portraitPlaceholder.setVisible(false);
     } else {
       this.portraitImage.setVisible(false);
+      this.portraitPlaceholder.setText("NO ART");
       this.portraitPlaceholder.setVisible(true);
     }
     const level = unit.level || 1;
@@ -1200,7 +1201,7 @@ export const playerActionMethods = {
       orb.setFillStyle(active ? 0x8b5cf6 : 0x2e1065, active ? 1 : 0.35);
       orb.setStrokeStyle(2, active ? 0xddd6fe : 0x6d28d9);
     });
-    this.unitStatsText.setText(`HP ${unit.hp}/${unit.maxHp}\nSTR ${unit.str}\nMAG ${unit.mag}\n${defLine}\nRES ${unit.res}\n${spdLine}\nLUCK ${unit.luck || 0}\nMOV ${unit.move}`);
+    this.unitStatsText.setText(`STR ${unit.str}   MAG ${unit.mag}\n${defLine}\nRES ${unit.res}\n${spdLine}\nLUCK ${unit.luck || 0}   MOV ${unit.move}`);
     const itemSummary = (unit.items || []).length > 0
       ? `
 Items: ${(unit.items || []).map((item) => `${item.name}${item.uses ? ` x${item.uses}` : ""}`).join(", ")}`
@@ -1208,8 +1209,9 @@ Items: ${(unit.items || []).map((item) => `${item.name}${item.uses ? ` x${item.u
 
     this.weaponText.setText(
       weapon
-        ? `Weapon: ${weapon.name} | Base ${weapon.baseDamage ?? weapon.damage ?? 0} | ${weapon.damageType || "physical"} | Hit ${weapon.hitRate ?? 100}% | Range ${getWeaponRangeLabel(weapon)}
-Crit: Luck difference %. Critical hits deal x3 damage.${itemSummary}`
+        ? `Weapon: ${weapon.name}
+Base ${weapon.baseDamage ?? weapon.damage ?? 0} | ${weapon.damageType || "physical"} | Hit ${weapon.hitRate ?? 100}%
+Range ${getWeaponRangeLabel(weapon)} | Crit: Luck diff x3${itemSummary}`
         : `Weapon: None${itemSummary}`
     );
   }

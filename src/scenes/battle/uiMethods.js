@@ -76,16 +76,16 @@ import {
 } from "../../chapters/progression.js";
 export const uiMethods = {
   createTopUI() {
-    const panel = createBannerPanel(this, 88, 92, 170, 170, { innerInset: 14 });
+    const panel = createBannerPanel(this, 88, 64, 170, 112, { innerInset: 14 });
     this.topInfoPanel = panel.container;
-    this.objectiveHeader = this.add.text(-68, -68, "Objective", {
+    this.objectiveHeader = this.add.text(-68, -42, "Objective", {
       fontSize: "13px",
       fontStyle: "bold",
       color: "#e8c98b",
       stroke: "#0b0811",
       strokeThickness: 2,
     });
-    this.objectiveText = this.add.text(-68, -48, this.levelData?.objective || "Escape through the glowing gate tile.", {
+    this.objectiveText = this.add.text(-68, -20, this.levelData?.objective || "Escape through the glowing gate tile.", {
       fontSize: "11px",
       color: "#f7ecd3",
       wordWrap: { width: 136 },
@@ -104,6 +104,8 @@ export const uiMethods = {
       wordWrap: { width: 136 },
       lineSpacing: 2,
     });
+    this.phaseText.setVisible(false);
+    this.helpText.setVisible(false);
     panel.container.add([this.objectiveHeader, this.objectiveText, this.phaseText, this.helpText]);
     this.uiLayer.add(panel.container);
   },
@@ -124,35 +126,33 @@ export const uiMethods = {
     this.sidePanelBarWidth = barWidth;
     const bg = this.add.rectangle(x + panelWidth / 2, y + panelHeight / 2, panelWidth, panelHeight, 0x111827, 0.92);
     bg.setStrokeStyle(2, 0x334155);
-    const title = this.add.text(innerX, y + 12, "Selected Unit", { fontSize: "18px", fontStyle: "bold", color: "#f7ecd3" });
-    this.portraitFrame = this.add.rectangle(innerX + 44, y + 76, 88, 104, 0x1f2937);
+    this.portraitFrame = this.add.rectangle(innerX + 44, y + 70, 88, 104, 0x1f2937);
     this.portraitFrame.setStrokeStyle(2, 0x475569);
-    this.portraitImage = this.add.image(innerX + 44, y + 76, "edwinPortrait").setVisible(false);
+    this.portraitImage = this.add.image(innerX + 44, y + 70, "edwinPortrait").setVisible(false);
     this.portraitImage.setDisplaySize(88, 104);
-    this.portraitPlaceholder = this.add.text(innerX + 44, y + 76, "NO ART", { fontSize: "18px", color: "#94a3b8", align: "center" }).setOrigin(0.5);
-    this.unitNameText = this.add.text(innerX, y + 136, "None", { fontSize: "21px", fontStyle: "bold", color: "#f7ecd3" });
-    this.unitClassText = this.add.text(innerX, y + 166, "", { fontSize: "12px", color: "#94a3b8", wordWrap: { width: 202 } });
-    this.hpBarText = this.add.text(innerX, y + 198, "", { fontSize: "12px", color: "#fecaca" });
-    this.hpBarBg = this.add.rectangle(innerX, y + 218, barWidth, 9, 0x1f2937).setOrigin(0, 0.5);
+    this.portraitPlaceholder = this.add.text(innerX + 44, y + 70, "", { fontSize: "13px", color: "#94a3b8", align: "center", wordWrap: { width: 74 } }).setOrigin(0.5);
+    this.unitNameText = this.add.text(innerX + 100, y + 22, "No unit", { fontSize: "20px", fontStyle: "bold", color: "#f7ecd3", wordWrap: { width: 102 } });
+    this.unitClassText = this.add.text(innerX + 100, y + 52, "", { fontSize: "11px", color: "#94a3b8", wordWrap: { width: 102 }, lineSpacing: 1 });
+    this.hpBarText = this.add.text(innerX, y + 132, "", { fontSize: "12px", color: "#fecaca" });
+    this.hpBarBg = this.add.rectangle(innerX, y + 150, barWidth, 9, 0x1f2937).setOrigin(0, 0.5);
     this.hpBarBg.setStrokeStyle(1, 0x475569);
-    this.hpBarFill = this.add.rectangle(innerX, y + 218, barWidth, 9, 0xef4444).setOrigin(0, 0.5);
+    this.hpBarFill = this.add.rectangle(innerX, y + 150, barWidth, 9, 0xef4444).setOrigin(0, 0.5);
     this.hpBarFill.displayWidth = 0;
-    this.levelXpText = this.add.text(innerX, y + 230, "", { fontSize: "12px", color: "#d8c4f0" });
-    this.xpBarBg = this.add.rectangle(innerX, y + 250, barWidth, 9, 0x1f2937).setOrigin(0, 0.5);
+    this.levelXpText = this.add.text(innerX, y + 162, "", { fontSize: "12px", color: "#d8c4f0" });
+    this.xpBarBg = this.add.rectangle(innerX, y + 180, barWidth, 9, 0x1f2937).setOrigin(0, 0.5);
     this.xpBarBg.setStrokeStyle(1, 0x475569);
-    this.xpBarFill = this.add.rectangle(innerX, y + 250, barWidth, 9, 0x8b5cf6).setOrigin(0, 0.5);
+    this.xpBarFill = this.add.rectangle(innerX, y + 180, barWidth, 9, 0x8b5cf6).setOrigin(0, 0.5);
     this.xpBarFill.displayWidth = 0;
-    this.sigilText = this.add.text(innerX, y + 264, "Sigil", { fontSize: "11px", color: "#ddd6fe" });
+    this.sigilText = this.add.text(innerX, y + 194, "Sigil", { fontSize: "11px", color: "#ddd6fe" });
     this.sigilOrbs = [0, 1, 2].map((index) => {
-      const orb = this.add.circle(innerX + 54 + index * 20, y + 270, 6, 0x2e1065, 1);
+      const orb = this.add.circle(innerX + 54 + index * 20, y + 200, 6, 0x2e1065, 1);
       orb.setStrokeStyle(2, 0xc4b5fd);
       return orb;
     });
-    this.unitStatsText = this.add.text(innerX, y + 284, "", { fontSize: "10px", color: "#e2e8f0", lineSpacing: 0 });
-    this.weaponText = this.add.text(innerX, y + 408, "", { fontSize: "10px", color: "#c4b5fd", wordWrap: { width: 202 }, lineSpacing: 1 });
+    this.unitStatsText = this.add.text(innerX, y + 218, "", { fontSize: "11px", color: "#e2e8f0", lineSpacing: 2, wordWrap: { width: 202 } });
+    this.weaponText = this.add.text(innerX, y + 358, "", { fontSize: "10px", color: "#c4b5fd", wordWrap: { width: 202 }, lineSpacing: 2 });
     this.sidePanelParts = [
       bg,
-      title,
       this.portraitFrame,
       this.portraitImage,
       this.portraitPlaceholder,
@@ -262,11 +262,6 @@ export const uiMethods = {
     this.standardBattleAttackerHp = this.createBattleHpBar(228, 410, "#93c5fd");
     this.standardBattleDefenderHp = this.createBattleHpBar(732, 410, "#fca5a5");
 
-    const hint = this.add.text(GAME_WIDTH / 2, 476, "Skills stay on the battle map. Standard attacks zoom in here.", {
-      fontSize: "12px",
-      color: "#cbd5e1",
-    }).setOrigin(0.5);
-
     this.standardBattleContainer.add([
       dim,
       panel.container,
@@ -285,7 +280,6 @@ export const uiMethods = {
       this.standardBattleMessageText,
       this.standardBattleAttackerHp.container,
       this.standardBattleDefenderHp.container,
-      hint,
     ]);
 
     this.uiLayer.add(this.standardBattleContainer);
