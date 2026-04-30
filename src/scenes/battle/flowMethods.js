@@ -121,7 +121,11 @@ export const flowMethods = {
       .filter(Boolean);
   },
 
-  serializeUnitForSave(unit) {
+  serializeUnitForSave(unit, options = {}) {
+    const restoreForChapterStart = options.restoreForChapterStart === true;
+    const maxHp = unit.maxHp || 1;
+    const maxSigilPoints = unit.maxSigilPoints ?? 3;
+
     return {
       id: unit.id,
       name: unit.name,
@@ -130,8 +134,8 @@ export const flowMethods = {
       className: unit.className,
       level: unit.level || 1,
       xp: unit.xp || 0,
-      hp: Math.max(0, unit.hp || 0),
-      maxHp: unit.maxHp || 1,
+      hp: restoreForChapterStart ? maxHp : Math.max(0, unit.hp || 0),
+      maxHp,
       str: unit.str || 0,
       mag: unit.mag || 0,
       def: unit.def || 0,
@@ -142,10 +146,10 @@ export const flowMethods = {
       x: unit.x,
       y: unit.y,
       facing: unit.facing || "down",
-      sigilPoints: unit.sigilPoints ?? 0,
-      maxSigilPoints: unit.maxSigilPoints ?? 3,
+      sigilPoints: restoreForChapterStart ? maxSigilPoints : (unit.sigilPoints ?? 0),
+      maxSigilPoints,
       items: (unit.items || []).map((item) => ({ ...item })),
-      alive: unit.hp > 0,
+      alive: restoreForChapterStart ? true : unit.hp > 0,
     };
   },
 
@@ -153,7 +157,9 @@ export const flowMethods = {
     return buildChapterTwoSaveData({
       slotNumber,
       defeatedAllies: this.defeatedAllies || [],
-      units: this.units.filter((unit) => unit.team === "player").map((unit) => this.serializeUnitForSave(unit)),
+      units: this.units
+        .filter((unit) => unit.team === "player")
+        .map((unit) => this.serializeUnitForSave(unit, { restoreForChapterStart: true })),
     });
   },
 
