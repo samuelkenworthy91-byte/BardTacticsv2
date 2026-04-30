@@ -664,7 +664,7 @@ export const narrativeMethods = {
 
     this.openingFullSceneImage = this.add.image(
       GAME_WIDTH / 2,
-      GAME_HEIGHT / 2,
+      166,
       "prologueScene"
     );
 
@@ -674,9 +674,9 @@ export const narrativeMethods = {
       this,
       this.openingFullSceneImage,
       "prologueScene",
-      GAME_WIDTH,
-      GAME_HEIGHT,
-      true
+      GAME_WIDTH - 36,
+      296,
+      false
     );
 
     this.titleCard = this.add.container(0, 0);
@@ -934,8 +934,9 @@ export const narrativeMethods = {
     if (isFullScreen) {
       const fullSceneKey = line.scene || step.background || "prologueScene";
       if (this.textures.exists(fullSceneKey)) {
-        fitImageToBounds(this, this.openingFullSceneImage, fullSceneKey, GAME_WIDTH - 36, GAME_HEIGHT - 36, false);
         this.openingFullSceneImage.setTexture(fullSceneKey);
+        this.openingFullSceneImage.setPosition(GAME_WIDTH / 2, 166);
+        fitImageToBounds(this, this.openingFullSceneImage, fullSceneKey, GAME_WIDTH - 36, 296, false);
       }
     }
 
