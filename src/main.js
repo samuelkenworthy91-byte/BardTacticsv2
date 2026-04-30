@@ -14,6 +14,15 @@ import {
   CHAPTER_TWO_TITLE,
 } from "./chapters/chapter2.js";
 import { LEVELS } from "./chapters/index.js";
+import {
+  buildChapterTwoSaveData,
+  CHAPTER_TWO_NUMBER,
+  getLevelForChapter,
+  getSaveDataChapterNumber,
+  getSceneDataChapterNumber,
+  isChapterOne,
+  isChapterTwoOrLater,
+} from "./chapters/progression.js";
 
 const GAME_WIDTH = 960;
 const GAME_HEIGHT = 540;
@@ -394,7 +403,7 @@ function getSaveSlotLabel(slotNumber) {
   const saveData = readSaveSlot(slotNumber);
   if (!saveData) return `Slot ${slotNumber}: Empty`;
 
-  const chapter = saveData.currentChapter || saveData.chapter || 1;
+    const chapter = getSaveDataChapterNumber(saveData);
   const chapterName = saveData.chapterTitle || saveData.chapterName || `Chapter ${chapter}`;
   const savedAt = saveData.savedAt || saveData.completedAt;
   let dateLabel = "saved game";
@@ -575,8 +584,8 @@ class LoadingScene extends Phaser.Scene {
       stroke: "#0b0811",
       strokeThickness: 5,
     }).setOrigin(0.5);
-    const chapterNumber = this.nextSceneData?.saveData?.currentChapter || this.nextSceneData?.saveData?.chapter || (this.nextSceneData?.playChapterTwoOpening ? 2 : 1);
-    const chapterLabel = chapterNumber >= 2 ? "Preparing Chapter 2: Owed an Explanation" : "Preparing Chapter 1: 4 Years Gone";
+    const chapterNumber = getSceneDataChapterNumber(this.nextSceneData);
+    const chapterLabel = isChapterTwoOrLater(chapterNumber) ? "Preparing Chapter 2: Owed an Explanation" : "Preparing Chapter 1: 4 Years Gone";
     const hintText = this.add.text(0, -42, chapterLabel, { fontSize: "16px", color: "#d8c4f0" }).setOrigin(0.5);
     panel.container.add([loadingText, hintText]);
     this.add.rectangle(barX + barWidth / 2, barY, barWidth, barHeight, 0x101828, 1).setStrokeStyle(2, 0xb6925f, 0.9);
@@ -607,7 +616,7 @@ class LoadingScene extends Phaser.Scene {
     this.load.on("progress", (value) => this.updateLoadingDisplay(value, barX, barY, barWidth));
     this.load.once("complete", () => this.updateLoadingDisplay(1, barX, barY, barWidth));
     queueImage(this, LOADING_RUNNER_KEY, LOADING_RUNNER_PATH);
-    const targetLevel = chapterNumber >= 2 ? LEVELS.chapter2 : LEVELS.chapter1;
+    const targetLevel = getLevelForChapter(chapterNumber);
     queueChapterAssets(this, targetLevel);
   }
 
@@ -815,7 +824,7 @@ class BattleScene extends Phaser.Scene {
     this.playChapterTwoOpening = data.playChapterTwoOpening === true;
     this.skipChapterTwoTitleCard = data.skipChapter2TitleCard === true;
     this.pendingChapterTwoTransitionData = data.pendingChapterTwoTransitionData || null;
-    this.currentChapterNumber = this.loadedSaveData?.currentChapter || this.loadedSaveData?.chapter || 1;
+    this.currentChapterNumber = getSaveDataChapterNumber(this.loadedSaveData);
   }
 
   preload() {
@@ -913,7 +922,7 @@ class BattleScene extends Phaser.Scene {
     this.updateSelectedPanel();
     this.setObjectiveDisplayVisible(false);
 
-    if (this.currentChapterNumber >= 2 && this.playChapterTwoOpening) {
+    if (isChapterTwoOrLater(this.currentChapterNumber) && this.playChapterTwoOpening) {
       this.startChapterTwoOpening();
     } else if (this.loadFromSave) {
       this.startLoadedBattle();
@@ -924,7 +933,7 @@ class BattleScene extends Phaser.Scene {
   }
 
   getCurrentLevel() {
-    return (this.currentChapterNumber || 1) >= 2 ? LEVELS.chapter2 : LEVELS.chapter1;
+    return getLevelForChapter(this.currentChapterNumber);
   }
 
   getSavedGameData() {
@@ -945,7 +954,7 @@ class BattleScene extends Phaser.Scene {
     if (!Array.isArray(saveData.units)) return;
 
     const savedById = new Map(saveData.units.map((unitState) => [unitState.id, unitState]));
-    const preserveMapPositions = (this.currentChapterNumber || 1) <= 1;
+    const preserveMapPositions = isChapterOne(this.currentChapterNumber);
 
     this.units = this.units
       .map((unit) => {
@@ -998,26 +1007,20 @@ class BattleScene extends Phaser.Scene {
   }
 
   buildChapterSaveData(slotNumber = null) {
-    return {
-      version: 2,
+    return buildChapterTwoSaveData({
       slotNumber,
-      currentChapter: 2,
-      chapter: 2,
-      chapterTitle: `${CHAPTER_TWO_TITLE.chapter}: ${CHAPTER_TWO_TITLE.subtitle}`,
-      completedChapters: [1],
-      savedAt: new Date().toISOString(),
-      defeatedAllies: [...new Set(this.defeatedAllies || [])],
+      defeatedAllies: this.defeatedAllies || [],
       units: this.units.filter((unit) => unit.team === "player").map((unit) => this.serializeUnitForSave(unit)),
-    };
+    });
   }
 
   startLoadedBattle() {
     this.openingContainer.setVisible(false);
 
     const saveData = this.loadedSaveData || this.getSavedGameData();
-    const savedChapter = saveData?.currentChapter || saveData?.chapter || 1;
+    const savedChapter = getSaveDataChapterNumber(saveData);
 
-    if (savedChapter >= 2) {
+    if (isChapterTwoOrLater(savedChapter)) {
       this.pendingChapterTwoTransitionData = saveData || this.pendingChapterTwoTransitionData;
       if (this.skipChapterTwoTitleCard) {
         this.startChapterTwoOpening();
@@ -2268,7 +2271,7 @@ class BattleScene extends Phaser.Scene {
       this.saveSlotContainer = null;
     }
 
-    this.currentChapterNumber = 2;
+    this.currentChapterNumber = CHAPTER_TWO_NUMBER;
     this.pendingChapterTwoTransitionData = this.pendingChapterTwoTransitionData || this.buildChapterSaveData(this.loadedSlotNumber || null);
     this.phaseText.setText("Chapter 2");
     this.phaseText.setColor("#fcd34d");
@@ -2352,7 +2355,7 @@ class BattleScene extends Phaser.Scene {
   }
 
   isChapterOneGameOverDeath(unit) {
-    return (this.currentChapterNumber || 1) === 1 && !!unit && CHAPTER_ONE_GAME_OVER_UNIT_IDS.includes(unit.id);
+    return isChapterOne(this.currentChapterNumber) && !!unit && CHAPTER_ONE_GAME_OVER_UNIT_IDS.includes(unit.id);
   }
 
   handleAllyUnitDeath(unit, onComplete = null) {
@@ -2958,7 +2961,7 @@ class BattleScene extends Phaser.Scene {
 
 
   getEscapeTile() {
-    return (this.currentChapterNumber || 1) === 1 ? CHAPTER_ONE_ESCAPE_TILE : null;
+    return isChapterOne(this.currentChapterNumber) ? CHAPTER_ONE_ESCAPE_TILE : null;
   }
 
   isEscapeTile(x, y) {
@@ -3653,7 +3656,7 @@ class BattleScene extends Phaser.Scene {
     if (this.isEscapeTile(unit.x, unit.y)) {
       actions.unshift({ label: "Escape", handler: () => this.escapeUnit(unit.id) });
     }
-    if ((this.currentChapterNumber || 1) >= 2 && this.getTerrainAt(unit.x, unit.y) === "fort") {
+    if (isChapterTwoOrLater(this.currentChapterNumber) && this.getTerrainAt(unit.x, unit.y) === "fort") {
       actions.unshift({ label: "Capture", handler: () => this.captureFort(unit.id) });
     }
 
@@ -3708,7 +3711,7 @@ class BattleScene extends Phaser.Scene {
   }
 
   beginChapterTwoSetupIfNeeded() {
-    if ((this.currentChapterNumber || 1) < 2 || this.chapterTwoSetupDone) return;
+    if (!isChapterTwoOrLater(this.currentChapterNumber) || this.chapterTwoSetupDone) return;
     const leon = this.units.find((u) => u.id === "leon" && u.team === "player");
     if (!leon) return;
     this.chapterTwoSetupDone = true;
@@ -5317,7 +5320,7 @@ Crit: Luck difference %. Critical hits deal x3 damage.${itemSummary}`
         this.setUnitSpriteFrame(unit, "idle", unit.facing || "down");
       }
     }
-    this.helpText.setText((this.currentChapterNumber || 1) >= 2
+    this.helpText.setText(isChapterTwoOrLater(this.currentChapterNumber)
       ? "Player Phase. Capture all four forts. Fences block movement."
       : "Player Phase. Reach the glowing gate tile and choose Escape.");
     this.busy = false;
@@ -5338,7 +5341,7 @@ const config = {
 };
 
 new Phaser.Game(config);
-    if ((this.currentChapterNumber || 1) >= 2) {
+    if (isChapterTwoOrLater(this.currentChapterNumber)) {
       this.chapterTwoTurns = (this.chapterTwoTurns || 0) + 1;
       if (!this.chapterTwoSetupDone) this.beginChapterTwoSetupIfNeeded();
       if (this.chapterTwoSetupDone && this.chapterTwoTurns % 2 === 0) {
