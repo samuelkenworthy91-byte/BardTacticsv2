@@ -1,79 +1,8 @@
 import Phaser from "phaser";
-import {
-  BROTHERS_BLIGH_CUTIN_FADE_DURATION,
-  BROTHERS_BLIGH_CUTIN_HOLD_DURATION,
-  BROTHERS_BLIGH_CUTIN_KEY,
-  BROTHERS_BLIGH_HIT_APPEAR_DURATION,
-  BROTHERS_BLIGH_HIT_EFFECT_KEY,
-  BROTHERS_BLIGH_HIT_FADE_DURATION,
-  BROTHERS_BLIGH_HIT_HOLD_DURATION,
-  BROTHERS_BLIGH_SKILL,
-  CARDINAL_DIRECTIONS,
-  CLOCKWISE_DIRECTIONS,
-  ENEMY_ACTION_PAUSE,
-  ENEMY_MOVE_DURATION,
-  GAME_HEIGHT,
-  GAME_WIDTH,
-  ICE_OF_AGES_HIT_EFFECT_KEY,
-  LEVEL_UP_PANEL_DEPTH,
-  LEVEL_UP_STATS,
-  OPPORTUNITY_ATTACK_HIT_RATE,
-  OPPORTUNITY_ATTACK_PAUSE,
-  PLAYER_ACTION_PAUSE,
-  PLAYER_MOVE_DURATION,
-  SAVE_KEY,
-  SAVE_SLOT_COUNT,
-  SKILL_BANNER_DURATION,
-  SKILL_IMPACT_DELAY,
-  SKILL_TILE_EFFECT_APPEAR_DURATION,
-  SKILL_TILE_EFFECT_END_SCALE,
-  SKILL_TILE_EFFECT_FADE_DURATION,
-  SKILL_TILE_EFFECT_HOLD_DURATION,
-  SKILL_TILE_EFFECT_STAGGER,
-  STANDARD_BATTLE_END_HOLD_DURATION,
-  STANDARD_BATTLE_HIT_STEP_DURATION,
-  STANDARD_BATTLE_INTRO_DURATION,
-  STANDARD_BATTLE_OUTRO_DURATION,
-  STANDARD_BATTLE_PANEL_DEPTH,
-  TARGET_HIGHLIGHT,
-  TILE_SIZE,
-  UNIT_SPRITE_TARGET_SIZE,
-} from "../config/constants.js";
-import {
-  BIOMES,
-  createDeathSpriteCandidateEntries,
-  createDirectionalSpriteCandidateEntries,
-  INDIVIDUAL_UNIT_SPRITE_SETS,
-  queueChapterAssets,
-  UNIT_SPRITE_RENDER,
-  uniqueSpriteEntries,
-} from "../data/assets.js";
-import { canAttack, getDefaultWeapon, getWeaponForTarget, getWeaponRangeLabel } from "../utils/combat.js";
-import { distance, tileColor, tileKey, tileLabel } from "../utils/grid.js";
-import { getSaveSlotKey, getSaveSlotLabel } from "../utils/saveSlots.js";
-import { createBannerButton, createBannerPanel, fitImageToBounds } from "../ui/banner.js";
-import {
-  ALLIED_DEATH_LINES,
-  CHAPTER_ONE_ESCAPE_TILE,
-  CHAPTER_ONE_GAME_OVER_UNIT_IDS,
-  CHAPTER_ONE_OPENING,
-  CHAPTER_ONE_UNITS as UNITS,
-  POST_BATTLE_SCENE,
-} from "../chapters/chapter1.js";
-import {
-  CHAPTER_TWO_ALLY_OPTIONS,
-  CHAPTER_TWO_ALLY_SELECTION_LINES,
-  CHAPTER_TWO_OPENING,
-  CHAPTER_TWO_TITLE,
-} from "../chapters/chapter2.js";
-import {
-  buildChapterTwoSaveData,
-  CHAPTER_TWO_NUMBER,
-  getLevelForChapter,
-  getSaveDataChapterNumber,
-  isChapterOne,
-  isChapterTwoOrLater,
-} from "../chapters/progression.js";
+import { GAME_HEIGHT, GAME_WIDTH, TILE_SIZE } from "../config/constants.js";
+import { queueChapterAssets } from "../data/assets.js";
+import { CHAPTER_ONE_OPENING } from "../chapters/chapter1.js";
+import { getSaveDataChapterNumber, isChapterTwoOrLater } from "../chapters/progression.js";
 import { flowMethods } from "./battle/flowMethods.js";
 import { uiMethods } from "./battle/uiMethods.js";
 import { combatMethods } from "./battle/combatMethods.js";
