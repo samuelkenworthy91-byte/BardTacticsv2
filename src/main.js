@@ -1,5 +1,63 @@
 import Phaser from "phaser";
 import {
+  BROTHERS_BLIGH_CUTIN_FADE_DURATION,
+  BROTHERS_BLIGH_CUTIN_HOLD_DURATION,
+  BROTHERS_BLIGH_CUTIN_KEY,
+  BROTHERS_BLIGH_HIT_APPEAR_DURATION,
+  BROTHERS_BLIGH_HIT_EFFECT_KEY,
+  BROTHERS_BLIGH_HIT_FADE_DURATION,
+  BROTHERS_BLIGH_HIT_HOLD_DURATION,
+  BROTHERS_BLIGH_SKILL,
+  CARDINAL_DIRECTIONS,
+  CLOCKWISE_DIRECTIONS,
+  ENEMY_ACTION_PAUSE,
+  ENEMY_MOVE_DURATION,
+  GAME_HEIGHT,
+  GAME_WIDTH,
+  ICE_OF_AGES_HIT_EFFECT_KEY,
+  LEVEL_UP_PANEL_DEPTH,
+  LEVEL_UP_STATS,
+  LOADING_RUNNER_KEY,
+  LOADING_RUNNER_PATH,
+  OPPORTUNITY_ATTACK_HIT_RATE,
+  OPPORTUNITY_ATTACK_PAUSE,
+  PLAYER_ACTION_PAUSE,
+  PLAYER_MOVE_DURATION,
+  SAVE_KEY,
+  SAVE_SLOT_COUNT,
+  SKILL_BANNER_DURATION,
+  SKILL_IMPACT_DELAY,
+  SKILL_TILE_EFFECT_APPEAR_DURATION,
+  SKILL_TILE_EFFECT_END_SCALE,
+  SKILL_TILE_EFFECT_FADE_DURATION,
+  SKILL_TILE_EFFECT_HOLD_DURATION,
+  SKILL_TILE_EFFECT_STAGGER,
+  STANDARD_BATTLE_END_HOLD_DURATION,
+  STANDARD_BATTLE_HIT_STEP_DURATION,
+  STANDARD_BATTLE_INTRO_DURATION,
+  STANDARD_BATTLE_OUTRO_DURATION,
+  STANDARD_BATTLE_PANEL_DEPTH,
+  TARGET_HIGHLIGHT,
+  TILE_SIZE,
+  TITLE_SCREEN_KEY,
+  TITLE_SCREEN_PATH,
+  UNIT_SPRITE_TARGET_SIZE,
+} from "./config/constants.js";
+import {
+  BIOMES,
+  createDeathSpriteCandidateEntries,
+  createDirectionalSpriteCandidateEntries,
+  INDIVIDUAL_UNIT_SPRITE_SETS,
+  queueChapterAssets,
+  queueImage,
+  UNIT_SPRITE_RENDER,
+  uniqueSpriteEntries,
+} from "./data/assets.js";
+import { canAttack, getDefaultWeapon, getWeaponForTarget, getWeaponRangeLabel } from "./utils/combat.js";
+import { distance, tileColor, tileKey, tileLabel } from "./utils/grid.js";
+import { getSaveSlotKey, getSaveSlotLabel, readSaveSlot } from "./utils/saveSlots.js";
+import { createBannerButton, createBannerPanel, fitImageToBounds } from "./ui/banner.js";
+import {
   ALLIED_DEATH_LINES,
   CHAPTER_ONE_ESCAPE_TILE,
   CHAPTER_ONE_GAME_OVER_UNIT_IDS,
@@ -13,7 +71,6 @@ import {
   CHAPTER_TWO_OPENING,
   CHAPTER_TWO_TITLE,
 } from "./chapters/chapter2.js";
-import { LEVELS } from "./chapters/index.js";
 import {
   buildChapterTwoSaveData,
   CHAPTER_TWO_NUMBER,
@@ -24,539 +81,6 @@ import {
   isChapterTwoOrLater,
 } from "./chapters/progression.js";
 
-const GAME_WIDTH = 960;
-const GAME_HEIGHT = 540;
-
-const TILE_SIZE = 64;
-const MAP_COLS = 8;
-const MAP_ROWS = 8;
-
-const UNIT_SPRITE_TARGET_SIZE = TILE_SIZE * 0.9;
-const ENEMY_MOVE_DURATION = 1400;
-const ENEMY_ACTION_PAUSE = 750;
-const PLAYER_MOVE_DURATION = 1350;
-const PLAYER_ACTION_PAUSE = 450;
-const SKILL_BANNER_DURATION = 1250;
-const SKILL_IMPACT_DELAY = 520;
-const LEVEL_UP_PANEL_DEPTH = 20000;
-const STANDARD_BATTLE_PANEL_DEPTH = 15000;
-const STANDARD_BATTLE_INTRO_DURATION = 700;
-const STANDARD_BATTLE_HIT_STEP_DURATION = 900;
-const STANDARD_BATTLE_END_HOLD_DURATION = 900;
-const STANDARD_BATTLE_OUTRO_DURATION = 700;
-
-const SAVE_KEY = "bardsTacticsSave";
-const SAVE_SLOT_COUNT = 3;
-const SAVE_SLOT_KEY_PREFIX = `${SAVE_KEY}_slot_`;
-const TITLE_SCREEN_KEY = "bardsTitleScreen";
-const TITLE_SCREEN_PATH = "/ui/title_screen.png";
-const LOADING_RUNNER_KEY = "edwin_move_right";
-const LOADING_RUNNER_PATH = "/sprites/edwin/move_right.png";
-const ICE_OF_AGES_HIT_EFFECT_KEY = "iceOfAgesHitEffect";
-const ICE_OF_AGES_HIT_EFFECT_PATH = "/effects/ice_of_ages_hit.png";
-const BROTHERS_BLIGH_CUTIN_KEY = "brothersBlighCutin";
-const BROTHERS_BLIGH_CUTIN_PATH = "/effects/brothers_bligh_cutin.png";
-const BROTHERS_BLIGH_HIT_EFFECT_KEY = "brothersBlighHitEffect";
-const BROTHERS_BLIGH_HIT_EFFECT_PATH = "/effects/brothers_bligh_hit.png";
-const BROTHERS_BLIGH_SKILL = {
-  id: "brothersBligh",
-  name: "Brother's Bligh",
-  cost: 3,
-  partnerCost: 3,
-  type: "forwardRectangle",
-  width: 3,
-  depth: 2,
-  targetTeam: "enemy",
-  damageFormula: "brothersCombinedStrMag",
-  animationState: "magic",
-  cutinKey: BROTHERS_BLIGH_CUTIN_KEY,
-  hitEffectKey: BROTHERS_BLIGH_HIT_EFFECT_KEY,
-};
-const OPPORTUNITY_ATTACK_HIT_RATE = 50;
-const OPPORTUNITY_ATTACK_PAUSE = 650;
-const SKILL_TILE_EFFECT_STAGGER = 180;
-const SKILL_TILE_EFFECT_APPEAR_DURATION = 220;
-const SKILL_TILE_EFFECT_HOLD_DURATION = 1000;
-const SKILL_TILE_EFFECT_FADE_DURATION = 700;
-const SKILL_TILE_EFFECT_END_SCALE = 1.18;
-const BROTHERS_BLIGH_HIT_APPEAR_DURATION = 100;
-const BROTHERS_BLIGH_HIT_HOLD_DURATION = 1000;
-const BROTHERS_BLIGH_HIT_FADE_DURATION = 380;
-const BROTHERS_BLIGH_CUTIN_HOLD_DURATION = 1500;
-const BROTHERS_BLIGH_CUTIN_FADE_DURATION = 360;
-const SMACK_SFX_KEY = "smackSfx";
-const SMACK_SFX_PATH = "/audio/smack.mp3";
-
-const CARDINAL_DIRECTIONS = ["down", "up", "left", "right"];
-const CLOCKWISE_DIRECTIONS = ["up", "right", "down", "left"];
-const LEVEL_UP_STATS = [
-  { key: "hp", label: "HP", description: "+1 max HP and current HP" },
-  { key: "str", label: "STR", description: "+1 physical damage" },
-  { key: "mag", label: "MAG", description: "+1 magical damage" },
-  { key: "def", label: "DEF", description: "+1 physical defence" },
-  { key: "res", label: "RES", description: "+1 magical defence" },
-  { key: "spd", label: "SPD", description: "+1 speed / extra attacks" },
-  { key: "luck", label: "LUCK", description: "+1 crit chance and better level rolls" },
-];
-
-const TARGET_HIGHLIGHT = {
-  attack: { fill: 0xef4444, stroke: 0xfda4af },
-  skill: { fill: 0xa78bfa, stroke: 0xddd6fe },
-  item: { fill: 0x22c55e, stroke: 0xbbf7d0 },
-};
-
-function createDirectionalStateEntries(unitKey, state) {
-  return {
-    down: { key: `${unitKey}_${state}_down`, path: `/sprites/${unitKey}/${state}_down.png` },
-    up: { key: `${unitKey}_${state}_up`, path: `/sprites/${unitKey}/${state}_up.png` },
-    left: { key: `${unitKey}_${state}_left`, path: `/sprites/${unitKey}/${state}_left.png` },
-    right: { key: `${unitKey}_${state}_right`, path: `/sprites/${unitKey}/${state}_right.png` },
-  };
-}
-
-function createDeathEntries(unitKey) {
-  return [1, 2, 3, 4].map((index) => ({
-    key: `${unitKey}_death_${index}`,
-    path: `/sprites/${unitKey}/death_${index}.png`,
-  }));
-}
-
-function getSpriteSetAliases(unitKey) {
-  const aliases = [unitKey];
-
-  if (unitKey?.endsWith("_thug")) {
-    const weaponName = unitKey.replace("_thug", "");
-    aliases.push(`thug_${weaponName}`);
-    aliases.push("thug");
-  }
-
-  if (unitKey?.startsWith("thug_")) {
-    const weaponName = unitKey.replace("thug_", "");
-    aliases.push(`${weaponName}_thug`);
-    aliases.push("thug");
-  }
-
-  return [...new Set(aliases.filter(Boolean))];
-}
-
-function safeSpriteKeyPart(value) {
-  return String(value || "sprite").replace(/[^a-zA-Z0-9_]/g, "_");
-}
-
-function createDirectionalSpriteCandidateEntries(unitKey, state, direction) {
-  const aliases = getSpriteSetAliases(unitKey);
-  const entries = [];
-
-  aliases.forEach((alias, aliasIndex) => {
-    const aliasPart = safeSpriteKeyPart(alias);
-    entries.push({
-      key: `${unitKey}_${state}_${direction}_candidate_${aliasIndex}_${aliasPart}_directional`,
-      path: `/sprites/${alias}/${state}_${direction}.png`,
-    });
-    entries.push({
-      key: `${unitKey}_${state}_${direction}_candidate_${aliasIndex}_${aliasPart}_named_directional`,
-      path: `/sprites/${alias}/${alias}_${state}_${direction}.png`,
-    });
-    entries.push({
-      key: `${unitKey}_${state}_${direction}_candidate_${aliasIndex}_${aliasPart}_named_state`,
-      path: `/sprites/${alias}/${alias}_${state}.png`,
-    });
-    entries.push({
-      key: `${unitKey}_${state}_${direction}_candidate_${aliasIndex}_${aliasPart}_plain_state`,
-      path: `/sprites/${alias}/${state}.png`,
-    });
-  });
-
-  return entries;
-}
-
-function createDeathSpriteCandidateEntries(unitKey, frameIndex = 0) {
-  const frameNumber = Math.max(1, frameIndex + 1);
-  const aliases = getSpriteSetAliases(unitKey);
-  const entries = [];
-
-  aliases.forEach((alias, aliasIndex) => {
-    const aliasPart = safeSpriteKeyPart(alias);
-    entries.push({
-      key: `${unitKey}_death_${frameNumber}_candidate_${aliasIndex}_${aliasPart}_numbered`,
-      path: `/sprites/${alias}/death_${frameNumber}.png`,
-    });
-    entries.push({
-      key: `${unitKey}_death_${frameNumber}_candidate_${aliasIndex}_${aliasPart}_named_numbered`,
-      path: `/sprites/${alias}/${alias}_death_${frameNumber}.png`,
-    });
-    entries.push({
-      key: `${unitKey}_death_${frameNumber}_candidate_${aliasIndex}_${aliasPart}_named_state`,
-      path: `/sprites/${alias}/${alias}_death.png`,
-    });
-    entries.push({
-      key: `${unitKey}_death_${frameNumber}_candidate_${aliasIndex}_${aliasPart}_plain_state`,
-      path: `/sprites/${alias}/death.png`,
-    });
-  });
-
-  return entries;
-}
-
-function uniqueSpriteEntries(entries) {
-  const seen = new Set();
-  return entries.filter((entry) => {
-    if (!entry?.key || !entry?.path || seen.has(entry.key)) return false;
-    seen.add(entry.key);
-    return true;
-  });
-}
-
-const INDIVIDUAL_UNIT_SPRITE_SETS = {
-  edwin: {
-    idle: createDirectionalStateEntries("edwin", "idle"),
-    move: createDirectionalStateEntries("edwin", "move"),
-    attack: createDirectionalStateEntries("edwin", "attack"),
-    magic: createDirectionalStateEntries("edwin", "magic"),
-    hurt: createDirectionalStateEntries("edwin", "hurt"),
-    death: createDeathEntries("edwin"),
-  },
-  leon: {
-    idle: createDirectionalStateEntries("leon", "idle"),
-    move: createDirectionalStateEntries("leon", "move"),
-    attack: createDirectionalStateEntries("leon", "attack"),
-    hurt: createDirectionalStateEntries("leon", "hurt"),
-    death: createDeathEntries("leon"),
-  },
-  falan: {
-    idle: createDirectionalStateEntries("falan", "idle"),
-    move: createDirectionalStateEntries("falan", "move"),
-    attack: createDirectionalStateEntries("falan", "attack"),
-    spin: createDirectionalStateEntries("falan", "spin"),
-    hurt: createDirectionalStateEntries("falan", "hurt"),
-    death: createDeathEntries("falan"),
-  },
-  sword_thug: {
-    idle: createDirectionalStateEntries("sword_thug", "idle"),
-    move: createDirectionalStateEntries("sword_thug", "move"),
-    attack: createDirectionalStateEntries("sword_thug", "attack"),
-    hurt: createDirectionalStateEntries("sword_thug", "hurt"),
-    death: createDeathEntries("sword_thug"),
-  },
-  axe_thug: {
-    idle: createDirectionalStateEntries("axe_thug", "idle"),
-    move: createDirectionalStateEntries("axe_thug", "move"),
-    attack: createDirectionalStateEntries("axe_thug", "attack"),
-    hurt: createDirectionalStateEntries("axe_thug", "hurt"),
-    death: createDeathEntries("axe_thug"),
-  },
-  chakram_thug: {
-    idle: createDirectionalStateEntries("chakram_thug", "idle"),
-    move: createDirectionalStateEntries("chakram_thug", "move"),
-    attack: createDirectionalStateEntries("chakram_thug", "attack"),
-    hurt: createDirectionalStateEntries("chakram_thug", "hurt"),
-    death: createDeathEntries("chakram_thug"),
-  },
-};
-
-const UNIT_SPRITE_RENDER = {
-  default: {
-    height: TILE_SIZE * 0.82,
-    maxWidth: TILE_SIZE * 0.96,
-    offsetX: 0,
-    offsetY: 0,
-    deathOffsetY: 0,
-    originX: 0.5,
-    originY: 1,
-    shadowWidth: TILE_SIZE * 0.42,
-    shadowHeight: TILE_SIZE * 0.12,
-    shadowX: 0,
-    shadowY: 2,
-    hpY: TILE_SIZE * 0.22,
-  },
-  edwin: {
-    height: TILE_SIZE * 0.96,
-    maxWidth: TILE_SIZE * 1.05,
-    originX: 0.5,
-    originY: 0.63,
-    shadowWidth: TILE_SIZE * 0.42,
-    shadowHeight: TILE_SIZE * 0.12,
-    shadowX: 0,
-    shadowY: TILE_SIZE * 0.16,
-    hpY: TILE_SIZE * 0.34,
-  },
-  leon: {
-    height: TILE_SIZE * 0.8,
-    maxWidth: TILE_SIZE * 0.92,
-    shadowWidth: TILE_SIZE * 0.4,
-  },
-  falan: {
-    height: TILE_SIZE * 0.86,
-    maxWidth: TILE_SIZE * 1.02,
-    shadowWidth: TILE_SIZE * 0.44,
-  },
-  sword_thug: {
-    height: TILE_SIZE * 0.82,
-    maxWidth: TILE_SIZE * 0.94,
-    shadowWidth: TILE_SIZE * 0.42,
-  },
-  axe_thug: {
-    height: TILE_SIZE * 0.82,
-    maxWidth: TILE_SIZE * 0.94,
-    shadowWidth: TILE_SIZE * 0.42,
-  },
-  chakram_thug: {
-    height: TILE_SIZE * 0.82,
-    maxWidth: TILE_SIZE * 0.94,
-    shadowWidth: TILE_SIZE * 0.42,
-  },
-};
-
-
-const BIOMES = {
-  city: {
-    terrainTextures: {
-      street: { key: "cityStreetTile", path: "/tiles/city/street.png" },
-      cover: { key: "cityCoverTile", path: "/tiles/city/cover.png" },
-      wall: { key: "cityWallTile", path: "/tiles/city/wall.png" },
-      gate: { key: "cityGateTile", path: "/tiles/city/gate.png" },
-      default: { key: "cityStreetTile", path: "/tiles/city/street.png" },
-    },
-  },
-  farm: {
-    terrainTextures: {
-      field: { key: "farmFieldTile", path: "/tiles/farm/field.png" },
-      cover: { key: "farmCoverTile", path: "/tiles/farm/cover.png" },
-      fort: { key: "farmFortTile", path: "/tiles/farm/fort.png" },
-      fence: { key: "farmFenceTile", path: "/tiles/farm/fence.png" },
-      default: { key: "farmFieldTile", path: "/tiles/farm/field.png" },
-    },
-  },
-};
-
-
-
-function tileColor(type) {
-  if (type === "street") return 0x374151;
-  if (type === "cover") return 0x475569;
-  if (type === "gate") return 0x7c5c3b;
-  if (type === "wall") return 0x6b7280;
-  if (type === "field") return 0x4d7c0f;
-  if (type === "fort") return 0x8b5a2b;
-  if (type === "fence") return 0x6b4f2d;
-  return 0x1f2937;
-}
-
-function tileLabel(type) {
-  if (type === "street") return "S";
-  if (type === "cover") return "C";
-  if (type === "gate") return "G";
-  if (type === "wall") return "W";
-  if (type === "field") return "F";
-  if (type === "fort") return "FT";
-  if (type === "fence") return "FN";
-  return "?";
-}
-
-function tileKey(x, y) {
-  return `${x},${y}`;
-}
-
-function distance(a, b) {
-  return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
-}
-
-function getWeaponForTarget(attacker, defender) {
-  if (!attacker || !defender || !attacker.weapons) return null;
-  const dist = distance(attacker, defender);
-  return attacker.weapons.find((weapon) => {
-    const minRange = weapon.minRange ?? weapon.range;
-    const maxRange = weapon.maxRange ?? weapon.range;
-    return dist >= minRange && dist <= maxRange;
-  }) || null;
-}
-
-function getDefaultWeapon(unit) {
-  return unit?.weapons?.[0] || null;
-}
-
-function getWeaponRangeLabel(weapon) {
-  if (!weapon) return "-";
-  const minRange = weapon.minRange ?? weapon.range;
-  const maxRange = weapon.maxRange ?? weapon.range;
-  return minRange === maxRange ? `${minRange}` : `${minRange}-${maxRange}`;
-}
-
-function canAttack(attacker, defender) {
-  return !!getWeaponForTarget(attacker, defender);
-}
-
-function getSaveSlotKey(slotNumber) {
-  return `${SAVE_SLOT_KEY_PREFIX}${slotNumber}`;
-}
-
-function readSaveSlot(slotNumber) {
-  try {
-    const raw = window.localStorage.getItem(getSaveSlotKey(slotNumber));
-    return raw ? JSON.parse(raw) : null;
-  } catch (error) {
-    return null;
-  }
-}
-
-function getSaveSlotLabel(slotNumber) {
-  const saveData = readSaveSlot(slotNumber);
-  if (!saveData) return `Slot ${slotNumber}: Empty`;
-
-    const chapter = getSaveDataChapterNumber(saveData);
-  const chapterName = saveData.chapterTitle || saveData.chapterName || `Chapter ${chapter}`;
-  const savedAt = saveData.savedAt || saveData.completedAt;
-  let dateLabel = "saved game";
-
-  if (savedAt) {
-    try {
-      dateLabel = new Date(savedAt).toLocaleString();
-    } catch (error) {
-      dateLabel = "saved game";
-    }
-  }
-
-  return `Slot ${slotNumber}: ${chapterName} - ${dateLabel}`;
-}
-
-function fitImageToBounds(scene, image, textureKey, maxWidth, maxHeight, cover = false) {
-  if (!scene?.textures?.exists(textureKey) || !image) return;
-  const source = scene.textures.get(textureKey)?.getSourceImage();
-  if (!source?.width || !source?.height) return;
-  const scale = cover
-    ? Math.max(maxWidth / source.width, maxHeight / source.height)
-    : Math.min(maxWidth / source.width, maxHeight / source.height);
-  image.setDisplaySize(source.width * scale, source.height * scale);
-}
-
-function createBannerPanel(scene, x, y, width, height, options = {}) {
-  const container = scene.add.container(x, y);
-  const shadowOffset = options.shadowOffset ?? 5;
-  const shadow = scene.add.rectangle(shadowOffset, shadowOffset, width, height, 0x000000, options.shadowAlpha ?? 0.34).setOrigin(0.5);
-  const outer = scene.add.rectangle(0, 0, width, height, options.outerColor ?? 0x14091f, options.outerAlpha ?? 0.97).setOrigin(0.5);
-  outer.setStrokeStyle(options.outerStrokeWidth ?? 3, options.outerStrokeColor ?? 0xb6925f, 1);
-  const inner = scene.add.rectangle(0, 0, width - (options.innerInset ?? 14), height - (options.innerInset ?? 14), options.innerColor ?? 0x29133f, options.innerAlpha ?? 0.98).setOrigin(0.5);
-  inner.setStrokeStyle(options.innerStrokeWidth ?? 1, options.innerStrokeColor ?? 0xe4d0a8, options.innerStrokeAlpha ?? 0.82);
-  container.add([shadow, outer, inner]);
-  return { container, shadow, outer, inner };
-}
-
-function createBannerButton(scene, x, y, width, height, label, onClick, fontSize = "22px") {
-  const container = scene.add.container(x, y);
-  const shadow = scene.add.rectangle(4, 4, width, height, 0x000000, 0.34).setOrigin(0.5);
-  const outer = scene.add.rectangle(0, 0, width, height, 0x1a0d2a, 0.98).setOrigin(0.5);
-  outer.setStrokeStyle(2, 0xb6925f, 1);
-  const inner = scene.add.rectangle(0, 0, width - 10, height - 10, 0x412164, 0.98).setOrigin(0.5);
-  inner.setStrokeStyle(1, 0xe4d0a8, 0.78);
-  const text = scene.add.text(0, 0, label, {
-    fontSize,
-    fontStyle: "bold",
-    color: "#f7ecd3",
-    stroke: "#0b0811",
-    strokeThickness: 3,
-  }).setOrigin(0.5);
-  const hit = scene.add.rectangle(0, 0, width, height, 0xffffff, 0).setOrigin(0.5);
-  hit.setInteractive({ useHandCursor: true });
-  hit.on("pointerover", () => {
-    inner.setFillStyle(0x573487, 0.99);
-    outer.setStrokeStyle(2, 0xe0c186, 1);
-    container.y = y - 1;
-  });
-  hit.on("pointerout", () => {
-    inner.setFillStyle(0x412164, 0.98);
-    outer.setStrokeStyle(2, 0xb6925f, 1);
-    container.y = y;
-  });
-  hit.on("pointerdown", (pointer, localX, localY, event) => {
-    if (event?.stopPropagation) event.stopPropagation();
-    if (typeof onClick === "function") onClick();
-  });
-  container.add([shadow, outer, inner, text, hit]);
-  return { container, shadow, outer, inner, text, hit };
-}
-
-function queueImage(scene, key, path) {
-  if (!scene || !key || !path) return;
-  if (scene.textures.exists(key)) return;
-  scene.load.image(key, path);
-}
-
-function queueAudio(scene, key, path) {
-  if (!scene || !key || !path) return;
-  if (scene.cache?.audio?.exists(key)) return;
-  scene.load.audio(key, [path]);
-}
-
-function queueBiomeTileAssets(scene, biomeKey) {
-  const biome = BIOMES[biomeKey];
-  if (!biome) return;
-  const queuedKeys = new Set();
-  Object.values(biome.terrainTextures).forEach((entry) => {
-    if (!entry?.key || !entry?.path || queuedKeys.has(entry.key)) return;
-    queueImage(scene, entry.key, entry.path);
-    queuedKeys.add(entry.key);
-  });
-}
-
-function queueIndividualDirectionalSpriteAssets(scene) {
-  const queuedKeys = new Set();
-
-  const queueEntry = (entry) => {
-    if (!entry?.key || !entry?.path || queuedKeys.has(entry.key)) return;
-    queueImage(scene, entry.key, entry.path);
-    queuedKeys.add(entry.key);
-  };
-
-  Object.entries(INDIVIDUAL_UNIT_SPRITE_SETS).forEach(([spriteSetKey, spriteSet]) => {
-    Object.entries(spriteSet).forEach(([state, entry]) => {
-      if (Array.isArray(entry)) {
-        entry.forEach((frameEntry, frameIndex) => {
-          queueEntry(frameEntry);
-          uniqueSpriteEntries(createDeathSpriteCandidateEntries(spriteSetKey, frameIndex)).forEach(queueEntry);
-        });
-        return;
-      }
-
-      Object.entries(entry || {}).forEach(([direction, directionEntry]) => {
-        queueEntry(directionEntry);
-        uniqueSpriteEntries(createDirectionalSpriteCandidateEntries(spriteSetKey, state, direction)).forEach(queueEntry);
-      });
-    });
-  });
-}
-
-function queueChapterAssets(scene, levelData = LEVELS.chapter1) {
-  queueImage(scene, "edwinPortrait", "/portraits/edwin.jpg");
-  queueImage(scene, "leonPortrait", "/portraits/leon.jpg");
-  queueImage(scene, "kayleyPortrait", "/portraits/kayley.jpg");
-  queueImage(scene, "richPortrait", "/portraits/rich.jpg");
-  queueImage(scene, "falanPortrait", "/portraits/falan.jpg");
-  queueImage(scene, "thugPortrait", "/portraits/thug.jpg");
-  queueImage(scene, "heathPortrait", "/portraits/heath.jpg");
-  queueImage(scene, "izzyPortrait", "/portraits/izzy.jpg");
-  queueImage(scene, "prologueScene", "/scenes/prologue.jpg");
-  queueImage(scene, "leonsHouseScene", "/scenes/leons_house.jpg");
-  queueImage(scene, "walkToSchoolScene", "/scenes/walk_to_school.jpg");
-  queueImage(scene, "underpassScene", "/scenes/underpass.jpg");
-  queueImage(scene, "vanInteriorScene", "/scenes/van_interior.jpg");
-  queueImage(scene, "byronFarmScene", "/scenes/byron_farm.jpg");
-  queueImage(scene, "chapter2BedroomScene", "/scenes/chapter2_bedroom.jpg");
-  queueImage(scene, "chapter2EdwinDoorScene", "/scenes/chapter2_edwin_door.jpg");
-  queueImage(scene, "chapter2FuneralSplitScene", "/scenes/chapter2_funeral_split.jpg");
-  queueImage(scene, "chapter2SigilScene", "/scenes/chapter2_sigil.jpg");
-  queueImage(scene, "chapter2CalebExperimentScene", "/scenes/chapter2_caleb_experiment.jpg");
-  queueImage(scene, "chapter2EdwinGuildliteScene", "/scenes/chapter2_edwin_guildlites.jpg");
-  queueImage(scene, "chapter2LeonShockedScene", "/scenes/chapter2_leon_shocked.jpg");
-  queueImage(scene, ICE_OF_AGES_HIT_EFFECT_KEY, ICE_OF_AGES_HIT_EFFECT_PATH);
-  queueImage(scene, BROTHERS_BLIGH_CUTIN_KEY, BROTHERS_BLIGH_CUTIN_PATH);
-  queueImage(scene, BROTHERS_BLIGH_HIT_EFFECT_KEY, BROTHERS_BLIGH_HIT_EFFECT_PATH);
-  queueBiomeTileAssets(scene, levelData?.biome);
-  queueIndividualDirectionalSpriteAssets(scene);
-  queueAudio(scene, SMACK_SFX_KEY, SMACK_SFX_PATH);
-  if (levelData?.battleMusic?.key && levelData?.battleMusic?.path) {
-    queueAudio(scene, levelData.battleMusic.key, levelData.battleMusic.path);
-  }
-}
 
 class LoadingScene extends Phaser.Scene {
   constructor() {
