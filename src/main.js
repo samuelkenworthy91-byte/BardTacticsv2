@@ -1,4 +1,19 @@
 import Phaser from "phaser";
+import {
+  ALLIED_DEATH_LINES,
+  CHAPTER_ONE_ESCAPE_TILE,
+  CHAPTER_ONE_GAME_OVER_UNIT_IDS,
+  CHAPTER_ONE_OPENING,
+  CHAPTER_ONE_UNITS as UNITS,
+  POST_BATTLE_SCENE,
+} from "./chapters/chapter1.js";
+import {
+  CHAPTER_TWO_ALLY_OPTIONS,
+  CHAPTER_TWO_ALLY_SELECTION_LINES,
+  CHAPTER_TWO_OPENING,
+  CHAPTER_TWO_TITLE,
+} from "./chapters/chapter2.js";
+import { LEVELS } from "./chapters/index.js";
 
 const GAME_WIDTH = 960;
 const GAME_HEIGHT = 540;
@@ -48,13 +63,6 @@ const BROTHERS_BLIGH_SKILL = {
   cutinKey: BROTHERS_BLIGH_CUTIN_KEY,
   hitEffectKey: BROTHERS_BLIGH_HIT_EFFECT_KEY,
 };
-const CHAPTER_TWO_TITLE = { chapter: "Chapter 2", subtitle: "Owed an Explanation" };
-const ALLIED_DEATH_LINES = {
-  leon: "I can't...not yet...I only just found you.",
-  edwin: "Please...take care of Leon for me.",
-};
-const CHAPTER_ONE_GAME_OVER_UNIT_IDS = ["edwin", "leon"];
-const CHAPTER_ONE_ESCAPE_TILE = { x: 6, y: 0 };
 const OPPORTUNITY_ATTACK_HIT_RATE = 50;
 const OPPORTUNITY_ATTACK_PAUSE = 650;
 const SKILL_TILE_EFFECT_STAGGER = 180;
@@ -290,16 +298,6 @@ const UNIT_SPRITE_RENDER = {
   },
 };
 
-const MAP = [
-  ["street", "cover", "street", "street", "street", "street", "gate", "street"],
-  ["street", "street", "cover", "street", "street", "cover", "street", "street"],
-  ["street", "wall", "wall", "street", "street", "street", "street", "street"],
-  ["street", "street", "street", "cover", "street", "street", "street", "street"],
-  ["street", "street", "cover", "street", "street", "wall", "wall", "street"],
-  ["street", "street", "street", "street", "cover", "street", "street", "street"],
-  ["street", "cover", "street", "street", "street", "street", "street", "street"],
-  ["street", "street", "street", "street", "street", "street", "street", "street"],
-];
 
 const BIOMES = {
   city: {
@@ -322,433 +320,7 @@ const BIOMES = {
   },
 };
 
-const CHAPTER_OPENING = [
-  {
-    type: "title",
-    chapter: "Chapter 1",
-    subtitle: "4 Years Gone",
-    tag: "",
-  },
-  {
-    type: "scene",
-    sceneName: "Leon's House",
-    background: "leonsHouseScene",
-    lines: [
-      { speaker: "Leon", portrait: "leonPortrait", text: "They left already...?" },
-      { speaker: "Letter", portrait: null, text: "Leon, happy birthday. There's been a sighting of Edwin near Poole." },
-      { speaker: "Letter", portrait: null, text: "We'll be back probably this weekend. Love, Mum and Dad." },
-      { speaker: "Leon", portrait: "leonPortrait", text: "...Still looking for him." },
-      { speaker: "Leon", portrait: "leonPortrait", text: "Four years, and they still won't stop. Not even today." },
-    ],
-  },
-  {
-    type: "scene",
-    sceneName: "Walk to School",
-    background: "walkToSchoolScene",
-    lines: [
-      { speaker: "Kayley", portrait: "kayleyPortrait", text: "There he is. Birthday boy finally decided to show up." },
-      { speaker: "Rich", portrait: "richPortrait", text: "You're late enough that we were about to eat your presents ourselves." },
-      { speaker: "Leon", portrait: "leonPortrait", text: "You didn't get me presents." },
-      { speaker: "Kayley", portrait: "kayleyPortrait", text: "Exactly. We saved money." },
-      { speaker: "Rich", portrait: "richPortrait", text: "Come on. If we cut through the underpass, we'll still make it." },
-    ],
-  },
-  {
-    type: "scene",
-    sceneName: "Underpass",
-    background: "underpassScene",
-    lines: [
-      { speaker: "Rich", portrait: "richPortrait", text: "...Leon." },
-      { speaker: "Kayley", portrait: "kayleyPortrait", text: "Those aren't students." },
-      { speaker: "Falan", portrait: "falanPortrait", text: "There you are." },
-      { speaker: "Leon", portrait: "leonPortrait", text: "Who are you people?" },
-      { speaker: "Falan", portrait: "falanPortrait", text: "Doesn't matter. You're coming with us." },
-      { speaker: "Kayley", portrait: "kayleyPortrait", text: "No chance. Back off." },
-      { speaker: "Rich", portrait: "richPortrait", text: "Leon, get behind us." },
-      {
-        type: "impact",
-        attacker: "Thug",
-        attackerPortrait: "thugPortrait",
-        defender: "Rich",
-        defenderPortrait: "richPortrait",
-        text: "A thug lunges. Rich falls first.",
-      },
-      {
-        type: "impact",
-        attacker: "Thug",
-        attackerPortrait: "thugPortrait",
-        defender: "Kayley",
-        defenderPortrait: "kayleyPortrait",
-        text: "Kayley tries to pull Leon away, but another attacker cuts her down.",
-      },
-      { speaker: "Leon", portrait: "leonPortrait", text: "Kayley! Rich! No-!" },
-      {
-        type: "impact",
-        attacker: "Edwin",
-        attackerPortrait: "edwinPortrait",
-        defender: "Thug",
-        defenderPortrait: "thugPortrait",
-        text: "A blue-white flash cuts across the underpass. Edwin strikes one attacker down.",
-      },
-      { speaker: "Edwin", portrait: "edwinPortrait", text: "Talk later. If you want answers, survive." },
-      { speaker: "Leon", portrait: "leonPortrait", text: "...Edwin?" },
-      { speaker: "Falan", portrait: "falanPortrait", text: "So the ghost brother finally crawls home." },
-      { speaker: "Edwin", portrait: "edwinPortrait", text: "Stay behind me, Leon." },
-    ],
-  },
-];
 
-const CHAPTER_TWO_OPENING = [
-  {
-    type: "scene",
-    sceneName: "Byron Farm Bedroom",
-    background: "chapter2BedroomScene",
-    lines: [
-      { speaker: "Leon", portrait: "leonPortrait", text: "*scratching head and yawning* I’d forgotten where I was for a second." },
-      { type: "fullScreenScene", scene: "chapter2EdwinDoorScene", speaker: "Edwin", text: "Safe is where you are… I’m sorry." },
-      {
-        type: "impact",
-        attacker: "Leon",
-        attackerPortrait: "leonPortrait",
-        defender: "Edwin",
-        defenderPortrait: "edwinPortrait",
-        impactText: "SMACK!",
-        soundKey: SMACK_SFX_KEY,
-        text: "*sobbing* You don’t get to swan back into my life and act cool about it. We thought you were dead. We had a funeral for you! Mum and dad gave up years looking for you! I…I was alone Edwin.",
-      },
-      { type: "fullScreenScene", scene: "chapter2FuneralSplitScene", speaker: "Edwin", text: "I know… I’m sorry." },
-      { speaker: "Leon", portrait: "leonPortrait", text: "Why? Why did you?" },
-      { speaker: "Edwin", portrait: "edwinPortrait", text: "I did it to protect you all. I failed at that…. mum and dad… I couldn't save all of you." },
-      { speaker: "Leon", portrait: "leonPortrait", text: "They’re…? Who were those guys?" },
-      { speaker: "Edwin", portrait: "edwinPortrait", text: "You've heard of Guildlites? Run by Caleb Guildlite?" },
-      { speaker: "Leon", portrait: "leonPortrait", text: "I don’t live under a rock. Everyone has heard of them." },
-      { speaker: "Leon", portrait: "leonPortrait", text: "They’re the biggest tech company outside Silicon Valley, plus all the charity work." },
-      { speaker: "Edwin", portrait: "edwinPortrait", text: "Well Caleb is an evil mastermind bent on revenge against the world and most of those charitable organisations are fronts for that… sooo yeah." },
-      { speaker: "Leon", portrait: "leonPortrait", text: "Going to need a bit more than that, won't lie." },
-      { type: "fullScreenScene", scene: "chapter2SigilScene", speaker: "Edwin", text: "You saw what I can do—and what we can all do. We call them sigils." },
-      { type: "fullScreenScene", scene: "chapter2SigilScene", speaker: "Edwin", text: "Each sigil grants power over something. Mine is ice. Yours looks like plants or earth." },
-      { type: "fullScreenScene", scene: "chapter2SigilScene", speaker: "Edwin", text: "Heath controls water. Izzy controls wind. Caleb controls light." },
-      { type: "fullScreenScene", scene: "chapter2CalebExperimentScene", speaker: "Edwin", text: "Caleb thinks sigil users are superior and wants everyone else gone." },
-      { type: "fullScreenScene", scene: "chapter2CalebExperimentScene", speaker: "Edwin", text: "Those children’s homes are fronts—he tests children, awakens sigils through torture, then brainwashes them into his army." },
-      { speaker: "Leon", portrait: "leonPortrait", text: "And he’s looking to murder your entire family becauuuuuse?" },
-      { type: "fullScreenScene", scene: "chapter2EdwinGuildliteScene", speaker: "Edwin", text: "I used to work for him." },
-      { type: "fullScreenScene", scene: "chapter2LeonShockedScene", speaker: "Leon", text: "You’d work for someone… like that?" },
-      { speaker: "Edwin", portrait: "edwinPortrait", text: "There are excuses, for another time, none of them excuse what I did for him. That’s why I made this place. For now though we need to make sure that you are never in a position like the underpass again. Training." },
-    ],
-  },
-];
-
-const POST_BATTLE_SCENE = [
-  { type: "mapDialogue", speaker: "Leon", portrait: "leonPortrait", text: "I..." },
-  {
-    type: "mapAction",
-    speaker: "Narration",
-    portrait: "edwinPortrait",
-    text: "Leon passes out. Edwin rushes in and catches him before he hits the ground.",
-  },
-  { type: "mapDialogue", speaker: "Edwin", portrait: "edwinPortrait", text: "Woah there. I got you. Sleep for now." },
-  { type: "sceneDialogue", sceneName: "Panel Van", scene: "vanInteriorScene", speaker: "Heath", portrait: "heathPortrait", text: "Hey there sleeping beauty!" },
-  { type: "sceneDialogue", sceneName: "Panel Van", scene: "vanInteriorScene", speaker: "Leon", portrait: "leonPortrait", text: "Where... Where's Edwin?" },
-  {
-    type: "sceneDialogue",
-    sceneName: "Panel Van",
-    scene: "vanInteriorScene",
-    speaker: "Heath",
-    portrait: "heathPortrait",
-    text: "The boss man is driving this heap. Name's Heath by the way, and this bundle of cuteness wrapped up is Izzy.",
-  },
-  { type: "sceneDialogue", sceneName: "Panel Van", scene: "vanInteriorScene", speaker: "Izzy", portrait: "izzyPortrait", text: "*Grunt*" },
-  { type: "sceneDialogue", sceneName: "Panel Van", scene: "vanInteriorScene", speaker: "Leon", portrait: "leonPortrait", text: "Kayley? Rich?" },
-  {
-    type: "sceneDialogue",
-    sceneName: "Panel Van",
-    scene: "vanInteriorScene",
-    speaker: "Izzy",
-    portrait: "izzyPortrait",
-    text: "The two you were with? Dead, I'm afraid... Any consolation, it was quick.",
-  },
-  { type: "sceneDialogue", sceneName: "Panel Van", scene: "vanInteriorScene", speaker: "Leon", portrait: "leonPortrait", text: "..." },
-  { type: "sceneDialogue", sceneName: "Panel Van", scene: "vanInteriorScene", speaker: "Heath", portrait: "heathPortrait", text: "It's OK." },
-  {
-    type: "sceneNarration",
-    sceneName: "Panel Van",
-    scene: "vanInteriorScene",
-    speaker: "Narration",
-    portrait: null,
-    text: "Heath pulls Leon into a hug as Leon sobs against him.",
-  },
-  {
-    type: "overlapDialogue",
-    sceneName: "Panel Van",
-    scene: "vanInteriorScene",
-    speaker: "Heath",
-    portrait: "heathPortrait",
-    overlapPortrait: "leonPortrait",
-    text: "Let it all out. We'll be home soon.",
-  },
-  { type: "fullScreenScene", sceneName: "Byron Farm", scene: "byronFarmScene", text: "Byron Farm" },
-  { type: "savePrompt", title: "Chapter 1 Complete", text: "Save game?" },
-];
-
-const UNITS = [
-  {
-    id: "edwin",
-    name: "Edwin",
-    title: "Iceblade",
-    level: 5,
-    xp: 0,
-    xpRate: 0.65,
-    sigilPoints: 3,
-    maxSigilPoints: 3,
-    team: "player",
-    className: "Spellsword",
-    portraitKey: "edwinPortrait",
-    spriteSet: "edwin",
-    facing: "down",
-    x: 2,
-    y: 6,
-    move: 5,
-    hp: 24,
-    maxHp: 24,
-    str: 8,
-    mag: 10,
-    def: 6,
-    res: 7,
-    spd: 8,
-    luck: 4,
-    weapons: [
-      { name: "Iceblade", baseDamage: 4, range: 1, damageType: "physical", stat: "str", hitRate: 100 },
-      { name: "Ice Sigil", baseDamage: 5, range: 2, damageType: "magical", stat: "mag", hitRate: 100 },
-    ],
-    skills: [{ id: "iceOfAges", name: "Ice of Ages", cost: 2, type: "adjacentSquare", damageFormula: "mag", animationState: "magic" }],
-    acted: false,
-    color: 0x60a5fa,
-  },
-  {
-    id: "leon",
-    name: "Leon",
-    title: "Brawler",
-    level: 1,
-    xp: 0,
-    xpRate: 1.5,
-    sigilPoints: 3,
-    maxSigilPoints: 3,
-    team: "player",
-    className: "Street Brawler",
-    portraitKey: "leonPortrait",
-    spriteSet: "leon",
-    facing: "down",
-    x: 4,
-    y: 6,
-    move: 5,
-    hp: 16,
-    maxHp: 16,
-    str: 3,
-    mag: 0,
-    def: 2,
-    res: 1,
-    spd: 7,
-    luck: 5,
-    weapons: [{ name: "Fists", baseDamage: 1, range: 1, damageType: "physical", stat: "str", hitRate: 100 }],
-    items: [
-      {
-        id: "greggsSausageRoll",
-        name: "Gregg's Sausage Roll",
-        heal: 10,
-        uses: 1,
-        targetType: "selfOrAdjacentAlly",
-        description: "Restore 10 HP to Leon or an adjacent ally.",
-      },
-    ],
-    acted: false,
-    color: 0x38bdf8,
-  },
-  {
-    id: "falan",
-    name: "Falan",
-    title: "Gang Leader",
-    sigilPoints: 3,
-    maxSigilPoints: 3,
-    team: "enemy",
-    className: "Leader",
-    portraitKey: "falanPortrait",
-    spriteSet: "falan",
-    facing: "down",
-    x: 4,
-    y: 1,
-    move: 4,
-    hp: 14,
-    maxHp: 14,
-    str: 5,
-    mag: 0,
-    def: 3,
-    res: 1,
-    spd: 5,
-    luck: 3,
-    weapons: [{ name: "Katars", baseDamage: 3, range: 1, damageType: "physical", stat: "str", hitRate: 100, speedBonus: 2 }],
-    deathLine: "I... didn\'t believe... Caleb... you\'re good, Bligh... but the others will end you.",
-    skills: [{ id: "manicDervish", name: "Manic Dervish", cost: 3, type: "adjacentSquare", damageFormula: "strPlusSpd", animationState: "spin" }],
-    acted: false,
-    color: 0xf87171,
-    boss: true,
-  },
-  {
-    id: "thug1",
-    name: "Thug",
-    title: "White Hood",
-    team: "enemy",
-    className: "Thug",
-    sigilPoints: 3,
-    maxSigilPoints: 3,
-    portraitKey: "thugPortrait",
-    spriteSet: "sword_thug",
-    facing: "down",
-    x: 2,
-    y: 1,
-    move: 4,
-    hp: 8,
-    maxHp: 8,
-    str: 3,
-    mag: 0,
-    def: 1,
-    res: 0,
-    spd: 4,
-    luck: 1,
-    weapons: [{ name: "Sword", baseDamage: 3, range: 1, damageType: "physical", stat: "str", hitRate: 100 }],
-    acted: false,
-    color: 0xfb7185,
-  },
-  {
-    id: "thug2",
-    name: "Thug",
-    title: "White Hood",
-    team: "enemy",
-    className: "Thug",
-    sigilPoints: 3,
-    maxSigilPoints: 3,
-    portraitKey: "thugPortrait",
-    spriteSet: "axe_thug",
-    facing: "down",
-    x: 3,
-    y: 0,
-    move: 4,
-    hp: 8,
-    maxHp: 8,
-    str: 3,
-    mag: 0,
-    def: 1,
-    res: 0,
-    spd: 4,
-    luck: 0,
-    weapons: [{ name: "Axe", baseDamage: 5, range: 1, damageType: "physical", stat: "str", hitRate: 75 }],
-    acted: false,
-    color: 0xfb7185,
-  },
-  {
-    id: "thug3",
-    name: "Thug",
-    title: "White Hood",
-    team: "enemy",
-    className: "Thug",
-    sigilPoints: 3,
-    maxSigilPoints: 3,
-    portraitKey: "thugPortrait",
-    spriteSet: "chakram_thug",
-    facing: "down",
-    x: 5,
-    y: 0,
-    move: 4,
-    hp: 8,
-    maxHp: 8,
-    str: 3,
-    mag: 0,
-    def: 1,
-    res: 0,
-    spd: 4,
-    luck: 2,
-    weapons: [{ name: "Chakram", baseDamage: 2, minRange: 1, maxRange: 2, damageType: "physical", stat: "str", hitRate: 100 }],
-    acted: false,
-    color: 0xfb7185,
-  },
-  {
-    id: "thug4",
-    name: "Thug",
-    title: "White Hood",
-    team: "enemy",
-    className: "Thug",
-    sigilPoints: 3,
-    maxSigilPoints: 3,
-    portraitKey: "thugPortrait",
-    spriteSet: "sword_thug",
-    facing: "down",
-    x: 6,
-    y: 1,
-    move: 4,
-    hp: 8,
-    maxHp: 8,
-    str: 3,
-    mag: 0,
-    def: 1,
-    res: 0,
-    spd: 4,
-    luck: 1,
-    weapons: [{ name: "Sword", baseDamage: 3, range: 1, damageType: "physical", stat: "str", hitRate: 100 }],
-    acted: false,
-    color: 0xfb7185,
-  },
-];
-
-const CHAPTER_TWO_MAP = [
-  ["field", "field", "field", "field", "fence", "fort", "fort", "field"],
-  ["field", "field", "field", "field", "fence", "fort", "fort", "field"],
-  ["field", "field", "cover", "field", "fence", "field", "fence", "field"],
-  ["field", "cover", "field", "field", "fence", "field", "fence", "field"],
-  ["field", "field", "field", "cover", "field", "field", "field", "field"],
-  ["field", "cover", "field", "field", "field", "field", "cover", "field"],
-  ["field", "field", "cover", "field", "field", "field", "field", "field"],
-  ["field", "field", "field", "field", "field", "field", "field", "field"],
-];
-
-const CHAPTER_TWO_UNITS = ["edwin", "leon"].map((unitId, index) => {
-  const baseUnit = UNITS.find((unit) => unit.id === unitId);
-  const fallbackPositions = {
-    edwin: { x: 1, y: 6, facing: "right" },
-    leon: { x: 2, y: 6, facing: "up" },
-  };
-  const placement = fallbackPositions[unitId] || { x: index + 1, y: 6, facing: "down" };
-  return {
-    ...baseUnit,
-    x: placement.x,
-    y: placement.y,
-    facing: placement.facing,
-    acted: false,
-    spriteState: "idle",
-  };
-});
-
-const CHAPTER_TWO_ALLY_OPTIONS = ["izzy", "heath", "grimmy", "kane"];
-const CHAPTER_TWO_ALLY_SELECTION_LINES = {
-  izzy: "*grunt* of course, you know a powerhouse when you see one.",
-  heath: "well I was kinda hoping to take a nap but *cracks neck* I 'spose I can show you how it's done.",
-  grimmy: "Oooh pick me, pick me! If you're the bosses brother you must be super strong.",
-  kane: "Bout time I saw some action. Stand back, or you might get burnt.",
-};
-
-const LEVELS = {
-  chapter1: {
-    biome: "city",
-    map: MAP,
-    units: UNITS,
-    battleMusic: { key: "chapter1BattleMusic", path: "/audio/chapter1_battle.mp3", volume: 0.45 },
-    objective: "Escape through the glowing gate tile.",
-  },
-  chapter2: {
-    biome: "farm",
-    map: CHAPTER_TWO_MAP,
-    units: CHAPTER_TWO_UNITS,
-    objective: "Capture all four forts. Fence tiles are impassable.",
-  },
-};
 
 function tileColor(type) {
   if (type === "street") return 0x374151;
@@ -1310,7 +882,7 @@ class BattleScene extends Phaser.Scene {
     this.currentLevelUpData = null;
     this.openingStep = 0;
     this.openingLine = 0;
-    this.activeOpeningSequence = CHAPTER_OPENING;
+    this.activeOpeningSequence = CHAPTER_ONE_OPENING;
 
     this.cameras.main.setBackgroundColor("#0f172a");
     this.boardWidth = this.mapCols * TILE_SIZE;
@@ -1346,7 +918,7 @@ class BattleScene extends Phaser.Scene {
     } else if (this.loadFromSave) {
       this.startLoadedBattle();
     } else {
-      this.activeOpeningSequence = CHAPTER_OPENING;
+      this.activeOpeningSequence = CHAPTER_ONE_OPENING;
       this.updateOpeningUI();
     }
   }
@@ -3200,7 +2772,7 @@ class BattleScene extends Phaser.Scene {
   }
 
   updateOpeningUI() {
-    const openingSequence = this.activeOpeningSequence || CHAPTER_OPENING;
+    const openingSequence = this.activeOpeningSequence || CHAPTER_ONE_OPENING;
     const step = openingSequence[this.openingStep];
     if (!step) return;
 
@@ -3275,7 +2847,7 @@ class BattleScene extends Phaser.Scene {
   }
 
   goOpeningBack() {
-    const openingSequence = this.activeOpeningSequence || CHAPTER_OPENING;
+    const openingSequence = this.activeOpeningSequence || CHAPTER_ONE_OPENING;
     if (this.openingStep === 0 && this.openingLine === 0) return;
     if (openingSequence[this.openingStep].type === "scene" && this.openingLine > 0) {
       this.openingLine -= 1;
@@ -3288,7 +2860,7 @@ class BattleScene extends Phaser.Scene {
   }
 
   advanceOpening() {
-    const openingSequence = this.activeOpeningSequence || CHAPTER_OPENING;
+    const openingSequence = this.activeOpeningSequence || CHAPTER_ONE_OPENING;
     const step = openingSequence[this.openingStep];
     if (step.type === "title") {
       this.openingStep += 1;

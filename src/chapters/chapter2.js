@@ -1,0 +1,81 @@
+import { CHAPTER_ONE_UNITS } from "./chapter1.js";
+
+const SMACK_SFX_KEY = "smackSfx";
+
+export const CHAPTER_TWO_TITLE = { chapter: "Chapter 2", subtitle: "Owed an Explanation" };
+
+export const CHAPTER_TWO_OPENING = [
+  {
+    type: "scene",
+    sceneName: "Byron Farm Bedroom",
+    background: "chapter2BedroomScene",
+    lines: [
+      { speaker: "Leon", portrait: "leonPortrait", text: "*scratching head and yawning* I’d forgotten where I was for a second." },
+      { type: "fullScreenScene", scene: "chapter2EdwinDoorScene", speaker: "Edwin", text: "Safe is where you are… I’m sorry." },
+      {
+        type: "impact",
+        attacker: "Leon",
+        attackerPortrait: "leonPortrait",
+        defender: "Edwin",
+        defenderPortrait: "edwinPortrait",
+        impactText: "SMACK!",
+        soundKey: SMACK_SFX_KEY,
+        text: "*sobbing* You don’t get to swan back into my life and act cool about it. We thought you were dead. We had a funeral for you! Mum and dad gave up years looking for you! I…I was alone Edwin.",
+      },
+      { type: "fullScreenScene", scene: "chapter2FuneralSplitScene", speaker: "Edwin", text: "I know… I’m sorry." },
+      { speaker: "Leon", portrait: "leonPortrait", text: "Why? Why did you?" },
+      { speaker: "Edwin", portrait: "edwinPortrait", text: "I did it to protect you all. I failed at that…. mum and dad… I couldn't save all of you." },
+      { speaker: "Leon", portrait: "leonPortrait", text: "They’re…? Who were those guys?" },
+      { speaker: "Edwin", portrait: "edwinPortrait", text: "You've heard of Guildlites? Run by Caleb Guildlite?" },
+      { speaker: "Leon", portrait: "leonPortrait", text: "I don’t live under a rock. Everyone has heard of them." },
+      { speaker: "Leon", portrait: "leonPortrait", text: "They’re the biggest tech company outside Silicon Valley, plus all the charity work." },
+      { speaker: "Edwin", portrait: "edwinPortrait", text: "Well Caleb is an evil mastermind bent on revenge against the world and most of those charitable organisations are fronts for that… sooo yeah." },
+      { speaker: "Leon", portrait: "leonPortrait", text: "Going to need a bit more than that, won't lie." },
+      { type: "fullScreenScene", scene: "chapter2SigilScene", speaker: "Edwin", text: "You saw what I can do—and what we can all do. We call them sigils." },
+      { type: "fullScreenScene", scene: "chapter2SigilScene", speaker: "Edwin", text: "Each sigil grants power over something. Mine is ice. Yours looks like plants or earth." },
+      { type: "fullScreenScene", scene: "chapter2SigilScene", speaker: "Edwin", text: "Heath controls water. Izzy controls wind. Caleb controls light." },
+      { type: "fullScreenScene", scene: "chapter2CalebExperimentScene", speaker: "Edwin", text: "Caleb thinks sigil users are superior and wants everyone else gone." },
+      { type: "fullScreenScene", scene: "chapter2CalebExperimentScene", speaker: "Edwin", text: "Those children’s homes are fronts—he tests children, awakens sigils through torture, then brainwashes them into his army." },
+      { speaker: "Leon", portrait: "leonPortrait", text: "And he’s looking to murder your entire family becauuuuuse?" },
+      { type: "fullScreenScene", scene: "chapter2EdwinGuildliteScene", speaker: "Edwin", text: "I used to work for him." },
+      { type: "fullScreenScene", scene: "chapter2LeonShockedScene", speaker: "Leon", text: "You’d work for someone… like that?" },
+      { speaker: "Edwin", portrait: "edwinPortrait", text: "There are excuses, for another time, none of them excuse what I did for him. That’s why I made this place. For now though we need to make sure that you are never in a position like the underpass again. Training." },
+    ],
+  },
+];
+
+export const CHAPTER_TWO_MAP = [
+  ["field", "field", "field", "field", "fence", "fort", "fort", "field"],
+  ["field", "field", "field", "field", "fence", "fort", "fort", "field"],
+  ["field", "field", "cover", "field", "fence", "field", "fence", "field"],
+  ["field", "cover", "field", "field", "fence", "field", "fence", "field"],
+  ["field", "field", "field", "cover", "field", "field", "field", "field"],
+  ["field", "cover", "field", "field", "field", "field", "cover", "field"],
+  ["field", "field", "cover", "field", "field", "field", "field", "field"],
+  ["field", "field", "field", "field", "field", "field", "field", "field"],
+];
+
+export const CHAPTER_TWO_UNITS = ["edwin", "leon"].map((unitId, index) => {
+  const baseUnit = CHAPTER_ONE_UNITS.find((unit) => unit.id === unitId);
+  const fallbackPositions = {
+    edwin: { x: 1, y: 6, facing: "right" },
+    leon: { x: 2, y: 6, facing: "up" },
+  };
+  const placement = fallbackPositions[unitId] || { x: index + 1, y: 6, facing: "down" };
+  return {
+    ...baseUnit,
+    x: placement.x,
+    y: placement.y,
+    facing: placement.facing,
+    acted: false,
+    spriteState: "idle",
+  };
+});
+
+export const CHAPTER_TWO_ALLY_OPTIONS = ["izzy", "heath", "grimmy", "kane"];
+export const CHAPTER_TWO_ALLY_SELECTION_LINES = {
+  izzy: "*grunt* of course, you know a powerhouse when you see one.",
+  heath: "well I was kinda hoping to take a nap but *cracks neck* I 'spose I can show you how it's done.",
+  grimmy: "Oooh pick me, pick me! If you're the bosses brother you must be super strong.",
+  kane: "Bout time I saw some action. Stand back, or you might get burnt.",
+};
