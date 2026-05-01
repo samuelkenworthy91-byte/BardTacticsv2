@@ -59,6 +59,9 @@ export class BattleScene extends Phaser.Scene {
     this.capturedForts = new Set();
     this.chapterTwoTurns = 0;
     this.chapterTwoSetupDone = false;
+    this.chapterThreeTurns = 0;
+    this.visitedChapterThreeCottages = new Set();
+    this.defeatedCivilians = [];
     this.applyLoadedSaveData(this.loadedSaveData);
 
     this.selectedUnitId = null;

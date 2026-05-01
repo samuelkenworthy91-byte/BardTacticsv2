@@ -17,9 +17,9 @@ export const LEVELS = {
     objective: "Capture all four forts. Fence tiles are impassable.",
   },
   chapter3: {
-    biome: "city",
+    biome: "town",
     map: CHAPTER_THREE_MAP,
     units: CHAPTER_THREE_UNITS,
-    objective: "Reach the end of the main road and choose Escape.",
+    objective: "Survive 10 turns and protect the townsfolk.",
   },
 };

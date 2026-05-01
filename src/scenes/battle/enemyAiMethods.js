@@ -66,12 +66,14 @@ import {
   CHAPTER_TWO_OPENING,
   CHAPTER_TWO_TITLE,
 } from "../../chapters/chapter2.js";
+import { CHAPTER_THREE_SURVIVAL_TURNS } from "../../chapters/chapter3.js";
 import {
   buildChapterTwoSaveData,
   CHAPTER_TWO_NUMBER,
   getLevelForChapter,
   getSaveDataChapterNumber,
   isChapterOne,
+  isChapterThree,
   isChapterTwoOrLater,
   isChapterTwo,
 } from "../../chapters/progression.js";
@@ -102,6 +104,7 @@ export const enemyAiMethods = {
     this.enemyIndex = 0;
     this.enemyTurnOrder = this.units.filter((u) => u.team === "enemy" && u.hp > 0);
     this.enemyTurnOrder.forEach((enemy) => {
+      this.applyTurnStartTerrainEffects(enemy);
       enemy.opportunityThreatIdsAtTurnStart = this.getAdjacentOpponents(enemy).map((opponent) => opponent.id);
     });
     this.time.delayedCall(ENEMY_ACTION_PAUSE, () => this.runNextEnemy());
@@ -114,6 +117,11 @@ export const enemyAiMethods = {
     }
 
     if (this.enemyIndex >= this.enemyTurnOrder.length) {
+      if (isChapterThree(this.currentChapterNumber) && (this.chapterThreeTurns || 0) >= CHAPTER_THREE_SURVIVAL_TURNS) {
+        this.helpText.setText("Tipen Whippet survived the attack.");
+        this.time.delayedCall(650, () => this.startPostBattleScene());
+        return;
+      }
       this.startPlayerPhase();
       return;
     }
@@ -217,6 +225,28 @@ export const enemyAiMethods = {
     }
 
     completeEnemyMove();
+  },
+
+  applyTurnStartTerrainEffects(unit) {
+    if (!unit || unit.hp <= 0) return;
+    const terrain = this.getTerrainAt(unit.x, unit.y);
+    unit.turnMoveBonus = terrain === "road" ? 2 : 0;
+
+    const healAmount = terrain === "chinese" || terrain === "church" ? 3 : 0;
+    if (healAmount <= 0) return;
+
+    const maxHp = unit.maxHp || unit.hp || 1;
+    const oldHp = unit.hp;
+    unit.hp = Math.min(maxHp, unit.hp + healAmount);
+    if (unit.hp <= oldHp) return;
+
+    this.refreshUnitSprite(unit);
+    this.showFloatingText(
+      this.boardX + unit.x * TILE_SIZE + TILE_SIZE / 2,
+      this.boardY + unit.y * TILE_SIZE + 8,
+      `+${unit.hp - oldHp}`,
+      "#86efac"
+    );
   },
 
   getLivingOpponents(unit) {
@@ -325,7 +355,7 @@ export const enemyAiMethods = {
   chooseEnemyPlan(enemy) {
     enemy.opportunityThreatIdsAtTurnStart = this.getAdjacentOpponents(enemy).map((opponent) => opponent.id);
 
-    const options = [{ x: enemy.x, y: enemy.y }, ...this.reachableTiles(enemy)];
+    const options = enemy.stationary ? [{ x: enemy.x, y: enemy.y }] : [{ x: enemy.x, y: enemy.y }, ...this.reachableTiles(enemy)];
     const nearest = this.getNearestOpponent(enemy);
     let bestPlan = null;
 
@@ -411,7 +441,14 @@ export const enemyAiMethods = {
           return;
         }
 
-        this.playUnitDeath(defender, () => this.removeUnitSpriteAndData(defender.id));
+        if (defender.team === "civilian") {
+          this.defeatedCivilians = [...new Set([...(this.defeatedCivilians || []), defender.id])];
+          this.playUnitDeath(defender, () => this.removeUnitSpriteAndData(defender.id));
+          this.helpText.setText(`${defender.name} was cut down.`);
+        } else {
+          this.playUnitDeath(defender, () => this.removeUnitSpriteAndData(defender.id));
+        }
+
       } else {
         this.refreshUnitSprite(defender);
         this.setUnitSpriteFrame(defender, "idle", defender.facing || "down");
@@ -435,18 +472,24 @@ export const enemyAiMethods = {
     this.phaseText.setText("Player Phase");
     this.phaseText.setColor("#c4b5fd");
     this.setObjectiveDisplayVisible(true);
+    if (isChapterThree(this.currentChapterNumber)) {
+      this.chapterThreeTurns = (this.chapterThreeTurns || 0) + 1;
+    }
     for (const unit of this.units) {
       if (unit.team === "player") {
         unit.acted = false;
         delete unit.pendingMoveOrigin;
+        this.applyTurnStartTerrainEffects(unit);
         unit.opportunityThreatIdsAtTurnStart = this.getAdjacentEnemies(unit).map((enemy) => enemy.id);
         this.refreshUnitSprite(unit);
         this.setUnitSpriteFrame(unit, "idle", unit.facing || "down");
       }
     }
-    this.helpText.setText(isChapterTwo(this.currentChapterNumber)
-      ? "Player Phase. Capture all four forts. Fences block movement."
-      : "Player Phase. Reach the glowing gate tile and choose Escape.");
+    this.helpText.setText(isChapterThree(this.currentChapterNumber)
+      ? `Player Phase ${this.chapterThreeTurns}/${CHAPTER_THREE_SURVIVAL_TURNS}. Survive and protect the townsfolk.`
+      : isChapterTwo(this.currentChapterNumber)
+        ? "Player Phase. Capture all four forts. Fences block movement."
+        : "Player Phase. Reach the glowing gate tile and choose Escape.");
     this.busy = false;
     if (isChapterTwo(this.currentChapterNumber)) {
       this.chapterTwoTurns = (this.chapterTwoTurns || 0) + 1;

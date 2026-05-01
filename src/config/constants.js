@@ -62,6 +62,17 @@ export const RECRUITMENT_CONFIG = {
     positiveClose: "all",
     successLine: "The boss said if you beat me I should follow your orders and I don't see myself winning this.",
   },
+  ambrose: {
+    recruitable: true,
+    positiveClose: ["izzy"],
+    negativeClose: ["leon"],
+    lockoutFailureUnits: ["leon"],
+    lockoutLine: "I've heard tell of Edwin Bligh, and that is enough for me.",
+    successLine: "If the town stands with you, then so will I.",
+    successLines: {
+      izzy: "A measured argument, Isabella. Very well. I will stand with you.",
+    },
+  },
 };
 export const OPPORTUNITY_ATTACK_HIT_RATE = 50;
 export const OPPORTUNITY_ATTACK_PAUSE = 650;

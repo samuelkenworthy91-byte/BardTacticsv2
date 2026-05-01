@@ -382,7 +382,7 @@ export const playerActionMethods = {
 
   isRecruitableTarget(target) {
     const config = this.getRecruitmentConfig(target);
-    return !!target && target.team === "enemy" && target.hp > 0 && config?.recruitable === true;
+    return !!target && target.team === "enemy" && target.hp > 0 && target.recruitmentLocked !== true && config?.recruitable === true;
   },
 
   getParleyTargets(unit) {
@@ -404,10 +404,18 @@ export const playerActionMethods = {
       return { type: "positiveClose", boost: 25 };
     }
     if (config.positiveClose === "all") return { type: "positiveClose", boost: 25 };
+    if (Array.isArray(config.negativeClose) && config.negativeClose.includes(unit.id)) {
+      return { type: "negativeClose", boost: -25 };
+    }
+    if (config.negativeClose === "all") return { type: "negativeClose", boost: -25 };
     if (Array.isArray(config.positive) && config.positive.includes(unit.id)) {
       return { type: "positive", boost: 12 };
     }
     if (config.positive === "all") return { type: "positive", boost: 12 };
+    if (Array.isArray(config.negative) && config.negative.includes(unit.id)) {
+      return { type: "negative", boost: -12 };
+    }
+    if (config.negative === "all") return { type: "negative", boost: -12 };
     return { type: "neutral", boost: 0 };
   },
 
@@ -418,7 +426,7 @@ export const playerActionMethods = {
     const missingRatio = maxHp <= 1 ? 1 : (maxHp - currentHp) / (maxHp - 1);
     const baseChance = 0.5 + missingRatio * 49.5;
     const relationship = this.getParleyRelationship(unit, target);
-    return Math.min(75, baseChance + relationship.boost);
+    return Phaser.Math.Clamp(baseChance + relationship.boost, 0, 75);
   },
 
   beginParleyTargetSelection(unit, skill = PARLEY_SKILL) {
@@ -539,6 +547,19 @@ export const playerActionMethods = {
     const chance = this.getParleyChance(unit, target);
     const succeeded = Phaser.Math.FloatBetween(0, 100) < chance;
     if (!succeeded) {
+      if (Array.isArray(config?.lockoutFailureUnits) && config.lockoutFailureUnits.includes(unit.id)) {
+        target.recruitmentLocked = true;
+        this.time.delayedCall(420, () => {
+          this.showSkillBanner("FAILED");
+          this.showChapterTwoSetupDialogue({
+            speaker: target.name,
+            portrait: target.portraitKey,
+            text: config.lockoutLine || "I will not join you.",
+            onContinue: () => this.finishParleyAttempt(unit, `${target.name} refused to join.`),
+          });
+        });
+        return true;
+      }
       this.time.delayedCall(420, () => {
         this.showSkillBanner("FAILED");
         this.finishParleyAttempt(unit, `${unit.name}'s Parley failed.`);
@@ -675,7 +696,8 @@ export const playerActionMethods = {
     return this.units.filter((other) => {
       if (!other || other.id === unit.id || other.hp <= 0) return false;
       if (!hitTileKeys.has(tileKey(other.x, other.y))) return false;
-      if (skill.targetTeam === "enemy" && other.team === unit.team) return false;
+      if (skill.targetTeam === "enemy" && unit.team === "player" && other.team !== "enemy") return false;
+      if (skill.targetTeam === "enemy" && unit.team !== "player" && other.team === unit.team) return false;
       if (skill.targetTeam === "ally" && other.team !== unit.team) return false;
       return true;
     });
@@ -752,6 +774,10 @@ export const playerActionMethods = {
           } else if (target.team === "player") {
             target.hp = 0;
             this.refreshUnitSprite(target);
+          } else if (target.team === "civilian") {
+            target.hp = 0;
+            this.defeatedCivilians = [...new Set([...(this.defeatedCivilians || []), target.id])];
+            this.playUnitDeath(target, () => this.removeUnitSpriteAndData(target.id));
           } else {
             this.playUnitDeath(target, () => this.removeUnitSpriteAndData(target.id));
           }
@@ -1172,6 +1198,7 @@ export const playerActionMethods = {
     const queue = [{ x: unit.x, y: unit.y, steps: 0 }];
     const visited = new Set([tileKey(unit.x, unit.y)]);
     const reachable = [];
+    const movementRange = (unit.move || 0) + (unit.turnMoveBonus || 0);
     while (queue.length > 0) {
       const current = queue.shift();
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
@@ -1181,7 +1208,7 @@ export const playerActionMethods = {
         const nextSteps = current.steps + 1;
         if (visited.has(key)) continue;
         if (!this.isWalkable(nx, ny)) continue;
-        if (nextSteps > unit.move) continue;
+        if (nextSteps > movementRange) continue;
         const occupant = this.getUnitAt(nx, ny);
         if (occupant && occupant.id !== unit.id) continue;
         visited.add(key);
@@ -1193,7 +1220,7 @@ export const playerActionMethods = {
   },
 
   attackableEnemies(unit) {
-    return this.units.filter((other) => other.team !== unit.team && other.hp > 0 && canAttack(unit, other));
+    return this.units.filter((other) => other.team === "enemy" && other.hp > 0 && canAttack(unit, other));
   },
 
   isMoveTile(x, y) {

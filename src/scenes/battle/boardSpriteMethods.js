@@ -66,7 +66,6 @@ import {
   CHAPTER_TWO_OPENING,
   CHAPTER_TWO_TITLE,
 } from "../../chapters/chapter2.js";
-import { CHAPTER_THREE_ESCAPE_TILE } from "../../chapters/chapter3.js";
 import {
   CHAPTER_THREE_NUMBER,
   buildChapterTwoSaveData,
@@ -101,7 +100,6 @@ export const boardSpriteMethods = {
 
   getEscapeTile() {
     if (isChapterOne(this.currentChapterNumber)) return CHAPTER_ONE_ESCAPE_TILE;
-    if (this.currentChapterNumber === CHAPTER_THREE_NUMBER) return CHAPTER_THREE_ESCAPE_TILE;
     return null;
   },
 
@@ -196,6 +194,7 @@ export const boardSpriteMethods = {
     this.playUnitState(attacker, this.getAttackAnimationState(attacker, weapon), OPPORTUNITY_ATTACK_PAUSE);
 
     const hit = Phaser.Math.Between(1, 100) <= OPPORTUNITY_ATTACK_HIT_RATE;
+    const terrainDodge = hit && this.rollTerrainDodge(attacker, defender, weapon);
     const damage = hit ? this.calculateDamage(attacker, defender, weapon) : 0;
     const defenderWasAlive = defender.hp > 0;
 
@@ -203,11 +202,11 @@ export const boardSpriteMethods = {
       this.showFloatingText(
         this.boardX + defender.x * TILE_SIZE + TILE_SIZE / 2,
         this.boardY + defender.y * TILE_SIZE + 8,
-        hit ? `OPPORTUNITY -${damage}` : "OPPORTUNITY MISS",
-        hit ? "#fca5a5" : "#fef3c7"
+        terrainDodge ? "OPPORTUNITY DODGE" : hit ? `OPPORTUNITY -${damage}` : "OPPORTUNITY MISS",
+        terrainDodge ? "#bbf7d0" : hit ? "#fca5a5" : "#fef3c7"
       );
 
-      if (hit) {
+      if (hit && !terrainDodge) {
         defender.hp = Math.max(0, defender.hp - damage);
         this.playUnitHurt(defender, 360);
         this.refreshUnitSprite(defender);
@@ -356,7 +355,8 @@ export const boardSpriteMethods = {
   createUnitSprite(unit) {
     const marker = this.add.circle(0, 0, 18, unit.color, 0.22);
     marker.setStrokeStyle(2, 0xffffff);
-    const label = this.add.text(0, -10, unit.team === "player" ? unit.name[0] : unit.boss ? "B" : "T", {
+    const unitLabel = unit.team === "player" ? unit.name[0] : unit.team === "civilian" ? "C" : unit.boss ? "B" : "T";
+    const label = this.add.text(0, -10, unitLabel, {
       fontSize: "16px",
       fontStyle: "bold",
       color: "#f7ecd3",
@@ -805,6 +805,9 @@ export const boardSpriteMethods = {
 
     if (this.isEscapeTile(unit.x, unit.y)) {
       actions.unshift({ label: "Escape", handler: () => this.escapeUnit(unit.id) });
+    }
+    if (this.canVisitChapterThreeCottage(unit)) {
+      actions.unshift({ label: "Visit", handler: () => this.visitChapterThreeCottage(unit.id) });
     }
     if (isChapterTwo(this.currentChapterNumber) && this.getTerrainAt(unit.x, unit.y) === "fort") {
       actions.unshift({ label: "Capture", handler: () => this.captureFort(unit.id) });

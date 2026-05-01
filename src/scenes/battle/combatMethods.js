@@ -81,6 +81,7 @@ export const combatMethods = {
     if (terrain === "cover") return 5;
     if (terrain === "fort") return 5;
     if (terrain === "gate") return 5;
+    if (terrain === "church") return 5;
     return 0;
   },
 
@@ -95,7 +96,7 @@ export const combatMethods = {
 
   getDefenseForAttack(defender, weapon) {
     if (!defender || !weapon) return 0;
-    if (weapon.damageType === "magical") return (defender.res || 0) + ((this.getTerrainAt(defender.x, defender.y) === "fort") ? 5 : 0);
+    if (weapon.damageType === "magical") return (defender.res || 0) + this.getTerrainDefenseBonus(defender, weapon);
     return (defender.def || 0) + this.getTerrainDefenseBonus(defender, weapon);
   },
 
@@ -135,6 +136,18 @@ export const combatMethods = {
     return Phaser.Math.Between(1, 100) <= (weapon?.hitRate ?? 100);
   },
 
+  getTerrainDodgeChance(attacker, defender, weapon) {
+    if (!attacker || !defender || !weapon) return 0;
+    if (this.getTerrainAt(defender.x, defender.y) !== "forest") return 0;
+    const attackRange = Math.abs(attacker.x - defender.x) + Math.abs(attacker.y - defender.y);
+    return attackRange <= 1 ? 10 : 25;
+  },
+
+  rollTerrainDodge(attacker, defender, weapon) {
+    const dodgeChance = this.getTerrainDodgeChance(attacker, defender, weapon);
+    return dodgeChance > 0 && Phaser.Math.Between(1, 100) <= dodgeChance;
+  },
+
   resolveAttackSequence(attacker, defender, weapon) {
     const attackCount = this.calculateAttackCount(attacker, defender, weapon);
     const results = [];
@@ -145,6 +158,10 @@ export const combatMethods = {
       const hit = this.rollHit(weapon);
       if (!hit) {
         results.push({ hit: false, critical: false, damage: 0, baseDamage: 0 });
+        continue;
+      }
+      if (this.rollTerrainDodge(attacker, defender, weapon)) {
+        results.push({ hit: false, critical: false, damage: 0, baseDamage: 0, terrainDodge: true });
         continue;
       }
       const baseDamage = this.calculateDamage(attacker, defender, weapon);
@@ -162,7 +179,7 @@ export const combatMethods = {
   },
 
   showCombatResultText(unit, result, index = 0) {
-    const text = !result.hit ? "MISS" : result.critical ? `CRIT -${result.damage}` : `-${result.damage}`;
+    const text = result.terrainDodge ? "DODGE" : !result.hit ? "MISS" : result.critical ? `CRIT -${result.damage}` : `-${result.damage}`;
     const color = !result.hit ? "#fef3c7" : result.critical ? "#fde68a" : "#fca5a5";
     this.time.delayedCall(index * 140, () => {
       this.showFloatingText(this.boardX + unit.x * TILE_SIZE + TILE_SIZE / 2, this.boardY + unit.y * TILE_SIZE + 8, text, color);

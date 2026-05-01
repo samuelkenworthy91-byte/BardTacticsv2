@@ -67,6 +67,7 @@ import {
   CHAPTER_TWO_OPENING,
   CHAPTER_TWO_TITLE,
 } from "../../chapters/chapter2.js";
+import { CHAPTER_THREE_COTTAGE_VISITS } from "../../chapters/chapter3.js";
 import {
   buildChapterTwoSaveData,
   CHAPTER_TWO_NUMBER,
@@ -167,6 +168,37 @@ export const chapterSetupMethods = {
     if (!this.chapterSetupDialogueContainer) return;
     this.chapterSetupDialogueContainer.destroy(true);
     this.chapterSetupDialogueContainer = null;
+  },
+
+  canVisitChapterThreeCottage(unit) {
+    if (!unit || unit.team !== "player" || unit.acted || unit.hp <= 0) return false;
+    if (this.currentChapterNumber !== 3 || this.getTerrainAt(unit.x, unit.y) !== "cottage") return false;
+    const visitKey = tileKey(unit.x, unit.y);
+    return !!CHAPTER_THREE_COTTAGE_VISITS[visitKey] && !this.visitedChapterThreeCottages?.has(visitKey);
+  },
+
+  visitChapterThreeCottage(unitId) {
+    const unit = this.units.find((candidate) => candidate.id === unitId);
+    if (!this.canVisitChapterThreeCottage(unit)) return;
+    const visitKey = tileKey(unit.x, unit.y);
+    const visit = CHAPTER_THREE_COTTAGE_VISITS[visitKey];
+    this.closeActionMenu();
+    this.closeSelectionMenu(false);
+    this.visitedChapterThreeCottages = this.visitedChapterThreeCottages || new Set();
+    this.visitedChapterThreeCottages.add(visitKey);
+    unit.acted = true;
+    this.busy = true;
+    this.refreshUnitSprite(unit);
+    this.showChapterTwoSetupDialogue({
+      speaker: visit.speaker,
+      portrait: visit.portrait,
+      text: visit.text,
+      onContinue: () => {
+        this.busy = false;
+        this.clearSelection(`${unit.name} visited the cottage.`);
+        this.checkEndOfPlayerPhase();
+      },
+    });
   },
 
   beginChapterTwoSetupIfNeeded() {

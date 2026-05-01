@@ -193,6 +193,13 @@ export const INDIVIDUAL_UNIT_SPRITE_SETS = {
     hurt: createDirectionalStateEntries("chakram_thug", "hurt"),
     death: createDeathEntries("chakram_thug"),
   },
+  ambrose: {
+    idle: createDirectionalStateEntries("ambrose", "idle"),
+    move: createDirectionalStateEntries("ambrose", "move"),
+    attack: createDirectionalStateEntries("ambrose", "attack"),
+    hurt: createDirectionalStateEntries("ambrose", "hurt"),
+    death: createDeathEntries("ambrose"),
+  },
 };
 
 export const UNIT_SPRITE_RENDER = {
@@ -267,6 +274,18 @@ export const BIOMES = {
       default: { key: "farmFieldTile", path: "/tiles/farm/field.png" },
     },
   },
+  town: {
+    terrainTextures: {
+      road: { key: "townRoadTile", path: "/tiles/town/road.png" },
+      pavement: { key: "townPavementTile", path: "/tiles/town/pavement.png" },
+      grass: { key: "townGrassTile", path: "/tiles/town/grass.png" },
+      cottage: { key: "townCottageTile", path: "/tiles/town/cottage.png" },
+      chinese: { key: "townChineseTile", path: "/tiles/town/chinese.png" },
+      forest: { key: "townForestTile", path: "/tiles/town/forest.png" },
+      church: { key: "townChurchTile", path: "/tiles/town/church.png" },
+      default: { key: "townGrassTile", path: "/tiles/town/grass.png" },
+    },
+  },
 };
 
 export function queueImage(scene, key, path) {
@@ -334,6 +353,7 @@ export function queueChapterAssets(scene, levelData = LEVELS.chapter1) {
   queueImage(scene, "maraPortrait", "/portraits/mara.jpg");
   queueImage(scene, "gusPortrait", "/portraits/gus.jpg");
   queueImage(scene, "mercenaryPortrait", "/portraits/mercenary.jpg");
+  queueImage(scene, "ambrosePortrait", "/portraits/Ambrose.jpg");
   queueImage(scene, "prologueScene", "/scenes/prologue.jpg");
   queueImage(scene, "leonsHouseScene", "/scenes/leons_house.jpg");
   queueImage(scene, "walkToSchoolScene", "/scenes/walk_to_school.jpg");
