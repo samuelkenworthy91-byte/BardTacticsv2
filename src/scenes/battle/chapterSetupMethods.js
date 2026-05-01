@@ -95,6 +95,16 @@ export const chapterSetupMethods = {
     return forts;
   },
 
+  getUpperRightChapterTwoFortTile(forts = null) {
+    const fortTiles = forts || this.getChapterTwoFortTiles();
+    return fortTiles.reduce((best, tile) => {
+      if (!best) return tile;
+      if (tile.y < best.y) return tile;
+      if (tile.y === best.y && tile.x > best.x) return tile;
+      return best;
+    }, null);
+  },
+
   showChapterTwoSetupDialogue({ speaker, portrait, text, onContinue }) {
     if (this.chapterSetupDialogueContainer) this.chapterSetupDialogueContainer.destroy(true);
 
@@ -220,7 +230,6 @@ export const chapterSetupMethods = {
       text: allyLine,
       onContinue: () => {
         this.spawnShadeWaveIntro();
-        this.busy = false;
       },
     });
   },
@@ -228,28 +237,72 @@ export const chapterSetupMethods = {
   spawnShadeWaveIntro() {
     const forts = this.getChapterTwoFortTiles();
     if (forts.length === 0) return;
-    const leaderTile = forts[0];
-    this.spawnShadeAt(leaderTile.x, leaderTile.y, 4, "shade_leader");
-    this.helpText.setText("Shade: well I can't be outnumbered now can I?");
-    this.time.delayedCall(800, () => {
-      forts.forEach((tile, index) => this.spawnShadeAt(tile.x, tile.y, 2, `shade_clone_fort_${index + 1}`));
-      this.spawnShadeAt(2, 4, 2, "shade_clone_low_1");
-      this.spawnShadeAt(5, 5, 2, "shade_clone_low_2");
-      this.helpText.setText("Shade: better");
+    const leaderTile = this.getUpperRightChapterTwoFortTile(forts);
+    if (!leaderTile) return;
+
+    const leader = this.spawnShadeAt(leaderTile.x, leaderTile.y, 6, "shade_leader");
+    this.helpText.setText("Shade appears on the upper-right fort.");
+    this.showChapterTwoSetupDialogue({
+      speaker: "Shade",
+      portrait: "shadePortrait",
+      text: "Trying to outnumber me? Hardly seems fair.",
+      onContinue: () => {
+        this.playShadeDirectionFlourish([leader], () => {
+          const clones = forts
+            .filter((tile) => tile.x !== leaderTile.x || tile.y !== leaderTile.y)
+            .map((tile, index) => this.spawnShadeAt(tile.x, tile.y, 2, `shade_clone_fort_${index + 1}`))
+            .filter(Boolean);
+          this.helpText.setText("Shade clones appear on the forts.");
+          this.playShadeDirectionFlourish(clones, () => {
+            this.helpText.setText("Player Phase. Capture all four forts. Fences block movement.");
+            this.busy = false;
+          });
+        });
+      },
+    });
+  },
+
+  playShadeDirectionFlourish(units, onComplete = null) {
+    const shadeUnits = (Array.isArray(units) ? units : [units]).filter(Boolean);
+    const directions = ["down", "left", "right", "up", "down", "left", "right", "up"];
+    const frameDuration = 70;
+
+    if (shadeUnits.length === 0) {
+      if (typeof onComplete === "function") onComplete();
+      return;
+    }
+
+    directions.forEach((direction, index) => {
+      this.time.delayedCall(index * frameDuration, () => {
+        shadeUnits.forEach((unit) => {
+          if (!unit || unit.hp <= 0) return;
+          unit.facing = direction;
+          this.setUnitSpriteFrame(unit, "idle", direction);
+        });
+      });
+    });
+
+    this.time.delayedCall(directions.length * frameDuration + 40, () => {
+      shadeUnits.forEach((unit) => {
+        if (!unit || unit.hp <= 0) return;
+        unit.facing = "up";
+        this.setUnitSpriteFrame(unit, "idle", "up");
+      });
+      if (typeof onComplete === "function") onComplete();
     });
   },
 
   spawnShadeAt(x, y, level = 2, shadeId = null) {
-    if (!this.isInBounds(x, y) || this.getUnitAt(x, y)) return;
+    if (!this.isInBounds(x, y) || this.getUnitAt(x, y)) return null;
     const thug = UNITS.find((u) => u.id === "thug1");
-    if (!thug) return;
+    if (!thug) return null;
     const id = shadeId || `shade_${Date.now()}_${Math.floor(Math.random() * 9999)}`;
-    const scale = level >= 4 ? 1 : 0.75;
+    const scale = Math.max(0.75, level / 4);
     const unit = {
       ...thug,
       id,
       name: "Shade",
-      title: level >= 4 ? "Recon Man" : "Shade Clone",
+      title: "Recon Man",
       className: "Assassin",
       team: "enemy",
       portraitKey: "shadePortrait",
@@ -266,6 +319,7 @@ export const chapterSetupMethods = {
     };
     this.units.push(unit);
     this.drawUnits();
+    return unit;
   },
 
   captureFort(unitId) {

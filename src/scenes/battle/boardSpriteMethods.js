@@ -503,7 +503,14 @@ export const boardSpriteMethods = {
   getAttackAnimationState(unit, weapon = null) {
     if (!unit) return "attack";
     if (weapon?.damageType === "magical") {
-      const magicEntries = this.getIndividualSpriteEntryCandidates(unit, "magic", unit.facing || "down", 0);
+      const spriteSet = this.getIndividualSpriteSet(unit);
+      const spriteSetKey = unit.spriteSet || unit.id;
+      const direction = CARDINAL_DIRECTIONS.includes(unit.facing) ? unit.facing : "down";
+      const magicEntries = uniqueSpriteEntries([
+        spriteSet?.magic?.[direction],
+        spriteSet?.magic?.down,
+        ...createDirectionalSpriteCandidateEntries(spriteSetKey, "magic", direction),
+      ].filter(Boolean));
       if (magicEntries.some((entry) => entry?.key && this.textures.exists(entry.key))) return "magic";
     }
     return "attack";
