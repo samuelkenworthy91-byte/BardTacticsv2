@@ -64,6 +64,7 @@ import {
   CHAPTER_TWO_ALLY_OPTIONS,
   CHAPTER_TWO_ALLY_SELECTION_LINES,
   CHAPTER_TWO_OPENING,
+  CHAPTER_TWO_POST_BATTLE_SCENE,
   CHAPTER_TWO_TITLE,
 } from "../../chapters/chapter2.js";
 import {
@@ -115,7 +116,7 @@ export const narrativeMethods = {
     const continueButton = this.add.rectangle(92, 48, 130, 40, 0x334155);
     continueButton.setStrokeStyle(2, 0x94a3b8);
     continueButton.setInteractive({ useHandCursor: true });
-    continueButton.on("pointerdown", () => this.finishChapterOne());
+    continueButton.on("pointerdown", () => this.finishCurrentChapter());
     const continueButtonText = this.add.text(92, 48, "Continue", { fontSize: "18px", fontStyle: "bold", color: "#f7ecd3" }).setOrigin(0.5);
     this.savePromptStatus = this.add.text(0, 92, "", { fontSize: "14px", color: "#86efac" }).setOrigin(0.5);
     this.savePromptContainer.add([saveBg, this.savePromptTitle, this.savePromptText, saveButton, saveButtonText, continueButton, continueButtonText, this.savePromptStatus]);
@@ -189,6 +190,10 @@ export const narrativeMethods = {
     this.tweens.add({ targets: this.postBattleContainer, alpha: 1, duration: 250, onComplete: () => this.updatePostBattleUI() });
   },
 
+  getPostBattleScene() {
+    return isChapterTwoOrLater(this.currentChapterNumber) ? CHAPTER_TWO_POST_BATTLE_SCENE : POST_BATTLE_SCENE;
+  },
+
   playPostBattleUnitDeath(unitId, autoAdvanceDelay = 1400) {
     if (this.postBattleActionSteps.has(this.postBattleStep)) return;
     this.postBattleActionSteps.add(this.postBattleStep);
@@ -211,7 +216,8 @@ export const narrativeMethods = {
   },
 
   updatePostBattleUI() {
-    const line = POST_BATTLE_SCENE[this.postBattleStep];
+    const scene = this.getPostBattleScene();
+    const line = scene[this.postBattleStep];
     if (!line) {
       this.showSavePrompt();
       return;
@@ -293,8 +299,9 @@ export const narrativeMethods = {
 
   advancePostBattle() {
     if (this.phase !== "postbattle") return;
+    const scene = this.getPostBattleScene();
     this.postBattleStep += 1;
-    if (this.postBattleStep >= POST_BATTLE_SCENE.length) {
+    if (this.postBattleStep >= scene.length) {
       this.showSavePrompt();
       return;
     }
@@ -374,7 +381,7 @@ export const narrativeMethods = {
       this.savePromptContainer.setVisible(true);
     }, "15px");
 
-    const continueButton = createBannerButton(this, 118, 156, 160, 34, "Continue", () => this.finishChapterOne(), "15px");
+    const continueButton = createBannerButton(this, 118, 156, 160, 34, "Continue", () => this.finishCurrentChapter(), "15px");
 
     this.saveSlotContainer.add([backButton.container, continueButton.container]);
     this.postBattleContainer.add(this.saveSlotContainer);
@@ -386,8 +393,11 @@ export const narrativeMethods = {
     try {
       window.localStorage.setItem(getSaveSlotKey(slotNumber), JSON.stringify(saveData));
       this.pendingChapterTwoTransitionData = saveData;
-      if (this.saveSlotStatusText) this.saveSlotStatusText.setText(`Saved to Slot ${slotNumber}. Moving to Chapter 2...`);
-      this.time.delayedCall(550, () => this.finishChapterOne());
+      const statusText = isChapterTwoOrLater(this.currentChapterNumber)
+        ? `Saved to Slot ${slotNumber}.`
+        : `Saved to Slot ${slotNumber}. Moving to Chapter 2...`;
+      if (this.saveSlotStatusText) this.saveSlotStatusText.setText(statusText);
+      this.time.delayedCall(550, () => this.finishCurrentChapter());
     } catch (error) {
       if (this.saveSlotStatusText) this.saveSlotStatusText.setText("Save failed in this browser preview.");
     }
@@ -406,6 +416,18 @@ export const narrativeMethods = {
     this.helpText.setText("Chapter 2: Owed an Explanation.");
     this.busy = true;
     this.showChapterTwoTitleCard();
+  },
+
+  finishCurrentChapter() {
+    if (isChapterTwoOrLater(this.currentChapterNumber)) {
+      if (this.saveSlotContainer) {
+        this.saveSlotContainer.destroy();
+        this.saveSlotContainer = null;
+      }
+      this.scene.start("MainMenuScene");
+      return;
+    }
+    this.finishChapterOne();
   },
 
   createAllyDeathCutsceneUI() {

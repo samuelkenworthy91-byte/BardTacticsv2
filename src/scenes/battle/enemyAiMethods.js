@@ -452,19 +452,26 @@ export const enemyAiMethods = {
       if (!this.chapterTwoSetupDone) this.beginChapterTwoSetupIfNeeded();
       if (this.chapterTwoSetupDone && this.chapterTwoTurns % 2 === 0) {
         const captured = this.capturedForts || new Set();
-        const forts = this.getChapterTwoFortTiles().filter((tile) => !captured.has(tileKey(tile.x, tile.y)));
-        if (forts.length > 0) {
-          const fort = Phaser.Utils.Array.GetRandom(forts);
+        const forts = Phaser.Utils.Array.Shuffle(
+          this.getChapterTwoFortTiles().filter((tile) => !captured.has(tileKey(tile.x, tile.y)))
+        ).slice(0, 2);
+        let spawnedClones = 0;
+        forts.forEach((fort) => {
           const spawnCandidates = [
+            { x: fort.x, y: fort.y },
             { x: fort.x, y: fort.y + 1 },
             { x: fort.x - 1, y: fort.y },
             { x: fort.x + 1, y: fort.y },
+            { x: fort.x, y: fort.y - 1 },
           ].filter((tile) => this.isInBounds(tile.x, tile.y) && this.isWalkable(tile.x, tile.y) && !this.getUnitAt(tile.x, tile.y));
           if (spawnCandidates.length > 0) {
-            const spawnTile = Phaser.Utils.Array.GetRandom(spawnCandidates);
+            const spawnTile = spawnCandidates[0];
             this.spawnShadeAt(spawnTile.x, spawnTile.y, 2);
-            this.helpText.setText("A Shade clone appears near an uncaptured fort!");
+            spawnedClones += 1;
           }
+        });
+        if (spawnedClones > 0) {
+          this.helpText.setText(`${spawnedClones === 1 ? "A Shade clone appears" : "Shade clones appear"} near uncaptured forts!`);
         }
       }
     }

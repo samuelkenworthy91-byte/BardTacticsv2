@@ -315,6 +315,7 @@ export const chapterSetupMethods = {
       def: Math.max(1, Math.round((thug.def || 1) * scale)),
       res: Math.max(0, Math.round((thug.res || 0) * scale)),
       spd: Math.max(3, Math.round((thug.spd || 4) * scale)),
+      weapons: [{ name: "Kunai", baseDamage: 3, range: 1, damageType: "physical", stat: "str", hitRate: 100 }],
       x, y, acted: false,
     };
     this.units.push(unit);
@@ -342,6 +343,7 @@ export const chapterSetupMethods = {
       this.phaseText.setText("Victory");
       this.phaseText.setColor("#86efac");
       this.busy = true;
+      this.time.delayedCall(650, () => this.startPostBattleScene());
       return;
     }
     this.checkEndOfPlayerPhase();

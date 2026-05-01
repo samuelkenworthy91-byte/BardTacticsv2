@@ -44,6 +44,18 @@ export const CHAPTER_TWO_OPENING = [
   },
 ];
 
+export const CHAPTER_TWO_POST_BATTLE_SCENE = [
+  {
+    type: "sceneDialogue",
+    sceneName: "Byron Farm",
+    scene: "byronFarmScene",
+    speaker: "Edwin",
+    portrait: "edwinPortrait",
+    text: "Good to see you all getting along. rest up for now. Guildlites are sure to come after us soon and we'll need everyone in fighting shape.",
+  },
+  { type: "savePrompt", title: "Chapter 2 Complete", text: "Save game?" },
+];
+
 export const CHAPTER_TWO_MAP = [
   ["field", "field", "field", "field", "fence", "fort", "fort", "field"],
   ["field", "field", "field", "field", "fence", "fort", "fort", "field"],
