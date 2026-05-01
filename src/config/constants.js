@@ -46,6 +46,23 @@ export const BROTHERS_BLIGH_SKILL = {
   cutinKey: BROTHERS_BLIGH_CUTIN_KEY,
   hitEffectKey: BROTHERS_BLIGH_HIT_EFFECT_KEY,
 };
+export const PARLEY_SKILL = {
+  id: "parley",
+  name: "Parley",
+  cost: 3,
+  type: "adjacentRecruit",
+};
+export const RECRUITMENT_CONFIG = {
+  falan: {
+    recruitable: false,
+  },
+  shade_leader: {
+    recruitable: true,
+    baseId: "shade",
+    positiveClose: "all",
+    successLine: "The boss said if you beat me I should follow your orders and I don't see myself winning this.",
+  },
+};
 export const OPPORTUNITY_ATTACK_HIT_RATE = 50;
 export const OPPORTUNITY_ATTACK_PAUSE = 650;
 export const SKILL_TILE_EFFECT_STAGGER = 180;

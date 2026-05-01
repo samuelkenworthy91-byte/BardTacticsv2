@@ -89,6 +89,11 @@ export const flowMethods = {
     }
   },
 
+  shouldRestoreResourcesForChapterStart(saveData = null) {
+    const chapterNumber = getSaveDataChapterNumber(saveData, this.currentChapterNumber);
+    return isChapterTwoOrLater(chapterNumber);
+  },
+
   applyLoadedSaveData(saveData) {
     if (!saveData) return;
 
@@ -98,6 +103,7 @@ export const flowMethods = {
 
     const savedById = new Map(saveData.units.map((unitState) => [unitState.id, unitState]));
     const preserveMapPositions = isChapterOne(this.currentChapterNumber);
+    const restoreResources = this.shouldRestoreResourcesForChapterStart(saveData);
 
     this.units = this.units
       .map((unit) => {
@@ -105,7 +111,7 @@ export const flowMethods = {
         if (!saved) return unit;
         if (saved.alive === false) return null;
 
-        return {
+        const merged = {
           ...unit,
           ...saved,
           x: preserveMapPositions ? (saved.x ?? unit.x) : unit.x,
@@ -117,6 +123,11 @@ export const flowMethods = {
           acted: false,
           spriteState: "idle",
         };
+        if (restoreResources && merged.team === "player") {
+          merged.hp = merged.maxHp || merged.hp || 1;
+          merged.sigilPoints = merged.maxSigilPoints ?? merged.sigilPoints ?? 3;
+        }
+        return merged;
       })
       .filter(Boolean);
   },

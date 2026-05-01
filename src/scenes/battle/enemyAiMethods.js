@@ -427,6 +427,7 @@ export const enemyAiMethods = {
 
   startPlayerPhase() {
     this.pendingItemUse = null;
+    this.pendingParleyUse = null;
     this.targetTileColor = null;
     this.targetTileStroke = null;
     this.phase = "player";

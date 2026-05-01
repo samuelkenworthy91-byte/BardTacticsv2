@@ -19,8 +19,10 @@ import {
   LEVEL_UP_STATS,
   OPPORTUNITY_ATTACK_HIT_RATE,
   OPPORTUNITY_ATTACK_PAUSE,
+  PARLEY_SKILL,
   PLAYER_ACTION_PAUSE,
   PLAYER_MOVE_DURATION,
+  RECRUITMENT_CONFIG,
   SAVE_KEY,
   SAVE_SLOT_COUNT,
   SKILL_BANNER_DURATION,
@@ -85,6 +87,7 @@ export const playerActionMethods = {
     }
     this.closeActionMenu();
     this.pendingItemUse = null;
+    this.pendingParleyUse = null;
     this.selectedUnitId = unit.id;
     this.moveTiles = [];
     this.targetTiles = targets;
@@ -114,7 +117,9 @@ export const playerActionMethods = {
   getAvailableSkills(unit) {
     if (!unit) return [];
 
-    const skills = (unit.skills || []).map((skill) => ({ ...skill }));
+    const skills = unit.team === "player"
+      ? [{ ...PARLEY_SKILL }, ...(unit.skills || []).map((skill) => ({ ...skill }))]
+      : (unit.skills || []).map((skill) => ({ ...skill }));
 
     if (this.isBrotherUnit(unit) && this.areBrothersAdjacent()) {
       skills.push({ ...BROTHERS_BLIGH_SKILL });
@@ -137,6 +142,11 @@ export const playerActionMethods = {
 
   spendSkillCost(unit, skill) {
     if (!unit || !skill) return;
+
+    if (skill.id === "parley") {
+      unit.sigilPoints = 0;
+      return;
+    }
 
     if (skill.id === "brothersBligh") {
       const partner = this.getBrotherSkillPartner(unit);
@@ -171,13 +181,17 @@ export const playerActionMethods = {
       getLabel: (skill) => `${skill.name} (${skill.cost || 0} SP)`,
       layout: "leftPanel",
       getSummary: (skill) => this.getSkillSummary(unit, skill),
-      getTargets: (skill) => this.getSkillTargetsAt(unit, skill, unit.x, unit.y),
-      getPreviewTiles: (skill) => this.getSkillHitTilesAt(unit, skill, unit.x, unit.y),
+      getTargets: (skill) => skill.id === "parley" ? this.getParleyTargets(unit) : this.getSkillTargetsAt(unit, skill, unit.x, unit.y),
+      getPreviewTiles: (skill) => skill.id === "parley" ? this.getParleyTargets(unit) : this.getSkillHitTilesAt(unit, skill, unit.x, unit.y),
       canChoose: (skill) => this.canUseSkill(unit, skill),
       disabledText: (skill) => `${skill.name} needs ${skill.cost} Sigil Points.`,
       onChoose: (skill) => {
         if (!this.canUseSkill(unit, skill)) {
           this.helpText.setText(`${skill.name} needs ${skill.cost} Sigil Points.`);
+          return;
+        }
+        if (skill.id === "parley") {
+          this.beginParleyTargetSelection(unit, skill);
           return;
         }
         const hitTiles = this.getSkillHitTilesAt(unit, skill, unit.x, unit.y);
@@ -361,11 +375,210 @@ export const playerActionMethods = {
     });
   },
 
+  getRecruitmentConfig(target) {
+    if (!target) return null;
+    return RECRUITMENT_CONFIG[target.id] || RECRUITMENT_CONFIG[target.recruitmentId] || null;
+  },
+
+  isRecruitableTarget(target) {
+    const config = this.getRecruitmentConfig(target);
+    return !!target && target.team === "enemy" && target.hp > 0 && config?.recruitable === true;
+  },
+
+  getParleyTargets(unit) {
+    if (!unit) return [];
+    return this.units.filter((target) => (
+      this.isRecruitableTarget(target) &&
+      distance(unit, target) === 1
+    ));
+  },
+
+  getParleyRelationship(unit, target) {
+    const config = this.getRecruitmentConfig(target);
+    if (!unit || !target || !config) return { type: "neutral", boost: 0 };
+    if (Array.isArray(config.terribleHistory) && config.terribleHistory.includes(unit.id)) {
+      return { type: "terrible", boost: 0 };
+    }
+    if (config.terribleHistory === "all") return { type: "terrible", boost: 0 };
+    if (Array.isArray(config.positiveClose) && config.positiveClose.includes(unit.id)) {
+      return { type: "positiveClose", boost: 25 };
+    }
+    if (config.positiveClose === "all") return { type: "positiveClose", boost: 25 };
+    if (Array.isArray(config.positive) && config.positive.includes(unit.id)) {
+      return { type: "positive", boost: 12 };
+    }
+    if (config.positive === "all") return { type: "positive", boost: 12 };
+    return { type: "neutral", boost: 0 };
+  },
+
+  getParleyChance(unit, target) {
+    if (!unit || !target) return 0;
+    const maxHp = Math.max(1, target.maxHp || target.hp || 1);
+    const currentHp = Phaser.Math.Clamp(target.hp || 0, 1, maxHp);
+    const missingRatio = maxHp <= 1 ? 1 : (maxHp - currentHp) / (maxHp - 1);
+    const baseChance = 0.5 + missingRatio * 49.5;
+    const relationship = this.getParleyRelationship(unit, target);
+    return Math.min(75, baseChance + relationship.boost);
+  },
+
+  beginParleyTargetSelection(unit, skill = PARLEY_SKILL) {
+    if (!unit || !skill) return;
+    const targets = this.getParleyTargets(unit);
+    if (targets.length === 0) {
+      this.helpText.setText("No recruitable enemy is adjacent for Parley.");
+      return;
+    }
+    this.closeSelectionMenu(false);
+    this.selectedUnitId = unit.id;
+    this.pendingParleyUse = { unitId: unit.id, skillId: skill.id };
+    this.moveTiles = [];
+    this.targetTiles = targets;
+    this.targetTileColor = TARGET_HIGHLIGHT.skill.fill;
+    this.targetTileStroke = TARGET_HIGHLIGHT.skill.stroke;
+    this.redrawSelection();
+    this.updateSelectedPanel();
+    this.helpText.setText(`Choose who ${unit.name} parleys with. Press Space to cancel.`);
+  },
+
+  showCenteredPopup(message, onComplete = null) {
+    const container = this.add.container(GAME_WIDTH / 2, GAME_HEIGHT / 2).setDepth(12000).setAlpha(0);
+    const panel = createBannerPanel(this, 0, 0, 520, 116, { innerInset: 16 });
+    const text = this.add.text(0, 0, message || "", {
+      fontSize: "24px",
+      fontStyle: "bold",
+      color: "#f7ecd3",
+      stroke: "#0b0811",
+      strokeThickness: 4,
+      align: "center",
+      wordWrap: { width: 460 },
+    }).setOrigin(0.5);
+    container.add([panel.container, text]);
+    this.uiLayer.add(container);
+    this.tweens.add({
+      targets: container,
+      alpha: 1,
+      duration: 180,
+      ease: "Quad.Out",
+      onComplete: () => {
+        this.time.delayedCall(1400, () => {
+          this.tweens.add({
+            targets: container,
+            alpha: 0,
+            duration: 220,
+            ease: "Quad.Out",
+            onComplete: () => {
+              container.destroy();
+              if (typeof onComplete === "function") onComplete();
+            },
+          });
+        });
+      },
+    });
+  },
+
+  finishParleyAttempt(unit, message = null) {
+    if (unit) {
+      unit.acted = true;
+      this.refreshUnitSprite(unit);
+    }
+    this.pendingParleyUse = null;
+    this.targetTiles = [];
+    this.targetTileColor = null;
+    this.targetTileStroke = null;
+    this.busy = false;
+    this.redrawSelection();
+    this.updateSelectedPanel();
+    this.clearSelection(message || `${unit?.name || "Unit"} used Parley.`);
+    this.checkEndOfPlayerPhase();
+  },
+
+  useParley(unitId, targetId) {
+    const unit = this.units.find((candidate) => candidate.id === unitId);
+    const target = this.units.find((candidate) => candidate.id === targetId);
+    const skill = this.getSkillById(unit, "parley");
+    if (!unit || !target || !skill || unit.acted || unit.hp <= 0 || !this.canUseSkill(unit, skill)) return false;
+    if (!this.getParleyTargets(unit).some((candidate) => candidate.id === target.id)) {
+      this.helpText.setText(`${target.name} cannot be targeted by Parley.`);
+      return false;
+    }
+
+    const config = this.getRecruitmentConfig(target);
+    const relationship = this.getParleyRelationship(unit, target);
+    this.closeActionMenu();
+    this.closeSelectionMenu(false);
+    this.pendingParleyUse = null;
+    delete unit.pendingMoveOrigin;
+    this.busy = true;
+    this.selectedUnitId = unit.id;
+    this.moveTiles = [];
+    this.targetTiles = [];
+    this.targetTileColor = null;
+    this.targetTileStroke = null;
+    this.redrawSelection();
+    this.spendSkillCost(unit, skill);
+    this.refreshUnitSprite(unit);
+    this.updateSelectedPanel();
+    this.showSkillBanner(skill.name);
+    this.helpText.setText(`${unit.name} uses Parley on ${target.name}.`);
+
+    if (relationship.type === "terrible") {
+      const lockoutLine = config?.lockoutLine || "Not after everything you have done.";
+      this.showChapterTwoSetupDialogue({
+        speaker: target.name,
+        portrait: target.portraitKey,
+        text: lockoutLine,
+        onContinue: () => {
+          this.showCenteredPopup(`${target.name} will never join the likes of you`, () => {
+            this.finishParleyAttempt(unit, `${target.name} refused to join.`);
+          });
+        },
+      });
+      return true;
+    }
+
+    const chance = this.getParleyChance(unit, target);
+    const succeeded = Phaser.Math.FloatBetween(0, 100) < chance;
+    if (!succeeded) {
+      this.time.delayedCall(420, () => {
+        this.showSkillBanner("FAILED");
+        this.finishParleyAttempt(unit, `${unit.name}'s Parley failed.`);
+      });
+      return true;
+    }
+
+    const successLine = config?.successLines?.[unit.id] || config?.successLine || "Fine. I'm with you.";
+    this.showChapterTwoSetupDialogue({
+      speaker: target.name,
+      portrait: target.portraitKey,
+      text: successLine,
+      onContinue: () => {
+        target.team = "player";
+        target.acted = true;
+        target.sigilPoints = target.sigilPoints ?? target.maxSigilPoints ?? 3;
+        target.spriteState = "idle";
+        this.refreshUnitSprite(target);
+        this.setUnitSpriteFrame(target, "idle", target.facing || "down");
+        this.showCenteredPopup(`${target.name} joined The Bards!`, () => {
+          this.finishParleyAttempt(unit, `${target.name} joined The Bards!`);
+        });
+      },
+    });
+    return true;
+  },
+
   getSkillSummary(unit, skill) {
     if (!unit || !skill) return "";
     const targets = this.getSkillTargetsAt(unit, skill, unit.x, unit.y);
     const hitTiles = this.getSkillHitTilesAt(unit, skill, unit.x, unit.y);
     let effect = "Uses a special technique.";
+
+    if (skill.id === "parley") {
+      const parleyTargets = this.getParleyTargets(unit);
+      const targetText = parleyTargets.length === 1
+        ? `Chance on ${parleyTargets[0].name}: ${this.getParleyChance(unit, parleyTargets[0]).toFixed(1)}%.`
+        : `${parleyTargets.length} adjacent recruitable targets.`;
+      return `${skill.name}: requires 3 Sigil Points and spends all current SP. Attempts to recruit an adjacent boss. ${targetText}`;
+    }
 
     if (skill.id === "brothersBligh") {
       const partner = this.getBrotherSkillPartner(unit);
@@ -386,6 +599,10 @@ export const playerActionMethods = {
 
   canUseSkill(unit, skill) {
     if (!unit || !skill) return false;
+
+    if (skill.id === "parley") {
+      return unit.team === "player" && (unit.sigilPoints ?? 0) >= (skill.cost ?? 0);
+    }
 
     if (skill.id === "brothersBligh") {
       const partner = this.getBrotherSkillPartner(unit);
@@ -482,6 +699,7 @@ export const playerActionMethods = {
     this.closeActionMenu();
     this.closeSelectionMenu(false);
     this.pendingItemUse = null;
+    this.pendingParleyUse = null;
     delete unit.pendingMoveOrigin;
     this.busy = true;
     this.selectedUnitId = unit.id;
@@ -657,6 +875,7 @@ export const playerActionMethods = {
     this.closeSelectionMenu(false);
     this.selectedUnitId = unit.id;
     this.pendingItemUse = { unitId: unit.id, itemId: item.id };
+    this.pendingParleyUse = null;
     this.moveTiles = [];
     this.targetTiles = targets;
     this.targetTileColor = TARGET_HIGHLIGHT.item.fill;
@@ -692,6 +911,7 @@ export const playerActionMethods = {
     }
     delete unit.pendingMoveOrigin;
     this.pendingItemUse = null;
+    this.pendingParleyUse = null;
     this.closeActionMenu();
     this.closeSelectionMenu(false);
     this.targetTiles = [];
@@ -731,6 +951,15 @@ export const playerActionMethods = {
       const clickedUnit = this.getUnitAt(tile.x, tile.y);
       const selectedUnit = this.getSelectedUnit();
 
+      if (this.pendingParleyUse) {
+        if (clickedUnit && this.isTargetTile(clickedUnit.x, clickedUnit.y)) {
+          this.useParley(this.pendingParleyUse.unitId, clickedUnit.id);
+          return;
+        }
+        this.helpText.setText("Choose one of the highlighted Parley targets, or press Space to cancel.");
+        return;
+      }
+
       if (this.pendingItemUse) {
         if (clickedUnit && this.isTargetTile(clickedUnit.x, clickedUnit.y)) {
           this.useItem(this.pendingItemUse.unitId, this.pendingItemUse.itemId, clickedUnit.id);
@@ -747,6 +976,7 @@ export const playerActionMethods = {
       if (clickedUnit && clickedUnit.team === "player" && !clickedUnit.acted) {
         this.closeActionMenu();
         this.pendingItemUse = null;
+        this.pendingParleyUse = null;
         this.selectedUnitId = clickedUnit.id;
         this.moveTiles = this.reachableTiles(clickedUnit);
         this.targetTiles = [];
@@ -797,6 +1027,19 @@ export const playerActionMethods = {
     }
 
     const selectedUnit = this.getSelectedUnit();
+
+    if (this.pendingParleyUse) {
+      const unit = this.units.find((candidate) => candidate.id === this.pendingParleyUse.unitId) || selectedUnit;
+      this.pendingParleyUse = null;
+      this.targetTiles = [];
+      this.targetTileColor = null;
+      this.targetTileStroke = null;
+      this.redrawSelection();
+      if (unit && unit.team === "player" && !unit.acted) {
+        this.showActionMenu(unit, "Parley cancelled. Choose another action.");
+      }
+      return;
+    }
 
     if (this.pendingItemUse) {
       const unit = this.units.find((candidate) => candidate.id === this.pendingItemUse.unitId) || selectedUnit;
@@ -865,6 +1108,7 @@ export const playerActionMethods = {
     this.closeActionMenu();
     this.closeSelectionMenu(false);
     this.pendingItemUse = null;
+    this.pendingParleyUse = null;
     this.moveTiles = [];
     this.targetTiles = [];
     this.targetTileColor = null;
@@ -1132,6 +1376,7 @@ export const playerActionMethods = {
   clearSelection(message = "Click Edwin or Leon to select a unit.") {
     this.closeActionMenu();
     this.pendingItemUse = null;
+    this.pendingParleyUse = null;
     this.selectedUnitId = null;
     this.moveTiles = [];
     this.targetTiles = [];
