@@ -336,6 +336,9 @@ export const boardSpriteMethods = {
   },
 
   drawUnits() {
+    this.unitLayer.removeAll(true);
+    this.unitSprites = {};
+
     for (const unit of this.units) {
       const sprite = this.createUnitSprite(unit);
       this.unitSprites[unit.id] = sprite;

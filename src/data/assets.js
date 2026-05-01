@@ -129,6 +129,41 @@ export const INDIVIDUAL_UNIT_SPRITE_SETS = {
     hurt: createDirectionalStateEntries("leon", "hurt"),
     death: createDeathEntries("leon"),
   },
+  shade: {
+    idle: createDirectionalStateEntries("shade", "idle"),
+    move: createDirectionalStateEntries("shade", "move"),
+    attack: createDirectionalStateEntries("shade", "attack"),
+    hurt: createDirectionalStateEntries("shade", "hurt"),
+    death: createDeathEntries("shade"),
+  },
+  izzy: {
+    idle: createDirectionalStateEntries("izzy", "idle"),
+    move: createDirectionalStateEntries("izzy", "move"),
+    attack: createDirectionalStateEntries("izzy", "attack"),
+    hurt: createDirectionalStateEntries("izzy", "hurt"),
+    death: createDeathEntries("izzy"),
+  },
+  heath: {
+    idle: createDirectionalStateEntries("heath", "idle"),
+    move: createDirectionalStateEntries("heath", "move"),
+    attack: createDirectionalStateEntries("heath", "attack"),
+    hurt: createDirectionalStateEntries("heath", "hurt"),
+    death: createDeathEntries("heath"),
+  },
+  grimmy: {
+    idle: createDirectionalStateEntries("grimmy", "idle"),
+    move: createDirectionalStateEntries("grimmy", "move"),
+    attack: createDirectionalStateEntries("grimmy", "attack"),
+    hurt: createDirectionalStateEntries("grimmy", "hurt"),
+    death: createDeathEntries("grimmy"),
+  },
+  kane: {
+    idle: createDirectionalStateEntries("kane", "idle"),
+    move: createDirectionalStateEntries("kane", "move"),
+    attack: createDirectionalStateEntries("kane", "attack"),
+    hurt: createDirectionalStateEntries("kane", "hurt"),
+    death: createDeathEntries("kane"),
+  },
   falan: {
     idle: createDirectionalStateEntries("falan", "idle"),
     move: createDirectionalStateEntries("falan", "move"),
@@ -295,6 +330,7 @@ export function queueChapterAssets(scene, levelData = LEVELS.chapter1) {
   queueImage(scene, "izzyPortrait", "/portraits/izzy.jpg");
   queueImage(scene, "grimmyPortrait", "/portraits/grimmy.jpg");
   queueImage(scene, "kanePortrait", "/portraits/kane.jpg");
+  queueImage(scene, "shadePortrait", "/portraits/shade.jpg");
   queueImage(scene, "prologueScene", "/scenes/prologue.jpg");
   queueImage(scene, "leonsHouseScene", "/scenes/leons_house.jpg");
   queueImage(scene, "walkToSchoolScene", "/scenes/walk_to_school.jpg");
