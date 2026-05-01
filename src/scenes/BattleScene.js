@@ -2,7 +2,11 @@ import Phaser from "phaser";
 import { GAME_HEIGHT, GAME_WIDTH, TILE_SIZE } from "../config/constants.js";
 import { queueChapterAssets } from "../data/assets.js";
 import { CHAPTER_ONE_OPENING } from "../chapters/chapter1.js";
-import { getSaveDataChapterNumber, isChapterTwoOrLater } from "../chapters/progression.js";
+import {
+  getSaveDataChapterNumber,
+  isChapterThreeOrLater,
+  isChapterTwo,
+} from "../chapters/progression.js";
 import { flowMethods } from "./battle/flowMethods.js";
 import { uiMethods } from "./battle/uiMethods.js";
 import { combatMethods } from "./battle/combatMethods.js";
@@ -21,8 +25,11 @@ export class BattleScene extends Phaser.Scene {
     this.loadedSaveData = data.saveData || null;
     this.loadedSlotNumber = data.slotNumber || null;
     this.playChapterTwoOpening = data.playChapterTwoOpening === true;
+    this.playChapterThreeOpening = data.playChapterThreeOpening === true;
     this.skipChapterTwoTitleCard = data.skipChapter2TitleCard === true;
+    this.skipChapterThreeTitleCard = data.skipChapter3TitleCard === true;
     this.pendingChapterTwoTransitionData = data.pendingChapterTwoTransitionData || null;
+    this.pendingChapterThreeTransitionData = data.pendingChapterThreeTransitionData || null;
     this.currentChapterNumber = getSaveDataChapterNumber(this.loadedSaveData);
   }
 
@@ -121,7 +128,9 @@ export class BattleScene extends Phaser.Scene {
     this.updateSelectedPanel();
     this.setObjectiveDisplayVisible(false);
 
-    if (isChapterTwoOrLater(this.currentChapterNumber) && this.playChapterTwoOpening) {
+    if (isChapterThreeOrLater(this.currentChapterNumber) && this.playChapterThreeOpening) {
+      this.startChapterThreeOpening();
+    } else if (isChapterTwo(this.currentChapterNumber) && this.playChapterTwoOpening) {
       this.startChapterTwoOpening();
     } else if (this.loadFromSave) {
       this.startLoadedBattle();

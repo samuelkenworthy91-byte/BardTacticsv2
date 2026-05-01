@@ -331,6 +331,9 @@ export function queueChapterAssets(scene, levelData = LEVELS.chapter1) {
   queueImage(scene, "grimmyPortrait", "/portraits/grimmy.jpg");
   queueImage(scene, "kanePortrait", "/portraits/kane.jpg");
   queueImage(scene, "shadePortrait", "/portraits/shade.jpg");
+  queueImage(scene, "maraPortrait", "/portraits/mara.jpg");
+  queueImage(scene, "gusPortrait", "/portraits/gus.jpg");
+  queueImage(scene, "mercenaryPortrait", "/portraits/mercenary.jpg");
   queueImage(scene, "prologueScene", "/scenes/prologue.jpg");
   queueImage(scene, "leonsHouseScene", "/scenes/leons_house.jpg");
   queueImage(scene, "walkToSchoolScene", "/scenes/walk_to_school.jpg");
@@ -344,6 +347,13 @@ export function queueChapterAssets(scene, levelData = LEVELS.chapter1) {
   queueImage(scene, "chapter2CalebExperimentScene", "/scenes/chapter2_caleb_experiment.jpg");
   queueImage(scene, "chapter2EdwinGuildliteScene", "/scenes/chapter2_edwin_guildlites.jpg");
   queueImage(scene, "chapter2LeonShockedScene", "/scenes/chapter2_leon_shocked.jpg");
+  queueImage(scene, "chapter3TipenWhippetEntranceScene", "/scenes/chapter3_tipen_whippet_entrance.jpg");
+  queueImage(scene, "chapter3TipenWhippetMainRoadScene", "/scenes/chapter3_tipen_whippet_main_road.jpg");
+  queueImage(scene, "chapter3TakeawayExteriorScene", "/scenes/chapter3_takeaway_exterior.jpg");
+  queueImage(scene, "chapter3TakeawayInteriorScene", "/scenes/chapter3_takeaway_interior.jpg");
+  queueImage(scene, "chapter3MaraThreatenedScene", "/scenes/chapter3_mara_threatened.jpg");
+  queueImage(scene, "chapter3IzzyWindAttackScene", "/scenes/chapter3_izzy_wind_attack.jpg");
+  queueImage(scene, "chapter3MaraAfterwardScene", "/scenes/chapter3_mara_afterward.jpg");
   queueImage(scene, ICE_OF_AGES_HIT_EFFECT_KEY, ICE_OF_AGES_HIT_EFFECT_PATH);
   queueImage(scene, BROTHERS_BLIGH_CUTIN_KEY, BROTHERS_BLIGH_CUTIN_PATH);
   queueImage(scene, BROTHERS_BLIGH_HIT_EFFECT_KEY, BROTHERS_BLIGH_HIT_EFFECT_PATH);

@@ -74,6 +74,7 @@ import {
   getSaveDataChapterNumber,
   isChapterOne,
   isChapterTwoOrLater,
+  isChapterTwo,
 } from "../../chapters/progression.js";
 export const chapterSetupMethods = {
   setOpeningDialogueText(text) {
@@ -169,7 +170,7 @@ export const chapterSetupMethods = {
   },
 
   beginChapterTwoSetupIfNeeded() {
-    if (!isChapterTwoOrLater(this.currentChapterNumber) || this.chapterTwoSetupDone) return;
+    if (!isChapterTwo(this.currentChapterNumber) || this.chapterTwoSetupDone) return;
     const leon = this.units.find((u) => u.id === "leon" && u.team === "player");
     if (!leon) return;
     this.chapterTwoSetupDone = true;

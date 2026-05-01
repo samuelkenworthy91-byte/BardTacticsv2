@@ -7,7 +7,12 @@ import {
 } from "../config/constants.js";
 import { queueChapterAssets, queueImage } from "../data/assets.js";
 import { createBannerPanel } from "../ui/banner.js";
-import { getLevelForChapter, getSceneDataChapterNumber, isChapterTwoOrLater } from "../chapters/progression.js";
+import {
+  getLevelForChapter,
+  getSceneDataChapterNumber,
+  isChapterThreeOrLater,
+  isChapterTwo,
+} from "../chapters/progression.js";
 export class LoadingScene extends Phaser.Scene {
   constructor() {
     super("LoadingScene");
@@ -35,7 +40,11 @@ export class LoadingScene extends Phaser.Scene {
       strokeThickness: 5,
     }).setOrigin(0.5);
     const chapterNumber = getSceneDataChapterNumber(this.nextSceneData);
-    const chapterLabel = isChapterTwoOrLater(chapterNumber) ? "Preparing Chapter 2: Owed an Explanation" : "Preparing Chapter 1: 4 Years Gone";
+    const chapterLabel = isChapterThreeOrLater(chapterNumber)
+      ? "Preparing Chapter 3: Tipen Whippet"
+      : isChapterTwo(chapterNumber)
+        ? "Preparing Chapter 2: Owed an Explanation"
+        : "Preparing Chapter 1: 4 Years Gone";
     const hintText = this.add.text(0, -42, chapterLabel, { fontSize: "16px", color: "#d8c4f0" }).setOrigin(0.5);
     panel.container.add([loadingText, hintText]);
     this.add.rectangle(barX + barWidth / 2, barY, barWidth, barHeight, 0x101828, 1).setStrokeStyle(2, 0xb6925f, 0.9);
@@ -108,4 +117,4 @@ export class LoadingScene extends Phaser.Scene {
     this.time.delayedCall(350, () => this.scene.start("BattleScene", this.nextSceneData || {}));
   }
 }
-
+

@@ -68,12 +68,21 @@ import {
   CHAPTER_TWO_TITLE,
 } from "../../chapters/chapter2.js";
 import {
+  CHAPTER_THREE_OPENING,
+  CHAPTER_THREE_POST_BATTLE_SCENE,
+  CHAPTER_THREE_TITLE,
+} from "../../chapters/chapter3.js";
+import {
+  buildChapterThreeSaveData,
   buildChapterTwoSaveData,
+  CHAPTER_THREE_NUMBER,
   CHAPTER_TWO_NUMBER,
   getLevelForChapter,
   getSaveDataChapterNumber,
   isChapterOne,
+  isChapterThree,
   isChapterTwoOrLater,
+  isChapterTwo,
 } from "../../chapters/progression.js";
 export const narrativeMethods = {
   createPostBattleUI() {
@@ -191,7 +200,9 @@ export const narrativeMethods = {
   },
 
   getPostBattleScene() {
-    return isChapterTwoOrLater(this.currentChapterNumber) ? CHAPTER_TWO_POST_BATTLE_SCENE : POST_BATTLE_SCENE;
+    if (isChapterThree(this.currentChapterNumber)) return CHAPTER_THREE_POST_BATTLE_SCENE;
+    if (isChapterTwo(this.currentChapterNumber)) return CHAPTER_TWO_POST_BATTLE_SCENE;
+    return POST_BATTLE_SCENE;
   },
 
   playPostBattleUnitDeath(unitId, autoAdvanceDelay = 1400) {
@@ -393,9 +404,11 @@ export const narrativeMethods = {
     try {
       window.localStorage.setItem(getSaveSlotKey(slotNumber), JSON.stringify(saveData));
       this.pendingChapterTwoTransitionData = saveData;
-      const statusText = isChapterTwoOrLater(this.currentChapterNumber)
-        ? `Saved to Slot ${slotNumber}.`
-        : `Saved to Slot ${slotNumber}. Moving to Chapter 2...`;
+      const statusText = isChapterTwo(this.currentChapterNumber)
+        ? `Saved to Slot ${slotNumber}. Moving to Chapter 3...`
+        : isChapterThree(this.currentChapterNumber)
+          ? `Saved to Slot ${slotNumber}.`
+          : `Saved to Slot ${slotNumber}. Moving to Chapter 2...`;
       if (this.saveSlotStatusText) this.saveSlotStatusText.setText(statusText);
       this.time.delayedCall(550, () => this.finishCurrentChapter());
     } catch (error) {
@@ -409,8 +422,8 @@ export const narrativeMethods = {
       this.saveSlotContainer = null;
     }
 
-    this.currentChapterNumber = CHAPTER_TWO_NUMBER;
     this.pendingChapterTwoTransitionData = this.pendingChapterTwoTransitionData || this.buildChapterSaveData(this.loadedSlotNumber || null);
+    this.currentChapterNumber = CHAPTER_TWO_NUMBER;
     this.phaseText.setText("Chapter 2");
     this.phaseText.setColor("#fcd34d");
     this.helpText.setText("Chapter 2: Owed an Explanation.");
@@ -418,13 +431,32 @@ export const narrativeMethods = {
     this.showChapterTwoTitleCard();
   },
 
+  finishChapterTwo() {
+    if (this.saveSlotContainer) {
+      this.saveSlotContainer.destroy();
+      this.saveSlotContainer = null;
+    }
+
+    this.pendingChapterThreeTransitionData = this.pendingChapterThreeTransitionData || this.buildChapterSaveData(this.loadedSlotNumber || null);
+    this.currentChapterNumber = CHAPTER_THREE_NUMBER;
+    this.phaseText.setText("Chapter 3");
+    this.phaseText.setColor("#fcd34d");
+    this.helpText.setText("Chapter 3: Tipen Whippet.");
+    this.busy = true;
+    this.showChapterThreeTitleCard();
+  },
+
   finishCurrentChapter() {
-    if (isChapterTwoOrLater(this.currentChapterNumber)) {
+    if (isChapterThree(this.currentChapterNumber)) {
       if (this.saveSlotContainer) {
         this.saveSlotContainer.destroy();
         this.saveSlotContainer = null;
       }
       this.scene.start("MainMenuScene");
+      return;
+    }
+    if (isChapterTwo(this.currentChapterNumber)) {
+      this.finishChapterTwo();
       return;
     }
     this.finishChapterOne();
@@ -609,6 +641,7 @@ export const narrativeMethods = {
 
     this.phase = "chapter2";
     this.busy = true;
+    this.pendingChapterTransitionTarget = CHAPTER_TWO_NUMBER;
 
     this.setObjectiveDisplayVisible(false);
 
@@ -629,6 +662,56 @@ export const narrativeMethods = {
       }
     }
 
+    if (this.chapterTransitionChapterText) this.chapterTransitionChapterText.setText(CHAPTER_TWO_TITLE.chapter);
+    if (this.chapterTransitionSubtitleText) this.chapterTransitionSubtitleText.setText(CHAPTER_TWO_TITLE.subtitle);
+
+    this.chapterTransitionContainer.setVisible(true);
+    this.chapterTransitionContainer.setAlpha(0);
+
+    this.tweens.add({
+      targets: this.chapterTransitionContainer,
+      alpha: 1,
+      duration: 420,
+      ease: "Quad.easeOut"
+    });
+  },
+
+  showChapterThreeTitleCard(message) {
+    var displayMessage = message || "";
+
+    if (this.postBattleContainer) {
+      this.postBattleContainer.setVisible(false);
+    }
+
+    if (this.openingContainer) {
+      this.openingContainer.setVisible(false);
+    }
+
+    if (this.previewContainer) {
+      this.previewContainer.setVisible(false);
+    }
+
+    this.phase = "chapter3";
+    this.busy = true;
+    this.pendingChapterTransitionTarget = CHAPTER_THREE_NUMBER;
+
+    this.setObjectiveDisplayVisible(false);
+
+    this.phaseText.setText(CHAPTER_THREE_TITLE.chapter);
+    this.phaseText.setColor("#fcd34d");
+
+    if (displayMessage) {
+      this.helpText.setText(displayMessage);
+    } else {
+      this.helpText.setText(`${CHAPTER_THREE_TITLE.chapter}: ${CHAPTER_THREE_TITLE.subtitle}.`);
+    }
+
+    if (this.chapterTransitionChapterText) this.chapterTransitionChapterText.setText(CHAPTER_THREE_TITLE.chapter);
+    if (this.chapterTransitionSubtitleText) this.chapterTransitionSubtitleText.setText(CHAPTER_THREE_TITLE.subtitle);
+    if (this.chapterTransitionHintText) {
+      this.chapterTransitionHintText.setText(displayMessage || "Continue into the Chapter 3 opening.");
+    }
+
     this.chapterTransitionContainer.setVisible(true);
     this.chapterTransitionContainer.setAlpha(0);
 
@@ -641,7 +724,9 @@ export const narrativeMethods = {
   },
 
   continueFromChapterTransition() {
-    var saveData = this.pendingChapterTwoTransitionData;
+    const transitionTarget = this.pendingChapterTransitionTarget || CHAPTER_TWO_NUMBER;
+    const isChapterThreeTransition = transitionTarget === CHAPTER_THREE_NUMBER;
+    var saveData = isChapterThreeTransition ? this.pendingChapterThreeTransitionData : this.pendingChapterTwoTransitionData;
 
     if (!saveData) {
       saveData = this.buildChapterSaveData(this.loadedSlotNumber || null);
@@ -667,8 +752,10 @@ export const narrativeMethods = {
       loadFromSave: true,
       saveData: saveData,
       slotNumber: slotNumber,
-      playChapterTwoOpening: true,
-      skipChapter2TitleCard: true
+      playChapterTwoOpening: !isChapterThreeTransition,
+      playChapterThreeOpening: isChapterThreeTransition,
+      skipChapter2TitleCard: !isChapterThreeTransition,
+      skipChapter3TitleCard: isChapterThreeTransition
     });
   },
 
@@ -1050,6 +1137,19 @@ export const narrativeMethods = {
     this.openingLine = 0;
     this.openingContainer.setVisible(true);
     this.helpText.setText("Watch the Chapter 2 opening.");
+    this.updateOpeningUI();
+  },
+
+  startChapterThreeOpening() {
+    this.chapterTransitionContainer.setVisible(false).setAlpha(0);
+    this.phase = "intro";
+    this.busy = false;
+    this.setObjectiveDisplayVisible(false);
+    this.activeOpeningSequence = CHAPTER_THREE_OPENING;
+    this.openingStep = 0;
+    this.openingLine = 0;
+    this.openingContainer.setVisible(true);
+    this.helpText.setText("Watch the Chapter 3 opening.");
     this.updateOpeningUI();
   },
 

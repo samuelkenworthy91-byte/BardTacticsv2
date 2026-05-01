@@ -66,13 +66,16 @@ import {
   CHAPTER_TWO_OPENING,
   CHAPTER_TWO_TITLE,
 } from "../../chapters/chapter2.js";
+import { CHAPTER_THREE_ESCAPE_TILE } from "../../chapters/chapter3.js";
 import {
+  CHAPTER_THREE_NUMBER,
   buildChapterTwoSaveData,
   CHAPTER_TWO_NUMBER,
   getLevelForChapter,
   getSaveDataChapterNumber,
   isChapterOne,
   isChapterTwoOrLater,
+  isChapterTwo,
 } from "../../chapters/progression.js";
 export const boardSpriteMethods = {
   getCurrentBiome() {
@@ -97,7 +100,9 @@ export const boardSpriteMethods = {
   },
 
   getEscapeTile() {
-    return isChapterOne(this.currentChapterNumber) ? CHAPTER_ONE_ESCAPE_TILE : null;
+    if (isChapterOne(this.currentChapterNumber)) return CHAPTER_ONE_ESCAPE_TILE;
+    if (this.currentChapterNumber === CHAPTER_THREE_NUMBER) return CHAPTER_THREE_ESCAPE_TILE;
+    return null;
   },
 
   isEscapeTile(x, y) {
@@ -801,7 +806,7 @@ export const boardSpriteMethods = {
     if (this.isEscapeTile(unit.x, unit.y)) {
       actions.unshift({ label: "Escape", handler: () => this.escapeUnit(unit.id) });
     }
-    if (isChapterTwoOrLater(this.currentChapterNumber) && this.getTerrainAt(unit.x, unit.y) === "fort") {
+    if (isChapterTwo(this.currentChapterNumber) && this.getTerrainAt(unit.x, unit.y) === "fort") {
       actions.unshift({ label: "Capture", handler: () => this.captureFort(unit.id) });
     }
 

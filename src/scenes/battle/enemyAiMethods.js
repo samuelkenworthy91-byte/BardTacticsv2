@@ -73,6 +73,7 @@ import {
   getSaveDataChapterNumber,
   isChapterOne,
   isChapterTwoOrLater,
+  isChapterTwo,
 } from "../../chapters/progression.js";
 export const enemyAiMethods = {
   checkEndOfPlayerPhase() {
@@ -443,11 +444,11 @@ export const enemyAiMethods = {
         this.setUnitSpriteFrame(unit, "idle", unit.facing || "down");
       }
     }
-    this.helpText.setText(isChapterTwoOrLater(this.currentChapterNumber)
+    this.helpText.setText(isChapterTwo(this.currentChapterNumber)
       ? "Player Phase. Capture all four forts. Fences block movement."
       : "Player Phase. Reach the glowing gate tile and choose Escape.");
     this.busy = false;
-    if (isChapterTwoOrLater(this.currentChapterNumber)) {
+    if (isChapterTwo(this.currentChapterNumber)) {
       this.chapterTwoTurns = (this.chapterTwoTurns || 0) + 1;
       if (!this.chapterTwoSetupDone) this.beginChapterTwoSetupIfNeeded();
       if (this.chapterTwoSetupDone && this.chapterTwoTurns % 2 === 0) {

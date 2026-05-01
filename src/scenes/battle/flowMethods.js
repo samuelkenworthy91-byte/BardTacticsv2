@@ -67,12 +67,16 @@ import {
   CHAPTER_TWO_TITLE,
 } from "../../chapters/chapter2.js";
 import {
+  buildChapterThreeSaveData,
   buildChapterTwoSaveData,
+  CHAPTER_THREE_NUMBER,
   CHAPTER_TWO_NUMBER,
   getLevelForChapter,
   getSaveDataChapterNumber,
   isChapterOne,
+  isChapterThree,
   isChapterTwoOrLater,
+  isChapterTwo,
 } from "../../chapters/progression.js";
 export const flowMethods = {
   getCurrentLevel() {
@@ -165,7 +169,11 @@ export const flowMethods = {
   },
 
   buildChapterSaveData(slotNumber = null) {
-    return buildChapterTwoSaveData({
+    const buildNextChapterSaveData = isChapterTwo(this.currentChapterNumber) || isChapterThree(this.currentChapterNumber)
+      ? buildChapterThreeSaveData
+      : buildChapterTwoSaveData;
+
+    return buildNextChapterSaveData({
       slotNumber,
       defeatedAllies: this.defeatedAllies || [],
       units: this.units
@@ -180,7 +188,18 @@ export const flowMethods = {
     const saveData = this.loadedSaveData || this.getSavedGameData();
     const savedChapter = getSaveDataChapterNumber(saveData);
 
-    if (isChapterTwoOrLater(savedChapter)) {
+    if (isChapterThree(savedChapter)) {
+      this.pendingChapterThreeTransitionData = saveData || this.pendingChapterThreeTransitionData;
+      if (this.skipChapterThreeTitleCard) {
+        this.startChapterThreeOpening();
+      } else {
+        this.setObjectiveDisplayVisible(false);
+        this.showChapterThreeTitleCard("Loaded save. Chapter 3 is ready to begin.");
+      }
+      return;
+    }
+
+    if (isChapterTwo(savedChapter)) {
       this.pendingChapterTwoTransitionData = saveData || this.pendingChapterTwoTransitionData;
       if (this.skipChapterTwoTitleCard) {
         this.startChapterTwoOpening();
