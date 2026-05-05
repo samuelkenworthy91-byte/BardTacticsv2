@@ -92,7 +92,7 @@ export const SMACK_SFX_PATH = "/audio/smack.mp3";
 export const CARDINAL_DIRECTIONS = ["down", "up", "left", "right"];
 export const CLOCKWISE_DIRECTIONS = ["up", "right", "down", "left"];
 export const LEVEL_UP_STATS = [
-  { key: "hp", label: "HP", description: "+1 max HP and current HP" },
+  { key: "hp", label: "HP", description: "+5 max HP and current HP" },
   { key: "str", label: "STR", description: "+1 physical damage" },
   { key: "mag", label: "MAG", description: "+1 magical damage" },
   { key: "def", label: "DEF", description: "+1 physical defence" },

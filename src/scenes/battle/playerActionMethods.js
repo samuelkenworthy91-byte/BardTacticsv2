@@ -68,6 +68,7 @@ import {
   CHAPTER_TWO_OPENING,
   CHAPTER_TWO_TITLE,
 } from "../../chapters/chapter2.js";
+import { CHAPTER_THREE_TOME_SKILLS } from "../../chapters/chapter3.js";
 import {
   buildChapterTwoSaveData,
   CHAPTER_TWO_NUMBER,
@@ -161,6 +162,148 @@ export const playerActionMethods = {
     unit.sigilPoints = Math.max(0, (unit.sigilPoints ?? 0) - (skill.cost ?? 0));
   },
 
+  getMiloRescueAllies(unit) {
+    if (!unit || unit.id !== "milo") return [];
+    return this.units.filter((other) => (
+      other &&
+      other.id !== unit.id &&
+      other.team === unit.team &&
+      other.hp > 0 &&
+      other.isMiloDecoy !== true &&
+      distance(unit, other) === 1
+    ));
+  },
+
+  getMiloRescueDestinationTiles(unit) {
+    if (!unit) return [];
+    const range = Math.max(1, Math.floor((unit.spd || 0) / 2));
+    const tiles = [];
+    for (let y = 0; y < this.mapRows; y += 1) {
+      for (let x = 0; x < this.mapCols; x += 1) {
+        if (Math.abs(unit.x - x) + Math.abs(unit.y - y) > range) continue;
+        if (!this.isWalkable(x, y) || this.getUnitAt(x, y)) continue;
+        tiles.push({ x, y });
+      }
+    }
+    return tiles;
+  },
+
+  beginMiloRescueAllySelection(unit, skill) {
+    const allies = this.getMiloRescueAllies(unit);
+    if (allies.length === 0) {
+      this.helpText.setText("No adjacent ally for Rescue Sprint.");
+      return;
+    }
+    this.closeSelectionMenu(false);
+    this.selectedUnitId = unit.id;
+    this.pendingMiloRescue = { stage: "ally", unitId: unit.id, skillId: skill.id };
+    this.pendingItemUse = null;
+    this.pendingParleyUse = null;
+    this.moveTiles = [];
+    this.targetTiles = allies;
+    this.targetTileColor = TARGET_HIGHLIGHT.skill.fill;
+    this.targetTileStroke = TARGET_HIGHLIGHT.skill.stroke;
+    this.redrawSelection();
+    this.updateSelectedPanel();
+    this.helpText.setText("Choose an adjacent ally for Rescue Sprint. Press Space to cancel.");
+  },
+
+  chooseMiloRescueAlly(allyId) {
+    const pending = this.pendingMiloRescue;
+    const unit = this.units.find((candidate) => candidate.id === pending?.unitId);
+    const ally = this.units.find((candidate) => candidate.id === allyId);
+    if (!unit || !ally || !this.getMiloRescueAllies(unit).some((candidate) => candidate.id === ally.id)) return;
+    const destinations = this.getMiloRescueDestinationTiles(unit);
+    if (destinations.length === 0) {
+      this.helpText.setText("No free tile is in range for Rescue Sprint.");
+      return;
+    }
+    this.pendingMiloRescue = { ...pending, stage: "destination", allyId: ally.id };
+    this.targetTiles = destinations;
+    this.redrawSelection();
+    this.helpText.setText(`Choose where ${ally.name} should land. Press Space to cancel.`);
+  },
+
+  useMiloRescueSprint(x, y) {
+    const pending = this.pendingMiloRescue;
+    const unit = this.units.find((candidate) => candidate.id === pending?.unitId);
+    const ally = this.units.find((candidate) => candidate.id === pending?.allyId);
+    const skill = this.getSkillById(unit, pending?.skillId);
+    if (!unit || !ally || !skill || !this.canUseSkill(unit, skill)) return false;
+    if (!this.getMiloRescueDestinationTiles(unit).some((tile) => tile.x === x && tile.y === y)) {
+      this.helpText.setText("Choose a highlighted free tile for Rescue Sprint.");
+      return false;
+    }
+    const sprite = this.unitSprites[ally.id];
+    this.closeSelectionMenu(false);
+    this.pendingMiloRescue = null;
+    this.spendSkillCost(unit, skill);
+    unit.acted = true;
+    this.busy = true;
+    this.moveTiles = [];
+    this.targetTiles = [];
+    this.redrawSelection();
+    this.showSkillBanner(skill.name);
+    this.playUnitState(unit, skill.animationState || "move", 620);
+    ally.x = x;
+    ally.y = y;
+    ally.facing = unit.facing || ally.facing || "down";
+    this.refreshUnitSprite(unit);
+    const finish = () => {
+      this.refreshUnitSprite(ally);
+      this.setUnitSpriteFrame(ally, "idle", ally.facing || "down");
+      this.updateSelectedPanel();
+      this.busy = false;
+      this.clearSelection(`${unit.name} used ${skill.name}.`);
+      this.checkEndOfPlayerPhase();
+    };
+    if (sprite) {
+      this.tweens.add({
+        targets: sprite.container,
+        x: this.boardX + x * TILE_SIZE + TILE_SIZE / 2,
+        y: this.boardY + y * TILE_SIZE + TILE_SIZE / 2,
+        duration: 280,
+        ease: "Cubic.Out",
+        onComplete: finish,
+      });
+    } else {
+      finish();
+    }
+    return true;
+  },
+
+  spawnMiloDecoy(unit) {
+    const tile = this.getFreeAdjacentTiles(unit.x, unit.y, true)[0];
+    if (!tile) return null;
+    const decoy = {
+      ...unit,
+      id: `milo_decoy_${Date.now()}`,
+      name: "Milo?",
+      title: "Decoy",
+      className: "Decoy",
+      x: tile.x,
+      y: tile.y,
+      hp: Math.max(1, unit.hp || 1),
+      maxHp: Math.max(1, unit.maxHp || unit.hp || 1),
+      move: 0,
+      weapons: [],
+      skills: [],
+      items: [],
+      acted: true,
+      isMiloDecoy: true,
+      decoyTurnsRemaining: 2,
+      permanentRecruit: false,
+      color: 0x67e8f9,
+    };
+    this.units.push(decoy);
+    const sprite = this.createUnitSprite(decoy);
+    this.unitSprites[decoy.id] = sprite;
+    this.unitLayer.add(sprite.container);
+    this.refreshUnitSprite(decoy);
+    this.setUnitSpriteFrame(decoy, "idle", decoy.facing || "down");
+    return decoy;
+  },
+
   chooseActionSkill(unitId) {
     const unit = this.units.find((u) => u.id === unitId);
     if (!unit || unit.team !== "player" || unit.acted) return;
@@ -181,8 +324,16 @@ export const playerActionMethods = {
       getLabel: (skill) => `${skill.name} (${skill.cost || 0} SP)`,
       layout: "leftPanel",
       getSummary: (skill) => this.getSkillSummary(unit, skill),
-      getTargets: (skill) => skill.id === "parley" ? this.getParleyTargets(unit) : this.getSkillTargetsAt(unit, skill, unit.x, unit.y),
-      getPreviewTiles: (skill) => skill.id === "parley" ? this.getParleyTargets(unit) : this.getSkillHitTilesAt(unit, skill, unit.x, unit.y),
+      getTargets: (skill) => skill.id === "parley"
+        ? this.getParleyTargets(unit)
+        : skill.id === "rescueSprint"
+          ? this.getMiloRescueAllies(unit)
+          : this.getSkillTargetsAt(unit, skill, unit.x, unit.y),
+      getPreviewTiles: (skill) => skill.id === "parley"
+        ? this.getParleyTargets(unit)
+        : skill.id === "rescueSprint"
+          ? this.getMiloRescueAllies(unit)
+          : this.getSkillHitTilesAt(unit, skill, unit.x, unit.y),
       canChoose: (skill) => this.canUseSkill(unit, skill),
       disabledText: (skill) => `${skill.name} needs ${skill.cost} Sigil Points.`,
       onChoose: (skill) => {
@@ -192,6 +343,10 @@ export const playerActionMethods = {
         }
         if (skill.id === "parley") {
           this.beginParleyTargetSelection(unit, skill);
+          return;
+        }
+        if (skill.id === "rescueSprint") {
+          this.beginMiloRescueAllySelection(unit, skill);
           return;
         }
         const hitTiles = this.getSkillHitTilesAt(unit, skill, unit.x, unit.y);
@@ -216,6 +371,7 @@ export const playerActionMethods = {
     this.closeActionMenu();
     this.closeSelectionMenu(false);
     this.pendingItemUse = null;
+    this.pendingMiloRescue = null;
     this.selectedUnitId = unit.id;
     this.moveTiles = [];
     this.targetTiles = [];
@@ -530,6 +686,7 @@ export const playerActionMethods = {
     this.helpText.setText(`${unit.name} uses Parley on ${target.name}.`);
 
     if (relationship.type === "terrible") {
+      this.awardParleyXp(unit, target, false);
       const lockoutLine = config?.lockoutLine || "Not after everything you have done.";
       this.showChapterTwoSetupDialogue({
         speaker: target.name,
@@ -547,6 +704,7 @@ export const playerActionMethods = {
     const chance = this.getParleyChance(unit, target);
     const succeeded = Phaser.Math.FloatBetween(0, 100) < chance;
     if (!succeeded) {
+      this.awardParleyXp(unit, target, false);
       if (Array.isArray(config?.lockoutFailureUnits) && config.lockoutFailureUnits.includes(unit.id)) {
         target.recruitmentLocked = true;
         this.time.delayedCall(420, () => {
@@ -573,9 +731,19 @@ export const playerActionMethods = {
       portrait: target.portraitKey,
       text: successLine,
       onContinue: () => {
+        this.awardParleyXp(unit, target, true);
+        const shouldRecruitHeal = target.boss === true;
         target.team = "player";
         target.acted = true;
         target.sigilPoints = target.sigilPoints ?? target.maxSigilPoints ?? 3;
+        if (shouldRecruitHeal) {
+          const maxHp = Math.max(1, target.maxHp || target.hp || 1);
+          const healed = Math.min(Math.ceil(maxHp * 0.25), Math.max(0, maxHp - (target.hp || 0)));
+          target.hp = Math.min(maxHp, (target.hp || 0) + healed);
+          if (healed > 0) {
+            this.showFloatingText(this.boardX + target.x * TILE_SIZE + TILE_SIZE / 2, this.boardY + target.y * TILE_SIZE + 8, `+${healed} HP`, "#86efac");
+          }
+        }
         target.spriteState = "idle";
         this.refreshUnitSprite(target);
         this.setUnitSpriteFrame(target, "idle", target.facing || "down");
@@ -605,10 +773,22 @@ export const playerActionMethods = {
       const partner = this.getBrotherSkillPartner(unit);
       const power = this.getCombinedBrotherPower();
       effect = `Combines Edwin and Leon's STR + MAG for ${power} damage in a 3x2 blast ahead of ${unit.name}. Costs 3 SP from both brothers${partner ? "" : " (partner missing)"}.`;
+    } else if (skill.id === "rescueSprint") {
+      effect = `Warps an adjacent ally to a free tile up to ${Math.floor((unit.spd || 0) / 2)} tiles away.`;
+    } else if (skill.id === "decoyBoy") {
+      effect = "Creates a decoy copy on an adjacent free tile for 2 enemy phases.";
+    } else if (skill.id === "slowRebuke") {
+      effect = "Stores damage Milo takes during the next enemy phase and adds it to his first attack next turn.";
+    } else if (skill.damageFormula === "resHeal") {
+      effect = `Restores ${unit.res || 0} HP to allies in the surrounding squares.`;
+    } else if (skill.type === "selfBuff") {
+      effect = "Focuses the user for a personal follow-up effect.";
     } else if (skill.damageFormula === "mag") {
       effect = `Deals ${unit.mag || 0} damage to every unit in the surrounding squares.`;
     } else if (skill.damageFormula === "strPlusSpd") {
       effect = `Deals ${(unit.str || 0) + (unit.spd || 0)} damage to every unit in the surrounding squares.`;
+    } else if (skill.damageFormula === "strPlusMag") {
+      effect = `Deals ${(unit.str || 0) + (unit.mag || 0)} damage to every unit in the surrounding squares.`;
     }
 
     return `${skill.name}: costs ${skill.cost || 0} Sigil Point${(skill.cost || 0) === 1 ? "" : "s"}. ${effect} Hit zone: ${hitTiles.length} tile${hitTiles.length === 1 ? "" : "s"}. Units currently hit: ${targets.length}.`;
@@ -633,11 +813,34 @@ export const playerActionMethods = {
         (partner.sigilPoints ?? 0) >= (skill.partnerCost ?? skill.cost ?? 0);
     }
 
+    if (skill.id === "rescueSprint") {
+      return unit.id === "milo" && (unit.sigilPoints ?? 0) >= (skill.cost ?? 0) && this.getMiloRescueAllies(unit).length > 0;
+    }
+
+    if (skill.id === "decoyBoy") {
+      return unit.id === "milo" && (unit.sigilPoints ?? 0) >= (skill.cost ?? 0) && this.getFreeAdjacentTiles(unit.x, unit.y, true).length > 0;
+    }
+
     return (unit.sigilPoints ?? 0) >= (skill.cost ?? 0);
   },
 
   getSkillHitTilesAt(unit, skill, x = unit.x, y = unit.y) {
     if (!unit || !skill) return [];
+
+    if (skill.type === "selfBuff" || skill.type === "miloDecoy" || skill.type === "slowRebuke") return [{ x, y }];
+    if (skill.type === "rescueSprint") return this.getMiloRescueAllies(unit);
+
+    if (skill.type === "meleeSingle" || skill.type === "rangedSingle") {
+      const range = skill.range || 1;
+      const tiles = [];
+      for (let tileY = 0; tileY < this.mapRows; tileY += 1) {
+        for (let tileX = 0; tileX < this.mapCols; tileX += 1) {
+          const dist = Math.abs(tileX - x) + Math.abs(tileY - y);
+          if (dist > 0 && dist <= range) tiles.push({ x: tileX, y: tileY });
+        }
+      }
+      return tiles;
+    }
 
     if (skill.type === "adjacentSquare") {
       const tiles = [];
@@ -693,6 +896,9 @@ export const playerActionMethods = {
     const hitTileKeys = new Set(this.getSkillHitTilesAt(unit, skill, x, y).map((tile) => tileKey(tile.x, tile.y)));
     if (hitTileKeys.size === 0) return [];
 
+    if (skill.type === "selfBuff" || skill.type === "miloDecoy" || skill.type === "slowRebuke") return [unit];
+    if (skill.type === "rescueSprint") return this.getMiloRescueAllies(unit);
+
     return this.units.filter((other) => {
       if (!other || other.id === unit.id || other.hp <= 0) return false;
       if (!hitTileKeys.has(tileKey(other.x, other.y))) return false;
@@ -707,7 +913,10 @@ export const playerActionMethods = {
     if (!unit || !skill) return 0;
     if (skill.damageFormula === "mag") return Math.max(0, unit.mag || 0);
     if (skill.damageFormula === "strPlusSpd") return Math.max(0, (unit.str || 0) + (unit.spd || 0));
+    if (skill.damageFormula === "strPlusMag") return Math.max(0, (unit.str || 0) + (unit.mag || 0));
     if (skill.damageFormula === "brothersCombinedStrMag") return Math.max(0, this.getCombinedBrotherPower());
+    if (skill.damageFormula === "resHeal") return -Math.max(0, unit.res || 0);
+    if (skill.damageFormula === "none") return 0;
     return Math.max(0, skill.baseDamage || 0);
   },
 
@@ -722,6 +931,7 @@ export const playerActionMethods = {
     this.closeSelectionMenu(false);
     this.pendingItemUse = null;
     this.pendingParleyUse = null;
+    this.pendingMiloRescue = null;
     delete unit.pendingMoveOrigin;
     this.busy = true;
     this.selectedUnitId = unit.id;
@@ -736,6 +946,37 @@ export const playerActionMethods = {
     this.updateSelectedPanel();
     this.showSkillBanner(skill.name);
     this.helpText.setText(`${unit.name} uses ${skill.name}!`);
+
+    if (skill.id === "decoyBoy") {
+      const decoy = this.spawnMiloDecoy(unit);
+      if (!decoy) {
+        this.busy = false;
+        this.helpText.setText("No adjacent free tile for Decoy Boy.");
+        return false;
+      }
+      if (options.endTurn !== false) unit.acted = true;
+      this.refreshUnitSprite(unit);
+      this.time.delayedCall(520, () => {
+        this.busy = false;
+        this.clearSelection(`${unit.name} created a decoy.`);
+        this.checkEndOfPlayerPhase();
+      });
+      return true;
+    }
+
+    if (skill.id === "slowRebuke") {
+      unit.slowRebukeGuard = true;
+      unit.slowRebukeDamageTaken = 0;
+      unit.slowRebukeReadyDamage = 0;
+      if (options.endTurn !== false) unit.acted = true;
+      this.refreshUnitSprite(unit);
+      this.time.delayedCall(520, () => {
+        this.busy = false;
+        this.clearSelection(`${unit.name} braces for Slow Rebuke.`);
+        this.checkEndOfPlayerPhase();
+      });
+      return true;
+    }
 
     const beginSkillImpact = () => {
       if (skill.animationState === "spin") {
@@ -753,14 +994,25 @@ export const playerActionMethods = {
       targetResults.forEach((entry, index) => {
         const target = entry.target;
         if (!target || target.hp <= 0) return;
-        target.hp = Math.max(0, target.hp - entry.damage);
-        this.showCombatResultText(target, { hit: true, critical: false, damage: entry.damage }, index);
-        this.time.delayedCall(index * 120, () => this.playUnitHurt(target, 360));
+        if (entry.damage < 0) {
+          const healed = Math.min(-entry.damage, Math.max(0, (target.maxHp || target.hp || 1) - target.hp));
+          target.hp = Math.min(target.maxHp || target.hp, target.hp + healed);
+          this.showFloatingText(this.boardX + target.x * TILE_SIZE + TILE_SIZE / 2, this.boardY + target.y * TILE_SIZE + 8, `+${healed} HP`, "#86efac");
+        } else {
+          target.hp = Math.max(0, target.hp - entry.damage);
+          if (target.id === "milo" && target.slowRebukeGuard === true && this.phase === "enemy" && entry.damage > 0) {
+            target.slowRebukeDamageTaken = (target.slowRebukeDamageTaken || 0) + entry.damage;
+          }
+          this.showCombatResultText(target, { hit: true, critical: false, damage: entry.damage }, index);
+          this.time.delayedCall(index * 120, () => this.playUnitHurt(target, 360));
+        }
         const didKill = entry.wasAlive && target.hp <= 0;
         if (didKill) {
           if (target.id === "falan") defeatedFalan = true;
-          if (target.team === "player") defeatedPlayerUnits.push(target);
+          if (target.team === "player" && target.isMiloDecoy !== true) defeatedPlayerUnits.push(target);
           if (unit.team === "player" && target.team === "enemy") totalXp += this.calculateXpGain(unit, target, true);
+        } else if (entry.damage >= 0) {
+          this.awardSurvivalXp(target, unit, entry.wasAlive);
         }
       });
       if (totalXp > 0) this.awardXp(unit, totalXp);
@@ -771,6 +1023,8 @@ export const playerActionMethods = {
           if (target.id === "falan") {
             target.hp = 0;
             this.refreshUnitSprite(target);
+          } else if (target.isMiloDecoy === true) {
+            this.removeMiloDecoy(target);
           } else if (target.team === "player") {
             target.hp = 0;
             this.refreshUnitSprite(target);
@@ -787,14 +1041,15 @@ export const playerActionMethods = {
         }
       });
       if (options.endTurn !== false) {
-        unit.acted = true;
+        unit.acted = skill.id === "shadowstep" ? false : true;
+        if (skill.id === "battleFocus") unit.nextAttackBonus = 3;
         this.refreshUnitSprite(unit);
       }
       this.updateSelectedPanel();
       const finishDelay = 760 + targetResults.length * 120;
       this.time.delayedCall(finishDelay, () => {
         if (defeatedPlayerUnits.length > 0) {
-          const gameOverUnit = defeatedPlayerUnits.find((target) => this.isChapterOneGameOverDeath(target)) || defeatedPlayerUnits[0];
+          const gameOverUnit = defeatedPlayerUnits.find((target) => this.isGameOverUnitDeath(target)) || defeatedPlayerUnits[0];
           this.handleAllyUnitDeath(gameOverUnit, () => {
             this.busy = false;
             if (typeof options.onComplete === "function") {
@@ -867,6 +1122,7 @@ export const playerActionMethods = {
 
   getItemTargetsAt(unit, item, x = unit.x, y = unit.y) {
     if (!unit || !item) return [];
+    if (item.targetType === "self") return [unit];
     if (item.targetType === "selfOrAdjacentAlly") {
       return this.units.filter((other) => {
         if (!other || other.team !== unit.team || other.hp <= 0) return false;
@@ -884,7 +1140,14 @@ export const playerActionMethods = {
     if (item.heal) {
       return `${item.name}: restores ${item.heal} HP to the consumer. Can target ${unit.name} or an adjacent ally. Targets now: ${targets.length}.`;
     }
+    if (item.learnSkill) return `${item.name}: teaches ${this.getSkillTomeSkillForUnit(unit).name} to ${unit.name}.`;
+    if (item.permanentStatBoost) return `${item.name}: permanently adds +${item.permanentStatBoost} to HP, STR, MAG, DEF, RES, SPD, and LUCK.`;
     return item.description || `${item.name}: item effect will be added later.`;
+  },
+
+  getSkillTomeSkillForUnit(unit) {
+    const skill = CHAPTER_THREE_TOME_SKILLS[unit?.id] || CHAPTER_THREE_TOME_SKILLS.fallback;
+    return { ...skill };
   },
 
   beginItemTargetSelection(unit, item) {
@@ -931,6 +1194,25 @@ export const playerActionMethods = {
       target.hp = Math.min(target.maxHp, target.hp + healed);
       this.showFloatingText(this.boardX + target.x * TILE_SIZE + TILE_SIZE / 2, this.boardY + target.y * TILE_SIZE + 8, `+${healed} HP`, "#86efac");
     }
+    if (item.learnSkill) {
+      const learnedSkill = this.getSkillTomeSkillForUnit(target);
+      target.skills = target.skills || [];
+      if (target.skills.some((skill) => skill.id === learnedSkill.id)) {
+        this.helpText.setText(`${target.name} already knows ${learnedSkill.name}.`);
+        return false;
+      }
+      target.skills.push(learnedSkill);
+      this.showFloatingText(this.boardX + target.x * TILE_SIZE + TILE_SIZE / 2, this.boardY + target.y * TILE_SIZE + 8, learnedSkill.name, "#ddd6fe");
+    }
+    if (item.permanentStatBoost) {
+      const boost = item.permanentStatBoost;
+      target.maxHp = (target.maxHp || target.hp || 1) + boost;
+      target.hp = Math.min(target.maxHp, (target.hp || 0) + boost);
+      ["str", "mag", "def", "res", "spd", "luck"].forEach((stat) => {
+        target[stat] = (target[stat] || 0) + boost;
+      });
+      this.showFloatingText(this.boardX + target.x * TILE_SIZE + TILE_SIZE / 2, this.boardY + target.y * TILE_SIZE + 8, `All stats +${boost}`, "#fde68a");
+    }
     item.uses = (item.uses ?? 1) - 1;
     if (item.uses <= 0) {
       unit.items = (unit.items || []).filter((candidate) => candidate.id !== item.id);
@@ -948,7 +1230,7 @@ export const playerActionMethods = {
     this.refreshUnitSprite(unit);
     this.refreshUnitSprite(target);
     this.updateSelectedPanel();
-    this.clearSelection(`${target.name} ate ${item.name}.`);
+    this.clearSelection(`${target.name} used ${item.name}.`);
     this.checkEndOfPlayerPhase();
     return true;
   },
@@ -958,9 +1240,22 @@ export const playerActionMethods = {
     if (!unit || unit.team !== "player" || unit.acted) return;
     this.closeActionMenu();
     delete unit.pendingMoveOrigin;
+    unit.counterStance = false;
+    unit.counterUsed = false;
     unit.acted = true;
     this.refreshUnitSprite(unit);
     this.clearSelection(`${unit.name} waits.`);
+    this.checkEndOfPlayerPhase();
+  },
+
+  waitAndCounterUnit(unitId) {
+    const unit = this.units.find((u) => u.id === unitId);
+    if (!unit || unit.team !== "player" || unit.acted || unit.hp <= 0) return;
+    this.closeActionMenu();
+    delete unit.pendingMoveOrigin;
+    unit.acted = true;
+    this.setCounterStance(unit, true);
+    this.clearSelection(`${unit.name} waits and prepares to counter.`);
     this.checkEndOfPlayerPhase();
   },
 
@@ -976,6 +1271,25 @@ export const playerActionMethods = {
       if (!tile) return;
       const clickedUnit = this.getUnitAt(tile.x, tile.y);
       const selectedUnit = this.getSelectedUnit();
+
+      if (this.pendingMiloRescue) {
+        if (this.pendingMiloRescue.stage === "ally") {
+          if (clickedUnit && this.isTargetTile(clickedUnit.x, clickedUnit.y)) {
+            this.chooseMiloRescueAlly(clickedUnit.id);
+            return;
+          }
+          this.helpText.setText("Choose one of the highlighted allies, or press Space to cancel.");
+          return;
+        }
+        if (this.pendingMiloRescue.stage === "destination") {
+          if (!clickedUnit && this.isTargetTile(tile.x, tile.y)) {
+            this.useMiloRescueSprint(tile.x, tile.y);
+            return;
+          }
+          this.helpText.setText("Choose one of the highlighted free tiles, or press Space to cancel.");
+          return;
+        }
+      }
 
       if (this.pendingParleyUse) {
         if (clickedUnit && this.isTargetTile(clickedUnit.x, clickedUnit.y)) {
@@ -995,14 +1309,15 @@ export const playerActionMethods = {
         return;
       }
 
-      if (clickedUnit && selectedUnit && clickedUnit.id === selectedUnit.id && selectedUnit.team === "player" && !selectedUnit.acted) {
+      if (clickedUnit && selectedUnit && clickedUnit.id === selectedUnit.id && selectedUnit.team === "player" && clickedUnit.isMiloDecoy !== true && !selectedUnit.acted) {
         this.showActionMenu(selectedUnit, `${selectedUnit.name} holds position. Choose an action.`);
         return;
       }
-      if (clickedUnit && clickedUnit.team === "player" && !clickedUnit.acted) {
+      if (clickedUnit && clickedUnit.team === "player" && clickedUnit.isMiloDecoy !== true && !clickedUnit.acted) {
         this.closeActionMenu();
         this.pendingItemUse = null;
         this.pendingParleyUse = null;
+        this.pendingMiloRescue = null;
         this.selectedUnitId = clickedUnit.id;
         this.moveTiles = this.reachableTiles(clickedUnit);
         this.targetTiles = [];
@@ -1053,6 +1368,19 @@ export const playerActionMethods = {
     }
 
     const selectedUnit = this.getSelectedUnit();
+
+    if (this.pendingMiloRescue) {
+      const unit = this.units.find((candidate) => candidate.id === this.pendingMiloRescue.unitId) || selectedUnit;
+      this.pendingMiloRescue = null;
+      this.targetTiles = [];
+      this.targetTileColor = null;
+      this.targetTileStroke = null;
+      this.redrawSelection();
+      if (unit && unit.team === "player" && !unit.acted) {
+        this.showActionMenu(unit, "Rescue Sprint cancelled. Choose another action.");
+      }
+      return;
+    }
 
     if (this.pendingParleyUse) {
       const unit = this.units.find((candidate) => candidate.id === this.pendingParleyUse.unitId) || selectedUnit;
@@ -1210,10 +1538,10 @@ export const playerActionMethods = {
         if (!this.isWalkable(nx, ny)) continue;
         if (nextSteps > movementRange) continue;
         const occupant = this.getUnitAt(nx, ny);
-        if (occupant && occupant.id !== unit.id) continue;
+        if (occupant && occupant.id !== unit.id && occupant.team !== unit.team) continue;
         visited.add(key);
         queue.push({ x: nx, y: ny, steps: nextSteps });
-        reachable.push({ x: nx, y: ny });
+        if (!occupant || occupant.id === unit.id) reachable.push({ x: nx, y: ny });
       }
     }
     return reachable;
@@ -1353,6 +1681,7 @@ export const playerActionMethods = {
     const defenderStartHp = defender.hp;
     const defenderWasAlive = defender.hp > 0;
     const sequence = this.resolveAttackSequence(attacker, defender, weapon);
+    attacker.nextAttackBonus = 0;
     const didKill = defenderWasAlive && defender.hp <= 0;
     const defeatedFalan = didKill && defender.id === "falan";
     const xpGain = this.calculateXpGain(attacker, defender, didKill);
@@ -1377,8 +1706,28 @@ export const playerActionMethods = {
         this.clearSelection(`${attacker.name} attacked ${defender.name} with ${weapon.name}.`);
       }
 
+      (sequence.targets || [])
+        .filter((target) => target && target.id !== defender.id)
+        .forEach((target) => {
+          if (target.hp <= 0) {
+            target.hp = 0;
+            if (target.team === "civilian") this.defeatedCivilians = [...new Set([...(this.defeatedCivilians || []), target.id])];
+            this.playUnitDeath(target, () => this.removeUnitSpriteAndData(target.id));
+          } else {
+            this.refreshUnitSprite(target);
+            this.setUnitSpriteFrame(target, "idle", target.facing || "down");
+          }
+        });
+
       this.setUnitSpriteFrame(attacker, "idle", attacker.facing || "down");
       this.updateSelectedPanel();
+
+      const completePlayerAttack = () => {
+        this.time.delayedCall(350, () => {
+          this.busy = false;
+          this.checkEndOfPlayerPhase();
+        });
+      };
 
       if (defeatedFalan) {
         this.time.delayedCall(350, () => {
@@ -1391,10 +1740,7 @@ export const playerActionMethods = {
         return;
       }
 
-      this.time.delayedCall(350, () => {
-        this.busy = false;
-        this.checkEndOfPlayerPhase();
-      });
+      this.resolveCounterAttack(defender, attacker, completePlayerAttack);
     };
 
     this.playStandardBattleScene(attacker, defender, weapon, sequence, defenderStartHp, finishStandardAttack);
@@ -1404,6 +1750,7 @@ export const playerActionMethods = {
     this.closeActionMenu();
     this.pendingItemUse = null;
     this.pendingParleyUse = null;
+    this.pendingMiloRescue = null;
     this.selectedUnitId = null;
     this.moveTiles = [];
     this.targetTiles = [];

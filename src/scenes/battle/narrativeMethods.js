@@ -70,6 +70,8 @@ import {
 import {
   CHAPTER_THREE_OPENING,
   CHAPTER_THREE_POST_BATTLE_SCENE,
+  CHAPTER_THREE_REWARDS,
+  CHAPTER_THREE_TOWNSFOLK_IDS,
   CHAPTER_THREE_TITLE,
 } from "../../chapters/chapter3.js";
 import {
@@ -197,6 +199,167 @@ export const narrativeMethods = {
     this.postBattleActionSteps = new Set();
     this.postBattleContainer.setVisible(true).setAlpha(0);
     this.tweens.add({ targets: this.postBattleContainer, alpha: 1, duration: 250, onComplete: () => this.updatePostBattleUI() });
+  },
+
+  getChapterThreeLivingTownsfolkCount() {
+    return CHAPTER_THREE_TOWNSFOLK_IDS.filter((id) => this.units.some((unit) => unit.id === id && unit.hp > 0)).length;
+  },
+
+  getChapterThreeEarnedRewards() {
+    const savedCount = this.getChapterThreeLivingTownsfolkCount();
+    return CHAPTER_THREE_REWARDS
+      .filter((reward) => savedCount >= reward.threshold)
+      .map((reward) => ({
+        ...reward,
+        item: reward.item ? { ...reward.item, id: `${reward.item.id}_${Date.now()}_${reward.threshold}` } : null,
+        weapon: reward.weapon ? { ...reward.weapon, id: `${reward.weapon.id}_${Date.now()}_${reward.threshold}` } : null,
+      }));
+  },
+
+  startChapterThreeVictoryFlow() {
+    if (this.resolveMiloChapterThreeRecruitment?.(() => this.startChapterThreeVictoryFlow())) return;
+    if (this.chapterThreeRewardsHandled) {
+      this.startPostBattleScene();
+      return;
+    }
+    this.chapterThreeRewardsHandled = true;
+    this.pendingChapterThreeRewards = this.getChapterThreeEarnedRewards();
+    this.chapterThreeRewardIndex = 0;
+    if (!this.pendingChapterThreeRewards.length) {
+      this.startPostBattleScene();
+      return;
+    }
+    this.showChapterThreeRewardAssignment();
+  },
+
+  resolveMiloChapterThreeRecruitment(onComplete = null) {
+    if (this.chapterThreeMiloResolutionHandled) return false;
+    const milo = this.units.find((unit) => unit.id === "milo");
+    if (!milo || milo.hp <= 0 || milo.recruitedThisChapter !== true) {
+      this.chapterThreeMiloResolutionHandled = true;
+      return false;
+    }
+    this.chapterThreeMiloResolutionHandled = true;
+    this.busy = true;
+
+    if (milo.gainedLevelAfterRecruitment === true || (milo.level || 1) > (milo.recruitmentStartLevel || 1)) {
+      this.showChapterTwoSetupDialogue({
+        speaker: "Milo",
+        portrait: "miloPortrait",
+        text: "Um... Leon? Can I come with you lot?",
+        onContinue: () => {
+          this.showChapterTwoSetupDialogue({
+            speaker: "Leon",
+            portrait: "leonPortrait",
+            text: "If you want to. Stay close, yeah?",
+            onContinue: () => {
+              milo.permanentRecruit = true;
+              milo.recruitedThisChapter = false;
+              this.showCenteredPopup("Milo joined The Bards!", () => {
+                this.busy = false;
+                if (typeof onComplete === "function") onComplete();
+              });
+            },
+          });
+        },
+      });
+      return true;
+    }
+
+    this.showChapterTwoSetupDialogue({
+      speaker: "Milo",
+      portrait: "miloPortrait",
+      text: "Thanks for getting me out. I should disappear before they start looking again.",
+      onContinue: () => {
+        milo.permanentRecruit = false;
+        this.playUnitDeath(milo, () => {
+          this.removeUnitSpriteAndData(milo.id);
+          this.busy = false;
+          if (typeof onComplete === "function") onComplete();
+        });
+      },
+    });
+    return true;
+  },
+
+  showChapterThreeRewardAssignment() {
+    const reward = this.pendingChapterThreeRewards?.[this.chapterThreeRewardIndex];
+    if (!reward) {
+      if (this.chapterThreeRewardContainer) {
+        this.chapterThreeRewardContainer.destroy(true);
+        this.chapterThreeRewardContainer = null;
+      }
+      this.startPostBattleScene();
+      return;
+    }
+
+    if (this.chapterThreeRewardContainer) this.chapterThreeRewardContainer.destroy(true);
+
+    const savedCount = this.getChapterThreeLivingTownsfolkCount();
+    const prize = reward.item || reward.weapon;
+    const holderOptions = this.units.filter((unit) => unit.team === "player" && unit.hp > 0 && unit.isMiloDecoy !== true);
+    const container = this.add.container(0, 0).setDepth(24000);
+    const dim = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.66).setInteractive();
+    const panel = createBannerPanel(this, GAME_WIDTH / 2, GAME_HEIGHT / 2, 660, 380, { innerInset: 16 });
+    const title = this.add.text(GAME_WIDTH / 2, 112, "Town Reward", {
+      fontSize: "30px",
+      fontStyle: "bold",
+      color: "#f7ecd3",
+      stroke: "#0b0811",
+      strokeThickness: 4,
+    }).setOrigin(0.5);
+    const body = this.add.text(GAME_WIDTH / 2, 156, `${savedCount}/5 townsfolk survived.\nChoose who receives ${prize.name}.`, {
+      fontSize: "18px",
+      color: "#eadff7",
+      align: "center",
+      wordWrap: { width: 560 },
+      lineSpacing: 6,
+    }).setOrigin(0.5, 0);
+    const summary = this.add.text(GAME_WIDTH / 2, 220, prize.description || this.getRewardSummaryText(reward), {
+      fontSize: "14px",
+      color: "#d8c4f0",
+      align: "center",
+      wordWrap: { width: 560 },
+      lineSpacing: 4,
+    }).setOrigin(0.5, 0);
+
+    container.add([dim, panel.container, title, body, summary]);
+
+    holderOptions.forEach((unit, index) => {
+      const row = Math.floor(index / 3);
+      const col = index % 3;
+      const x = GAME_WIDTH / 2 - 190 + col * 190;
+      const y = 296 + row * 52;
+      const button = createBannerButton(this, x, y, 172, 38, unit.name, () => this.assignChapterThreeReward(unit.id), "14px");
+      container.add(button.container);
+    });
+
+    this.chapterThreeRewardContainer = container;
+    this.uiLayer.add(container);
+  },
+
+  getRewardSummaryText(reward) {
+    if (reward.weapon) {
+      const weapon = reward.weapon;
+      return `${weapon.name}: Base ${weapon.baseDamage}, Hit ${weapon.hitRate}%, Range ${getWeaponRangeLabel(weapon)}.`;
+    }
+    return reward.item?.description || "";
+  },
+
+  assignChapterThreeReward(unitId) {
+    const unit = this.units.find((candidate) => candidate.id === unitId && candidate.team === "player" && candidate.hp > 0);
+    const reward = this.pendingChapterThreeRewards?.[this.chapterThreeRewardIndex];
+    if (!unit || !reward) return;
+
+    if (reward.weapon) {
+      unit.weapons = [...(unit.weapons || []), { ...reward.weapon }];
+    } else if (reward.item) {
+      unit.items = [...(unit.items || []), { ...reward.item }];
+    }
+
+    this.refreshUnitSprite(unit);
+    this.chapterThreeRewardIndex += 1;
+    this.showChapterThreeRewardAssignment();
   },
 
   getPostBattleScene() {
@@ -536,8 +699,8 @@ export const narrativeMethods = {
     });
   },
 
-  isChapterOneGameOverDeath(unit) {
-    return isChapterOne(this.currentChapterNumber) && !!unit && CHAPTER_ONE_GAME_OVER_UNIT_IDS.includes(unit.id);
+  isGameOverUnitDeath(unit) {
+    return !!unit && CHAPTER_ONE_GAME_OVER_UNIT_IDS.includes(unit.id);
   },
 
   handleAllyUnitDeath(unit, onComplete = null) {
@@ -546,7 +709,7 @@ export const narrativeMethods = {
       return;
     }
 
-    const isGameOverDeath = this.isChapterOneGameOverDeath(unit);
+    const isGameOverDeath = this.isGameOverUnitDeath(unit);
     this.defeatedAllies = [...new Set([...(this.defeatedAllies || []), unit.id])];
 
     this.showAllyDeathCutscene(unit, () => {
@@ -568,12 +731,16 @@ export const narrativeMethods = {
     this.phase = "defeat";
     this.phaseText.setText("Game Over");
     this.phaseText.setColor("#f87171");
-    this.helpText.setText(`${unit?.name || "An ally"} has fallen. Loading save slots...`);
+    this.helpText.setText(`${unit?.name || "An ally"} has fallen.`);
     this.busy = true;
     this.updateSelectedPanel();
 
     this.time.delayedCall(850, () => {
-      this.scene.start("LoadGameScene", { fromGameOver: true, defeatedUnitName: unit?.name || "An ally" });
+      this.scene.start("LoadGameScene", {
+        fromGameOver: true,
+        defeatedUnitName: unit?.name || "An ally",
+        restartSceneData: this.getChapterRestartSceneData(),
+      });
     });
   },
 
@@ -1156,6 +1323,16 @@ export const narrativeMethods = {
   finishOpening() {
     this.openingContainer.setVisible(false);
     this.openingFullSceneImage.setVisible(false);
+    if (isChapterThree(this.currentChapterNumber)) {
+      this.beginChapterThreeDeployment(() => {
+        this.beginChapterThreeBattleStartDialogue(() => {
+          this.startPlayerPhase();
+          this.selectedUnitId = this.units.find((unit) => unit.team === "player")?.id || null;
+          this.updateSelectedPanel();
+        });
+      });
+      return;
+    }
     this.startPlayerPhase();
     this.selectedUnitId = this.units.find((unit) => unit.team === "player")?.id || null;
     this.updateSelectedPanel();

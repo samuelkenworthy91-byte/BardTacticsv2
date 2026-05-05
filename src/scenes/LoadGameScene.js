@@ -19,6 +19,7 @@ export class LoadGameScene extends Phaser.Scene {
   init(data = {}) {
     this.fromGameOver = data.fromGameOver === true;
     this.defeatedUnitName = data.defeatedUnitName || "";
+    this.restartSceneData = data.restartSceneData || null;
   }
 
   preload() {
@@ -37,7 +38,7 @@ export class LoadGameScene extends Phaser.Scene {
 
     this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x06030b, 0.68);
 
-    const panelHeight = this.fromGameOver ? 388 : 342;
+    const panelHeight = this.fromGameOver ? 316 : 342;
     const panel = createBannerPanel(this, GAME_WIDTH / 2, GAME_HEIGHT / 2, 640, panelHeight, { innerInset: 16 });
 
     const heading = this.add.text(0, -panelHeight / 2 + 42, this.fromGameOver ? "Game Over" : "Load Game", {
@@ -49,7 +50,7 @@ export class LoadGameScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     const subText = this.fromGameOver
-      ? `${this.defeatedUnitName || "An ally"} has fallen. Choose a save slot to load.`
+      ? `${this.defeatedUnitName || "An ally"} has fallen. Restart the chapter or return to the main menu.`
       : "Choose one of your three save slots.";
 
     const subtitle = this.add.text(0, -panelHeight / 2 + 82, subText, {
@@ -67,6 +68,22 @@ export class LoadGameScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     panel.container.add([heading, subtitle, this.statusText]);
+
+    if (this.fromGameOver) {
+      const restartButton = createBannerButton(this, 0, -8, 280, 46, "Restart Chapter", () => {
+        if (!this.restartSceneData) {
+          this.statusText.setText("Chapter restart data is unavailable.");
+          return;
+        }
+        this.scene.start("LoadingScene", this.restartSceneData);
+      }, "22px");
+
+      const menuButton = createBannerButton(this, 0, 52, 280, 42, "Main Menu", () => this.scene.start("MainMenuScene"), "20px");
+
+      restartButton.container.setAlpha(this.restartSceneData ? 1 : 0.55);
+      panel.container.add([restartButton.container, menuButton.container]);
+      return;
+    }
 
     for (let slotNumber = 1; slotNumber <= SAVE_SLOT_COUNT; slotNumber += 1) {
       const saveData = readSaveSlot(slotNumber);
@@ -87,4 +104,4 @@ export class LoadGameScene extends Phaser.Scene {
     panel.container.add(backButton.container);
   }
 }
-
+

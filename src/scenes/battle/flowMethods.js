@@ -98,6 +98,41 @@ export const flowMethods = {
     return isChapterTwoOrLater(chapterNumber);
   },
 
+  cloneSceneData(data = null) {
+    if (!data) return null;
+    return JSON.parse(JSON.stringify(data));
+  },
+
+  getChapterRestartSceneData() {
+    if (isChapterThree(this.currentChapterNumber)) {
+      const saveData = this.cloneSceneData(this.pendingChapterThreeTransitionData || this.loadedSaveData);
+      if (saveData) {
+        return {
+          loadFromSave: true,
+          saveData,
+          slotNumber: saveData.slotNumber || this.loadedSlotNumber || null,
+          playChapterThreeOpening: true,
+          skipChapter3TitleCard: true,
+        };
+      }
+    }
+
+    if (isChapterTwo(this.currentChapterNumber)) {
+      const saveData = this.cloneSceneData(this.pendingChapterTwoTransitionData || this.loadedSaveData);
+      if (saveData) {
+        return {
+          loadFromSave: true,
+          saveData,
+          slotNumber: saveData.slotNumber || this.loadedSlotNumber || null,
+          playChapterTwoOpening: true,
+          skipChapter2TitleCard: true,
+        };
+      }
+    }
+
+    return { loadFromSave: false };
+  },
+
   applyLoadedSaveData(saveData) {
     if (!saveData) return;
 
@@ -121,8 +156,8 @@ export const flowMethods = {
           x: preserveMapPositions ? (saved.x ?? unit.x) : unit.x,
           y: preserveMapPositions ? (saved.y ?? unit.y) : unit.y,
           facing: preserveMapPositions ? (saved.facing || unit.facing || "down") : (unit.facing || saved.facing || "down"),
-          skills: (unit.skills || []).map((skill) => ({ ...skill })),
-          weapons: (unit.weapons || []).map((weapon) => ({ ...weapon })),
+          skills: Array.isArray(saved.skills) ? saved.skills.map((skill) => ({ ...skill })) : (unit.skills || []).map((skill) => ({ ...skill })),
+          weapons: Array.isArray(saved.weapons) ? saved.weapons.map((weapon) => ({ ...weapon })) : (unit.weapons || []).map((weapon) => ({ ...weapon })),
           items: Array.isArray(saved.items) ? saved.items.map((item) => ({ ...item })) : (unit.items || []).map((item) => ({ ...item })),
           acted: false,
           spriteState: "idle",
@@ -134,6 +169,29 @@ export const flowMethods = {
         return merged;
       })
       .filter(Boolean);
+
+    if (isChapterThree(this.currentChapterNumber)) {
+      const existingIds = new Set(this.units.map((unit) => unit.id));
+      saveData.units
+        .filter((unitState) => unitState.team === "player" && unitState.alive !== false && !existingIds.has(unitState.id))
+        .forEach((unitState) => {
+          this.units.push({
+            ...unitState,
+            team: "player",
+            portraitKey: unitState.portraitKey || (String(unitState.id).startsWith("shade") ? "shadePortrait" : unitState.portraitKey),
+            spriteSet: unitState.spriteSet || (String(unitState.id).startsWith("shade") ? "shade" : unitState.id),
+            hp: restoreResources ? (unitState.maxHp || unitState.hp || 1) : Math.max(1, unitState.hp || 1),
+            sigilPoints: restoreResources ? (unitState.maxSigilPoints ?? unitState.sigilPoints ?? 3) : (unitState.sigilPoints ?? 0),
+            facing: unitState.facing || "up",
+            acted: false,
+            spriteState: "idle",
+            skills: (unitState.skills || []).map((skill) => ({ ...skill })),
+            weapons: (unitState.weapons || []).map((weapon) => ({ ...weapon })),
+            items: (unitState.items || []).map((item) => ({ ...item })),
+          });
+          existingIds.add(unitState.id);
+        });
+    }
   },
 
   serializeUnitForSave(unit, options = {}) {
@@ -147,6 +205,10 @@ export const flowMethods = {
       title: unit.title,
       team: unit.team,
       className: unit.className,
+      portraitKey: unit.portraitKey,
+      spriteSet: unit.spriteSet,
+      recruitmentId: unit.recruitmentId,
+      color: unit.color,
       level: unit.level || 1,
       xp: unit.xp || 0,
       hp: restoreForChapterStart ? maxHp : Math.max(0, unit.hp || 0),
@@ -163,6 +225,13 @@ export const flowMethods = {
       facing: unit.facing || "down",
       sigilPoints: restoreForChapterStart ? maxSigilPoints : (unit.sigilPoints ?? 0),
       maxSigilPoints,
+      latent: unit.latent === true,
+      miloSigil: unit.miloSigil || null,
+      recruitedThisChapter: unit.recruitedThisChapter === true,
+      recruitmentStartLevel: unit.recruitmentStartLevel,
+      permanentRecruit: unit.permanentRecruit === true,
+      skills: (unit.skills || []).map((skill) => ({ ...skill })),
+      weapons: (unit.weapons || []).map((weapon) => ({ ...weapon })),
       items: (unit.items || []).map((item) => ({ ...item })),
       alive: restoreForChapterStart ? true : unit.hp > 0,
     };
@@ -173,11 +242,22 @@ export const flowMethods = {
       ? buildChapterThreeSaveData
       : buildChapterTwoSaveData;
 
+    const reserveUnits = Array.isArray(this.chapterThreeReserveUnits) ? this.chapterThreeReserveUnits : [];
+    const playerUnits = this.units.filter((unit) => (
+      unit.team === "player" &&
+      unit.isMiloDecoy !== true &&
+      (unit.id !== "milo" || unit.permanentRecruit === true)
+    ));
+    const seenPlayerIds = new Set(playerUnits.map((unit) => unit.id));
+    const unitsToSave = [
+      ...playerUnits,
+      ...reserveUnits.filter((unit) => unit?.team === "player" && !seenPlayerIds.has(unit.id)),
+    ];
+
     return buildNextChapterSaveData({
       slotNumber,
       defeatedAllies: this.defeatedAllies || [],
-      units: this.units
-        .filter((unit) => unit.team === "player")
+      units: unitsToSave
         .map((unit) => this.serializeUnitForSave(unit, { restoreForChapterStart: true })),
     });
   },

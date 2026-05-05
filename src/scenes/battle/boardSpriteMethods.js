@@ -158,6 +158,122 @@ export const boardSpriteMethods = {
     return this.getAdjacentEnemies(unit);
   },
 
+  isCounterCombatUnit(unit) {
+    return !!unit && unit.isMiloDecoy !== true && (unit.team === "player" || unit.team === "enemy");
+  },
+
+  setCounterStance(unit, enabled) {
+    if (!this.isCounterCombatUnit(unit) || unit.hp <= 0) return;
+    unit.counterStance = enabled === true;
+    unit.counterUsed = false;
+    this.refreshUnitSprite(unit);
+  },
+
+  resolveCounterAttack(counterUnit, attacker, onComplete = null) {
+    const finish = () => {
+      if (typeof onComplete === "function") onComplete();
+    };
+
+    if (
+      !this.isCounterCombatUnit(counterUnit) ||
+      !this.isCounterCombatUnit(attacker) ||
+      !counterUnit.counterStance ||
+      counterUnit.counterUsed ||
+      counterUnit.hp <= 0 ||
+      attacker.hp <= 0
+    ) {
+      finish();
+      return;
+    }
+
+    const weapon = getWeaponForTarget(counterUnit, attacker);
+    if (!weapon) {
+      finish();
+      return;
+    }
+
+    counterUnit.counterUsed = true;
+    counterUnit.counterStance = false;
+    this.helpText.setText(`${counterUnit.name} counters!`);
+    this.faceUnitToward(counterUnit, attacker);
+    this.faceUnitToward(attacker, counterUnit);
+
+    const attackerStartHp = attacker.hp;
+    const attackerWasAlive = attacker.hp > 0;
+    const sequence = this.resolveAttackSequence(counterUnit, attacker, weapon);
+    counterUnit.nextAttackBonus = 0;
+    const didKill = attackerWasAlive && attacker.hp <= 0;
+    const xpGain = this.calculateXpGain(counterUnit, attacker, didKill);
+
+    const finishCounter = () => {
+      this.awardSurvivalXpForTargets(sequence.targets, counterUnit);
+      if (xpGain > 0) this.awardXp(counterUnit, xpGain);
+
+      this.refreshUnitSprite(counterUnit);
+      this.setUnitSpriteFrame(counterUnit, "idle", counterUnit.facing || "down");
+
+      const completeAfterDeaths = () => {
+        this.updateSelectedPanel();
+        finish();
+      };
+
+      const handlePrimaryDeath = () => {
+        attacker.hp = 0;
+
+        if (attacker.team === "player") {
+          this.handleAllyUnitDeath(attacker, completeAfterDeaths);
+          return;
+        }
+
+        if (attacker.id === "falan") {
+          this.handleFalanDefeat(attacker, completeAfterDeaths);
+          return;
+        }
+
+        this.playUnitDeath(attacker, () => {
+          this.removeUnitSpriteAndData(attacker.id);
+          completeAfterDeaths();
+        });
+      };
+
+      const defeatedSplashPlayerUnits = [];
+      (sequence.targets || [])
+        .filter((target) => target && target.id !== attacker.id)
+        .forEach((target) => {
+          if (target.hp <= 0) {
+            target.hp = 0;
+            if (target.team === "player") {
+              this.refreshUnitSprite(target);
+              defeatedSplashPlayerUnits.push(target);
+              return;
+            }
+            if (target.team === "civilian") this.defeatedCivilians = [...new Set([...(this.defeatedCivilians || []), target.id])];
+            this.playUnitDeath(target, () => this.removeUnitSpriteAndData(target.id));
+          } else {
+            this.refreshUnitSprite(target);
+            this.setUnitSpriteFrame(target, "idle", target.facing || "down");
+          }
+        });
+
+      if (attacker.hp <= 0) {
+        handlePrimaryDeath();
+        return;
+      }
+
+      if (defeatedSplashPlayerUnits.length > 0) {
+        const gameOverUnit = defeatedSplashPlayerUnits.find((target) => this.isGameOverUnitDeath(target)) || defeatedSplashPlayerUnits[0];
+        this.handleAllyUnitDeath(gameOverUnit, completeAfterDeaths);
+        return;
+      }
+
+      this.refreshUnitSprite(attacker);
+      this.setUnitSpriteFrame(attacker, "idle", attacker.facing || "down");
+      completeAfterDeaths();
+    };
+
+    this.playStandardBattleScene(counterUnit, attacker, weapon, sequence, attackerStartHp, finishCounter);
+  },
+
   getOpportunityThreatBeforeMove(unit, targetX, targetY) {
     if (!unit) return null;
 
@@ -221,6 +337,7 @@ export const boardSpriteMethods = {
         const xpGain = this.calculateXpGain(attacker, defender, true);
         if (xpGain > 0) this.awardXp(attacker, xpGain);
       }
+      this.awardSurvivalXp(defender, attacker, defenderWasAlive);
 
       const continueAfterLevelUp = () => {
         if (defender.hp <= 0) {
@@ -249,7 +366,12 @@ export const boardSpriteMethods = {
     unit.hp = 0;
 
     if (unit.team === "player") {
-      this.handleAllyUnitDeath(unit, onComplete);
+      this.handleAllyUnitDeath(unit, () => {
+        this.busy = false;
+        this.clearSelection(`${unit.name} fell while moving.`);
+        this.checkEndOfPlayerPhase();
+        if (typeof onComplete === "function") onComplete();
+      });
       return;
     }
 
@@ -800,6 +922,7 @@ export const boardSpriteMethods = {
       { label: "Attack", handler: () => this.chooseActionAttack(unit.id) },
       { label: "Skill", handler: () => this.chooseActionSkill(unit.id) },
       { label: "Item", handler: () => this.chooseActionItem(unit.id) },
+      { label: "Wait & Counter", handler: () => this.waitAndCounterUnit(unit.id) },
       { label: "Wait", handler: () => this.waitUnit(unit.id) },
     ];
 
@@ -813,7 +936,7 @@ export const boardSpriteMethods = {
       actions.unshift({ label: "Capture", handler: () => this.captureFort(unit.id) });
     }
 
-    const menuWidth = 152;
+    const menuWidth = 176;
     const menuHeight = 52 + actions.length * 40 + 36;
     const x = Phaser.Math.Clamp(centerX + TILE_SIZE * 0.95, menuWidth / 2 + 8, GAME_WIDTH - menuWidth / 2 - 8);
     const y = Phaser.Math.Clamp(centerY - 8, menuHeight / 2 + 8, GAME_HEIGHT - menuHeight / 2 - 8);

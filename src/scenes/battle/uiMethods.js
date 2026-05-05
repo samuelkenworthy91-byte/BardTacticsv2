@@ -66,6 +66,7 @@ import {
   CHAPTER_TWO_OPENING,
   CHAPTER_TWO_TITLE,
 } from "../../chapters/chapter2.js";
+import { MILO_SIGILS } from "../../chapters/chapter3.js";
 import {
   buildChapterTwoSaveData,
   CHAPTER_TWO_NUMBER,
@@ -613,8 +614,8 @@ export const uiMethods = {
     const unit = this.units.find((candidate) => candidate.id === data.unitId);
     if (!unit) return;
     if (statKey === "hp") {
-      unit.maxHp += 1;
-      unit.hp += 1;
+      unit.maxHp += 5;
+      unit.hp += 5;
     } else {
       unit[statKey] = (unit[statKey] || 0) + 1;
     }
@@ -636,11 +637,91 @@ export const uiMethods = {
       this.refreshUnitSprite(unit);
       this.updateSelectedPanel();
     }
+    if (this.handleMiloLevelTenAwakening?.(unit, data)) return;
     this.processLevelUpQueue();
 
     if (!this.levelUpAllocationOpen && this.levelUpQueue.length === 0) {
       this.flushLevelUpCallbacks();
     }
+  },
+
+  handleMiloLevelTenAwakening(unit, levelData) {
+    if (!unit || unit.id !== "milo" || unit.latent !== true || (levelData?.level || unit.level) < 10 || unit.miloAwakeningComplete === true) return false;
+    unit.miloAwakeningComplete = true;
+    this.busy = true;
+    this.showChapterTwoSetupDialogue({
+      speaker: "Milo",
+      portrait: "miloPortrait",
+      text: "I feel...odd",
+      onContinue: () => this.showMiloSigilMenu(unit),
+    });
+    return true;
+  },
+
+  applyMiloSigil(unit, sigil) {
+    if (!unit || !sigil) return;
+    ["hp", "str", "mag", "def", "res", "spd", "luck"].forEach((stat) => {
+      const bonus = stat === sigil.stat ? 5 : 1;
+      if (stat === "hp") {
+        unit.maxHp = (unit.maxHp || unit.hp || 1) + bonus;
+        unit.hp = Math.min(unit.maxHp, (unit.hp || 0) + bonus);
+      } else {
+        unit[stat] = (unit[stat] || 0) + bonus;
+      }
+    });
+    unit.level = 1;
+    unit.xp = 0;
+    unit.latent = false;
+    unit.miloSigil = sigil.id;
+    unit.className = `${sigil.name} Sigil`;
+    unit.title = `${sigil.name} Sigil`;
+    unit.skills = (unit.skills || []).filter((skill) => !["rescueSprint", "decoyBoy", "slowRebuke"].includes(skill.id));
+    unit.skills.push({ ...sigil.skill });
+    this.refreshUnitSprite(unit);
+    this.updateSelectedPanel();
+  },
+
+  showMiloSigilMenu(unit) {
+    if (!unit) return;
+    if (this.miloSigilContainer) this.miloSigilContainer.destroy(true);
+    const container = this.add.container(0, 0).setDepth(LEVEL_UP_PANEL_DEPTH + 10);
+    const dim = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.7).setInteractive();
+    const panel = createBannerPanel(this, GAME_WIDTH / 2, GAME_HEIGHT / 2, 660, 360, { innerInset: 16 });
+    const title = this.add.text(GAME_WIDTH / 2, 126, "Choose Milo's Sigil", {
+      fontSize: "30px",
+      fontStyle: "bold",
+      color: "#f7ecd3",
+      stroke: "#0b0811",
+      strokeThickness: 4,
+    }).setOrigin(0.5);
+    const body = this.add.text(GAME_WIDTH / 2, 166, "Rabbit, Fox, or Turtle", {
+      fontSize: "16px",
+      color: "#d8c4f0",
+    }).setOrigin(0.5);
+    container.add([dim, panel.container, title, body]);
+
+    Object.values(MILO_SIGILS).forEach((sigil, index) => {
+      const x = GAME_WIDTH / 2 - 210 + index * 210;
+      const label = sigil.id === "rabbit"
+        ? "Rabbit\n+5 SPD\nRescue Sprint"
+        : sigil.id === "fox"
+          ? "Fox\n+5 MAG\nDecoy Boy"
+          : "Turtle\n+5 DEF\nSlow Rebuke";
+      const button = createBannerButton(this, x, 300, 176, 104, label, () => {
+        this.applyMiloSigil(unit, sigil);
+        this.miloSigilContainer?.destroy(true);
+        this.miloSigilContainer = null;
+        this.busy = false;
+        this.showCenteredPopup(`${unit.name} awakened the ${sigil.name} Sigil.`, () => {
+          this.processLevelUpQueue();
+          if (!this.levelUpAllocationOpen && this.levelUpQueue.length === 0) this.flushLevelUpCallbacks();
+        });
+      }, "15px");
+      container.add(button.container);
+    });
+
+    this.miloSigilContainer = container;
+    this.uiLayer.add(container);
   },
 
   rollLevelUpPoints(unit) {

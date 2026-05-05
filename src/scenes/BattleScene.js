@@ -62,6 +62,19 @@ export class BattleScene extends Phaser.Scene {
     this.chapterThreeTurns = 0;
     this.visitedChapterThreeCottages = new Set();
     this.defeatedCivilians = [];
+    this.chapterThreeFirstEnemyPhaseDone = false;
+    this.chapterThreeBattleStartDialogueShown = false;
+    this.chapterThreeDeploymentDone = false;
+    this.chapterThreeDeploymentRoster = [];
+    this.chapterThreeSelectedDeployIds = new Set();
+    this.chapterThreeReserveUnits = [];
+    this.pendingChapterThreeDeploymentComplete = null;
+    this.chapterThreeRewardsHandled = false;
+    this.pendingChapterThreeRewards = [];
+    this.chapterThreeRewardIndex = 0;
+    this.chapterThreeMiloResolutionHandled = false;
+    this.pendingMiloRescue = null;
+    this.miloSigilContainer = null;
     this.applyLoadedSaveData(this.loadedSaveData);
 
     this.selectedUnitId = null;
@@ -80,6 +93,7 @@ export class BattleScene extends Phaser.Scene {
     this.selectionMenuContainer = null;
     this.selectionMenuSummaryText = null;
     this.pendingItemUse = null;
+    this.pendingParleyUse = null;
     this.targetTileColor = null;
     this.targetTileStroke = null;
     this.skillBannerContainer = null;

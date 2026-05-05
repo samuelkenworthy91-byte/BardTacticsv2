@@ -20,6 +20,6 @@ export const LEVELS = {
     biome: "town",
     map: CHAPTER_THREE_MAP,
     units: CHAPTER_THREE_UNITS,
-    objective: "Survive 10 turns and protect the townsfolk.",
+    objective: "Survive 10 turns and protect the 5 townsfolk.",
   },
 };

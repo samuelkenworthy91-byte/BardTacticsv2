@@ -193,12 +193,53 @@ export const INDIVIDUAL_UNIT_SPRITE_SETS = {
     hurt: createDirectionalStateEntries("chakram_thug", "hurt"),
     death: createDeathEntries("chakram_thug"),
   },
+  mercenary_male: {
+    idle: createDirectionalStateEntries("mercenary_male", "idle"),
+    move: createDirectionalStateEntries("mercenary_male", "move"),
+    attack: createDirectionalStateEntries("mercenary_male", "attack"),
+    hurt: createDirectionalStateEntries("mercenary_male", "hurt"),
+    death: createDeathEntries("mercenary_male"),
+  },
+  mercenary_female: {
+    idle: createDirectionalStateEntries("mercenary_female", "idle"),
+    move: createDirectionalStateEntries("mercenary_female", "move"),
+    attack: createDirectionalStateEntries("mercenary_female", "attack"),
+    hurt: createDirectionalStateEntries("mercenary_female", "hurt"),
+    death: createDeathEntries("mercenary_female"),
+  },
+  civ_man_1: {
+    idle: createDirectionalStateEntries("civ_man_1", "idle"),
+    move: createDirectionalStateEntries("civ_man_1", "move"),
+  },
+  civ_man_2: {
+    idle: createDirectionalStateEntries("civ_man_2", "idle"),
+    move: createDirectionalStateEntries("civ_man_2", "move"),
+  },
+  civ_woman_1: {
+    idle: createDirectionalStateEntries("civ_woman_1", "idle"),
+    move: createDirectionalStateEntries("civ_woman_1", "move"),
+  },
+  civ_woman_2: {
+    idle: createDirectionalStateEntries("civ_woman_2", "idle"),
+    move: createDirectionalStateEntries("civ_woman_2", "move"),
+  },
+  civ_woman_3: {
+    idle: createDirectionalStateEntries("civ_woman_3", "idle"),
+    move: createDirectionalStateEntries("civ_woman_3", "move"),
+  },
   ambrose: {
     idle: createDirectionalStateEntries("ambrose", "idle"),
     move: createDirectionalStateEntries("ambrose", "move"),
     attack: createDirectionalStateEntries("ambrose", "attack"),
     hurt: createDirectionalStateEntries("ambrose", "hurt"),
     death: createDeathEntries("ambrose"),
+  },
+  milo: {
+    idle: createDirectionalStateEntries("milo", "idle"),
+    move: createDirectionalStateEntries("milo", "move"),
+    attack: createDirectionalStateEntries("milo", "attack"),
+    hurt: createDirectionalStateEntries("milo", "hurt"),
+    death: createDeathEntries("milo"),
   },
 };
 
@@ -252,6 +293,21 @@ export const UNIT_SPRITE_RENDER = {
     height: TILE_SIZE * 0.82,
     maxWidth: TILE_SIZE * 0.94,
     shadowWidth: TILE_SIZE * 0.42,
+  },
+  mercenary_male: {
+    height: TILE_SIZE * 0.84,
+    maxWidth: TILE_SIZE * 0.96,
+    shadowWidth: TILE_SIZE * 0.42,
+  },
+  mercenary_female: {
+    height: TILE_SIZE * 0.84,
+    maxWidth: TILE_SIZE * 0.96,
+    shadowWidth: TILE_SIZE * 0.42,
+  },
+  milo: {
+    height: TILE_SIZE * 0.82,
+    maxWidth: TILE_SIZE * 0.94,
+    shadowWidth: TILE_SIZE * 0.4,
   },
 };
 
@@ -353,7 +409,12 @@ export function queueChapterAssets(scene, levelData = LEVELS.chapter1) {
   queueImage(scene, "maraPortrait", "/portraits/mara.jpg");
   queueImage(scene, "gusPortrait", "/portraits/gus.jpg");
   queueImage(scene, "mercenaryPortrait", "/portraits/mercenary.jpg");
+  queueImage(scene, "mercenaryFemalePortrait", "/portraits/mercenary_female.jpg");
+  queueImage(scene, "civMan2Portrait", "/portraits/civ_man_2.jpg");
+  queueImage(scene, "civWoman1Portrait", "/portraits/civ_woman_1.jpg");
+  queueImage(scene, "civWoman2Portrait", "/portraits/civ_woman_2.jpg");
   queueImage(scene, "ambrosePortrait", "/portraits/Ambrose.jpg");
+  queueImage(scene, "miloPortrait", "/portraits/milo.png");
   queueImage(scene, "prologueScene", "/scenes/prologue.jpg");
   queueImage(scene, "leonsHouseScene", "/scenes/leons_house.jpg");
   queueImage(scene, "walkToSchoolScene", "/scenes/walk_to_school.jpg");
