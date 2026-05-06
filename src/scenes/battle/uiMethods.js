@@ -109,12 +109,20 @@ export const uiMethods = {
     this.helpText.setVisible(false);
     panel.container.add([this.objectiveHeader, this.objectiveText, this.phaseText, this.helpText]);
     this.uiLayer.add(panel.container);
+
+    this.endTurnButton = createBannerButton(this, 88, 140, 148, 30, "End Turn", () => this.endPlayerTurnByWaitingAll(), "13px");
+    this.setAmbushButton = createBannerButton(this, 88, 176, 148, 30, "Set Ambush", () => this.endPlayerTurnWithAmbush(), "13px");
+    this.endTurnButton.container.setVisible(false);
+    this.setAmbushButton.container.setVisible(false);
+    this.uiLayer.add([this.endTurnButton.container, this.setAmbushButton.container]);
   },
 
   setObjectiveDisplayVisible(visible) {
     const shouldShow = !!visible;
     if (this.objectiveHeader) this.objectiveHeader.setVisible(shouldShow);
     if (this.objectiveText) this.objectiveText.setVisible(shouldShow);
+    if (this.endTurnButton?.container) this.endTurnButton.container.setVisible(shouldShow);
+    if (this.setAmbushButton?.container) this.setAmbushButton.container.setVisible(shouldShow);
   },
 
   createSidePanel() {
@@ -421,8 +429,22 @@ export const uiMethods = {
 
     this.setBattleHpBar(this.standardBattleAttackerHp, attacker, attacker.hp);
     this.setBattleHpBar(this.standardBattleDefenderHp, defender, defenderStartHp);
-    this.setBattleSceneSprite(this.standardBattleAttackerSprite, attacker, "idle", "right");
-    this.setBattleSceneSprite(this.standardBattleDefenderSprite, defender, "idle", "left");
+    this.setBattleSceneSprite(
+      this.standardBattleAttackerSprite,
+      attacker,
+      "idle",
+      "right",
+      attacker.team === "player" ? 210 : 178,
+      attacker.team === "player" ? 284 : 240
+    );
+    this.setBattleSceneSprite(
+      this.standardBattleDefenderSprite,
+      defender,
+      "idle",
+      "left",
+      defender.team === "player" ? 210 : 178,
+      defender.team === "player" ? 284 : 240
+    );
 
     this.tweens.add({ targets: this.standardBattleContainer, alpha: 1, duration: STANDARD_BATTLE_INTRO_DURATION });
 
@@ -437,8 +459,22 @@ export const uiMethods = {
       this.time.delayedCall(STANDARD_BATTLE_INTRO_DURATION + 150 + index * STANDARD_BATTLE_HIT_STEP_DURATION, () => {
         this.standardBattleAttackerSprite.x = 292;
         this.standardBattleDefenderSprite.x = 668;
-        this.setBattleSceneSprite(this.standardBattleAttackerSprite, attacker, attackState, "right");
-        this.setBattleSceneSprite(this.standardBattleDefenderSprite, defender, "idle", "left");
+        this.setBattleSceneSprite(
+          this.standardBattleAttackerSprite,
+          attacker,
+          attackState,
+          "right",
+          attacker.team === "player" ? 210 : 178,
+          attacker.team === "player" ? 284 : 240
+        );
+        this.setBattleSceneSprite(
+          this.standardBattleDefenderSprite,
+          defender,
+          "idle",
+          "left",
+          defender.team === "player" ? 210 : 178,
+          defender.team === "player" ? 284 : 240
+        );
 
         this.tweens.add({
           targets: this.standardBattleAttackerSprite,
@@ -446,7 +482,14 @@ export const uiMethods = {
           duration: 135,
           ease: "Cubic.Out",
           yoyo: true,
-          onComplete: () => this.setBattleSceneSprite(this.standardBattleAttackerSprite, attacker, "idle", "right"),
+          onComplete: () => this.setBattleSceneSprite(
+            this.standardBattleAttackerSprite,
+            attacker,
+            "idle",
+            "right",
+            attacker.team === "player" ? 210 : 178,
+            attacker.team === "player" ? 284 : 240
+          ),
         });
 
         if (!result.hit) {
@@ -459,7 +502,14 @@ export const uiMethods = {
         this.showBattleMessage(message, result.critical ? "#fde68a" : "#fca5a5");
 
         this.time.delayedCall(120, () => {
-          this.setBattleSceneSprite(this.standardBattleDefenderSprite, defender, "hurt", "left");
+          this.setBattleSceneSprite(
+            this.standardBattleDefenderSprite,
+            defender,
+            "hurt",
+            "left",
+            defender.team === "player" ? 210 : 178,
+            defender.team === "player" ? 284 : 240
+          );
           this.standardBattleDefenderSprite.setTintFill(result.critical ? 0xfff1a8 : 0xff6666);
           this.standardBattleImpactFlash.setAlpha(result.critical ? 0.32 : 0.2);
           this.tweens.add({ targets: this.standardBattleImpactFlash, alpha: 0, duration: 180, ease: "Quad.Out" });
@@ -471,7 +521,14 @@ export const uiMethods = {
         this.time.delayedCall(520, () => {
           this.standardBattleDefenderSprite.clearTint();
           if (defenderDisplayHp > 0) {
-            this.setBattleSceneSprite(this.standardBattleDefenderSprite, defender, "idle", "left");
+            this.setBattleSceneSprite(
+              this.standardBattleDefenderSprite,
+              defender,
+              "idle",
+              "left",
+              defender.team === "player" ? 210 : 178,
+              defender.team === "player" ? 284 : 240
+            );
           }
         });
       });

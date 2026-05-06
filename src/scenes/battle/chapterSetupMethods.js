@@ -450,6 +450,10 @@ export const chapterSetupMethods = {
         if (visit.recruitMilo) {
           const spawned = this.spawnMiloFromCottage(unit);
           message = spawned ? "Milo joined The Bards!" : "Milo has no room to get out.";
+        } else if (visit.item) {
+          unit.items = [...(unit.items || []), { ...visit.item }];
+          message = `${unit.name} received ${visit.item.name}.`;
+          this.showFloatingText(this.boardX + unit.x * TILE_SIZE + TILE_SIZE / 2, this.boardY + unit.y * TILE_SIZE + 8, "Item received", "#fde68a");
         }
         this.busy = false;
         this.clearSelection(message);

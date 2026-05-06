@@ -84,6 +84,8 @@ export const enemyAiMethods = {
       return;
     }
 
+    if (this.checkChapterThreeRoutVictory?.()) return;
+
     const remaining = this.units.filter((u) => u.team === "player" && u.isMiloDecoy !== true && !u.acted && u.hp > 0);
     if (remaining.length === 0) this.startEnemyPhase();
   },
@@ -128,16 +130,26 @@ export const enemyAiMethods = {
     this.helpText.setText("Enemies are moving...");
     this.clearSelection("Enemies are moving...");
     this.busy = true;
-    this.enemyIndex = 0;
-    this.enemyPhaseNoMove = isChapterThree(this.currentChapterNumber) && !this.chapterThreeFirstEnemyPhaseDone && (this.chapterThreeTurns || 0) === 1;
-    this.enemyTurnOrder = this.units.filter((u) => u.team === "enemy" && u.hp > 0);
-    this.enemyTurnOrder.forEach((enemy) => {
-      enemy.counterStance = false;
-      enemy.counterUsed = false;
-      this.applyTurnStartTerrainEffects(enemy);
-      enemy.opportunityThreatIdsAtTurnStart = this.getAdjacentOpponents(enemy).map((opponent) => opponent.id);
-    });
-    this.time.delayedCall(ENEMY_ACTION_PAUSE, () => this.runNextEnemy());
+    const beginEnemyActions = () => {
+      if (this.shouldSpawnChapterThreeReinforcements?.()) this.spawnChapterThreeReinforcements();
+      this.enemyIndex = 0;
+      this.enemyPhaseNoMove = isChapterThree(this.currentChapterNumber) && !this.chapterThreeFirstEnemyPhaseDone && (this.chapterThreeTurns || 0) === 1;
+      this.enemyTurnOrder = this.units.filter((u) => u.team === "enemy" && u.hp > 0);
+      this.enemyTurnOrder.forEach((enemy) => {
+        enemy.counterStance = false;
+        enemy.counterUsed = false;
+        this.applyTurnStartTerrainEffects(enemy);
+        enemy.opportunityThreatIdsAtTurnStart = this.getAdjacentOpponents(enemy).map((opponent) => opponent.id);
+      });
+      this.time.delayedCall(ENEMY_ACTION_PAUSE, () => this.runNextEnemy());
+    };
+
+    if (isChapterThree(this.currentChapterNumber)) {
+      this.runCivilianMovement(beginEnemyActions);
+      return;
+    }
+
+    beginEnemyActions();
   },
 
   runNextEnemy() {
@@ -147,6 +159,7 @@ export const enemyAiMethods = {
     }
 
     if (this.enemyIndex >= this.enemyTurnOrder.length) {
+      if (this.checkChapterThreeRoutVictory?.()) return;
       if (isChapterThree(this.currentChapterNumber) && (this.chapterThreeTurns || 0) >= CHAPTER_THREE_SURVIVAL_TURNS) {
         this.finishMiloEnemyPhaseEffects();
         this.helpText.setText("Tipen Whippet survived the attack.");
@@ -161,7 +174,11 @@ export const enemyAiMethods = {
     }
     const enemyRef = this.enemyTurnOrder[this.enemyIndex];
     const enemy = this.units.find((u) => u.id === enemyRef.id);
-    if (!enemy || enemy.hp <= 0) {
+    const shouldSkipDelayedEnemy = !!enemy &&
+      isChapterThree(this.currentChapterNumber) &&
+      enemy.skipEnemyPhaseTurn != null &&
+      enemy.skipEnemyPhaseTurn >= (this.chapterThreeTurns || 0);
+    if (!enemy || enemy.hp <= 0 || enemy.team !== "enemy" || shouldSkipDelayedEnemy) {
       this.enemyIndex += 1;
       this.runNextEnemy();
       return;
@@ -288,6 +305,8 @@ export const enemyAiMethods = {
   },
 
   getLivingOpponents(unit) {
+    if (unit?.team === "civilian") return this.units.filter((other) => other.team === "enemy" && other.hp > 0);
+    if (unit?.team === "enemy") return this.units.filter((other) => (other.team === "player" || other.team === "civilian") && other.hp > 0);
     return this.units.filter((other) => other.team !== unit.team && other.hp > 0);
   },
 
@@ -358,22 +377,25 @@ export const enemyAiMethods = {
   evaluateEnemyActionAt(enemy, x, y) {
     const opponents = this.getLivingOpponents(enemy);
     const actions = [];
-    (enemy.skills || []).forEach((skill) => {
-      if (!this.canUseSkill(enemy, skill)) return;
-      const allTargets = this.getSkillTargetsAt(enemy, skill, x, y);
-      const opponentTargets = allTargets.filter((target) => target.team !== enemy.team);
-      if (opponentTargets.length === 0) return;
-      let totalDamage = 0;
-      let canKill = false;
-      opponentTargets.forEach((target) => {
-        const damage = this.calculateSkillDamage(enemy, target, skill);
-        totalDamage += damage;
-        if (damage >= target.hp) canKill = true;
+    if (enemy.adjacentOnlyEnemy !== true) {
+      (enemy.skills || []).forEach((skill) => {
+        if (!this.canUseSkill(enemy, skill)) return;
+        const allTargets = this.getSkillTargetsAt(enemy, skill, x, y);
+        const opponentTargets = allTargets.filter((target) => target.team !== enemy.team);
+        if (opponentTargets.length === 0) return;
+        let totalDamage = 0;
+        let canKill = false;
+        opponentTargets.forEach((target) => {
+          const damage = this.calculateSkillDamage(enemy, target, skill);
+          totalDamage += damage;
+          if (damage >= target.hp) canKill = true;
+        });
+        const decoyPriority = opponentTargets.some((target) => target.isMiloDecoy) ? 250000 : 0;
+        actions.push({ type: "skill", skill, targets: opponentTargets, canKill, totalDamage, expectedDamage: totalDamage, score: (canKill ? 120000 : 0) + totalDamage * 115 + opponentTargets.length * 10 + decoyPriority });
       });
-      const decoyPriority = opponentTargets.some((target) => target.isMiloDecoy) ? 250000 : 0;
-      actions.push({ type: "skill", skill, targets: opponentTargets, canKill, totalDamage, expectedDamage: totalDamage, score: (canKill ? 120000 : 0) + totalDamage * 115 + opponentTargets.length * 10 + decoyPriority });
-    });
+    }
     opponents.forEach((target) => {
+      if (enemy.adjacentOnlyEnemy === true && Math.abs(x - target.x) + Math.abs(y - target.y) !== 1) return;
       const weapon = this.getWeaponForPosition(enemy, target, x, y);
       if (!weapon) return;
       const attackScore = this.calculateAttackScoreAt({ ...enemy, x, y }, target, weapon);
@@ -394,7 +416,7 @@ export const enemyAiMethods = {
   chooseEnemyPlan(enemy, options = {}) {
     enemy.opportunityThreatIdsAtTurnStart = this.getAdjacentOpponents(enemy).map((opponent) => opponent.id);
 
-    const allowMove = options.allowMove !== false && !enemy.stationary;
+    const allowMove = options.allowMove !== false && !enemy.stationary && enemy.adjacentOnlyEnemy !== true;
     const moveOptions = allowMove ? [{ x: enemy.x, y: enemy.y }, ...this.reachableTiles(enemy)] : [{ x: enemy.x, y: enemy.y }];
     const nearest = this.getNearestOpponent(enemy);
     let bestPlan = null;
@@ -450,6 +472,169 @@ export const enemyAiMethods = {
     return best;
   },
 
+  isAmbroseStillEnemy() {
+    return this.units.some((unit) => unit.id === "ambrose" && unit.team === "enemy" && unit.hp > 0);
+  },
+
+  shouldSpawnChapterThreeReinforcements() {
+    return isChapterThree(this.currentChapterNumber) && (this.chapterThreeTurns || 0) > 5 && this.isAmbroseStillEnemy();
+  },
+
+  createChapterThreeReinforcement(id, placement, gender = "male") {
+    const isMale = gender === "male";
+    return {
+      id,
+      name: "Mercenary",
+      title: isMale ? "Guildlite Hammer" : "Guildlite Spear",
+      team: "enemy",
+      className: "Mercenary",
+      level: 5,
+      xp: 0,
+      portraitKey: isMale ? "mercenaryPortrait" : "mercenaryFemalePortrait",
+      spriteSet: isMale ? "mercenary_male" : "mercenary_female",
+      facing: "down",
+      move: 4,
+      hp: isMale ? 14 : 12,
+      maxHp: isMale ? 14 : 12,
+      str: isMale ? 5 : 4,
+      mag: 0,
+      def: isMale ? 2 : 1,
+      res: 1,
+      spd: isMale ? 3 : 5,
+      luck: 3,
+      weapons: [isMale
+        ? { name: "Mercenary Hammer", baseDamage: 5, range: 1, damageType: "physical", stat: "str", hitRate: 95, defPierce: 5 }
+        : { name: "Mercenary Spear", baseDamage: 3, range: 1, damageType: "physical", stat: "str", hitRate: 95, lineThroughTarget: 2 }],
+      skills: [],
+      acted: true,
+      skipEnemyPhaseTurn: this.chapterThreeTurns || 0,
+      color: isMale ? 0xf97316 : 0xf87171,
+      ...placement,
+    };
+  },
+
+  spawnChapterThreeReinforcements() {
+    const spawnTiles = [
+      { x: 0, y: 1 }, { x: 2, y: 0 }, { x: 7, y: 1 },
+      { x: 5, y: 0 }, { x: 6, y: 0 }, { x: 1, y: 1 },
+      { x: 4, y: 0 },
+    ];
+    let spawned = 0;
+    spawnTiles.forEach((tile) => {
+      if (spawned >= 3 || !this.isInBounds(tile.x, tile.y) || this.getUnitAt(tile.x, tile.y)) return;
+      const id = `chapter3_reinforcement_${this.chapterThreeTurns || 0}_${spawned + 1}_${Date.now()}`;
+      const unit = this.createChapterThreeReinforcement(id, tile, spawned % 2 === 0 ? "male" : "female");
+      this.units.push(unit);
+      const sprite = this.createUnitSprite(unit);
+      this.unitSprites[unit.id] = sprite;
+      this.unitLayer.add(sprite.container);
+      this.refreshUnitSprite(unit);
+      this.setUnitSpriteFrame(unit, "idle", unit.facing || "down");
+      spawned += 1;
+    });
+    if (spawned > 0) this.helpText.setText(`${spawned} mercenaries emerged from the trees.`);
+  },
+
+  getCivilianMoveTiles(unit, range = 3) {
+    const queue = [{ x: unit.x, y: unit.y, steps: 0 }];
+    const visited = new Set([tileKey(unit.x, unit.y)]);
+    const reachable = [{ x: unit.x, y: unit.y }];
+    while (queue.length > 0) {
+      const current = queue.shift();
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = current.x + dx;
+        const ny = current.y + dy;
+        const key = tileKey(nx, ny);
+        const nextSteps = current.steps + 1;
+        if (visited.has(key) || nextSteps > range || !this.isWalkable(nx, ny)) continue;
+        const occupant = this.getUnitAt(nx, ny);
+        if (occupant && occupant.id !== unit.id) continue;
+        visited.add(key);
+        queue.push({ x: nx, y: ny, steps: nextSteps });
+        reachable.push({ x: nx, y: ny });
+      }
+    }
+    return reachable;
+  },
+
+  getCivilianSafetyScoreAt(civilian, x, y) {
+    const terrain = this.getTerrainAt(x, y);
+    const terrainBonus = terrain === "church" ? 30 : terrain === "forest" ? 24 : terrain === "cover" || terrain === "fort" ? 18 : terrain === "grass" ? 6 : 0;
+    let score = terrainBonus;
+    this.units.filter((unit) => unit.team === "enemy" && unit.hp > 0).forEach((enemy) => {
+      const dist = Math.abs(enemy.x - x) + Math.abs(enemy.y - y);
+      const weapon = this.getWeaponForPosition(enemy, { ...civilian, x, y }, enemy.x, enemy.y);
+      if (weapon) score -= 1000;
+      score += Math.min(8, dist) * 12;
+      if (dist <= (enemy.move || 0) + 1) score -= 80 - dist * 8;
+    });
+    return score;
+  },
+
+  chooseCivilianMove(civilian) {
+    const tiles = this.getCivilianMoveTiles(civilian, Math.max(3, civilian.move || 0));
+    return tiles.reduce((best, tile) => {
+      const score = this.getCivilianSafetyScoreAt(civilian, tile.x, tile.y);
+      if (!best || score > best.score) return { ...tile, score };
+      return best;
+    }, null);
+  },
+
+  runCivilianMovement(onComplete = null) {
+    const civilians = this.units.filter((unit) => unit.team === "civilian" && unit.hp > 0);
+    let index = 0;
+    const moveNext = () => {
+      if (index >= civilians.length) {
+        if (typeof onComplete === "function") onComplete();
+        return;
+      }
+      const civilian = civilians[index];
+      index += 1;
+      const target = this.chooseCivilianMove(civilian);
+      if (!target || (target.x === civilian.x && target.y === civilian.y)) {
+        moveNext();
+        return;
+      }
+      const sprite = this.unitSprites[civilian.id];
+      const oldX = civilian.x;
+      const oldY = civilian.y;
+      civilian.facing = this.getDirectionFromDelta(target.x - oldX, target.y - oldY, civilian.facing || "down");
+      civilian.x = target.x;
+      civilian.y = target.y;
+      this.playUnitState(civilian, "move", 360);
+      if (!sprite) {
+        moveNext();
+        return;
+      }
+      this.tweens.add({
+        targets: sprite.container,
+        x: this.boardX + target.x * TILE_SIZE + TILE_SIZE / 2,
+        y: this.boardY + target.y * TILE_SIZE + TILE_SIZE / 2,
+        duration: 360,
+        ease: "Sine.easeInOut",
+        onComplete: () => {
+          this.setUnitSpriteFrame(civilian, "idle", civilian.facing || "down");
+          moveNext();
+        },
+      });
+    };
+    moveNext();
+  },
+
+  checkChapterThreeRoutVictory() {
+    if (!isChapterThree(this.currentChapterNumber) || this.postBattleStarted) return false;
+    const ambrose = this.units.find((unit) => unit.id === "ambrose" && unit.hp > 0);
+    if (!ambrose || ambrose.team !== "player") return false;
+    const enemiesRemaining = this.units.some((unit) => unit.team === "enemy" && unit.hp > 0);
+    if (enemiesRemaining) return false;
+    this.helpText.setText("Ambrose is with the Bards and the mercenaries are beaten.");
+    this.phaseText.setText("Victory");
+    this.phaseText.setColor("#86efac");
+    this.busy = true;
+    this.time.delayedCall(650, () => this.startChapterThreeVictoryFlow ? this.startChapterThreeVictoryFlow() : this.startPostBattleScene());
+    return true;
+  },
+
   enemyAttack(attacker, defender) {
     const weapon = getWeaponForTarget(attacker, defender);
     if (!weapon) {
@@ -466,6 +651,7 @@ export const enemyAiMethods = {
 
     const defenderStartHp = defender.hp;
     const sequence = this.resolveAttackSequence(attacker, defender, weapon);
+    const shouldTriggerAshIntervention = this.shouldTriggerAshCivilianIntervention(attacker, sequence);
 
     const finishEnemyAttack = () => {
       const completeEnemyAttack = () => {
@@ -527,15 +713,67 @@ export const enemyAiMethods = {
 
       this.setUnitSpriteFrame(attacker, "idle", attacker.facing || "down");
       this.updateSelectedPanel();
-      if (defeatedSplashPlayerUnits.length > 0) {
-        const gameOverUnit = defeatedSplashPlayerUnits.find((target) => this.isGameOverUnitDeath(target)) || defeatedSplashPlayerUnits[0];
-        this.handleAllyUnitDeath(gameOverUnit, () => this.resolveCounterAttack(defender, attacker, completeEnemyAttack));
+      const finishWithCounter = () => {
+        if (defeatedSplashPlayerUnits.length > 0) {
+          const gameOverUnit = defeatedSplashPlayerUnits.find((target) => this.isGameOverUnitDeath(target)) || defeatedSplashPlayerUnits[0];
+          this.handleAllyUnitDeath(gameOverUnit, () => this.resolveCounterAttack(defender, attacker, completeEnemyAttack));
+          return;
+        }
+        this.resolveCounterAttack(defender, attacker, completeEnemyAttack);
+      };
+
+      if (shouldTriggerAshIntervention) {
+        this.triggerAshCivilianIntervention(finishWithCounter);
         return;
       }
-      this.resolveCounterAttack(defender, attacker, completeEnemyAttack);
+
+      finishWithCounter();
     };
 
     this.playStandardBattleScene(attacker, defender, weapon, sequence, defenderStartHp, finishEnemyAttack);
+  },
+
+  shouldTriggerAshCivilianIntervention(attacker, sequence) {
+    if (this.chapterThreeAshInterventionTriggered === true) return false;
+    if (!isChapterThree(this.currentChapterNumber)) return false;
+    if (!attacker || attacker.team !== "enemy" || attacker.id === "ash") return false;
+    if (!String(attacker.id || "").startsWith("chapter3_mercenary")) return false;
+    const ash = this.units.find((unit) => unit.id === "ash" && unit.team === "enemy" && unit.hp > 0);
+    if (!ash) return false;
+    return [...(sequence?.results || []), ...(sequence?.splashResults || [])].some((result) => (
+      result?.hit === true &&
+      (result.damage || 0) > 0 &&
+      result.target?.team === "civilian"
+    ));
+  },
+
+  triggerAshCivilianIntervention(onComplete = null) {
+    const ash = this.units.find((unit) => unit.id === "ash" && unit.hp > 0);
+    if (!ash || ash.team !== "enemy") {
+      if (typeof onComplete === "function") onComplete();
+      return;
+    }
+
+    this.chapterThreeAshInterventionTriggered = true;
+    this.showChapterTwoSetupDialogue({
+      speaker: "Ash",
+      portrait: ash.portraitKey,
+      text: "No. I cannot stand by and watch this. Draw blades on soldiers if you must, but leave the innocent out of it.",
+      onContinue: () => {
+        ash.team = "player";
+        ash.acted = true;
+        ash.stationary = false;
+        ash.adjacentOnlyEnemy = false;
+        ash.sigilPoints = ash.sigilPoints ?? ash.maxSigilPoints ?? 3;
+        ash.spriteState = "idle";
+        this.refreshUnitSprite(ash);
+        this.setUnitSpriteFrame(ash, "idle", ash.facing || "down");
+        this.updateSelectedPanel();
+        this.showCenteredPopup("Ash joined the Bards!", () => {
+          if (typeof onComplete === "function") onComplete();
+        });
+      },
+    });
   },
 
   startPlayerPhase() {
@@ -567,6 +805,13 @@ export const enemyAiMethods = {
       : isChapterTwo(this.currentChapterNumber)
         ? "Player Phase. Capture all four forts. Fences block movement."
         : "Player Phase. Reach the glowing gate tile and choose Escape.");
+    if (isChapterThree(this.currentChapterNumber) && (this.chapterThreeTurns || 0) > 5 && this.isAmbroseStillEnemy()) {
+      this.showChapterTwoSetupDialogue({
+        speaker: "Townsperson",
+        portrait: "maraPortrait",
+        text: "look out they're hiding in the tree",
+      });
+    }
     this.busy = false;
     if (isChapterTwo(this.currentChapterNumber)) {
       this.chapterTwoTurns = (this.chapterTwoTurns || 0) + 1;

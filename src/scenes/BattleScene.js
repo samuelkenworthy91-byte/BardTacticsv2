@@ -3,7 +3,7 @@ import { GAME_HEIGHT, GAME_WIDTH, TILE_SIZE } from "../config/constants.js";
 import { queueChapterAssets } from "../data/assets.js";
 import { CHAPTER_ONE_OPENING } from "../chapters/chapter1.js";
 import {
-  getSaveDataChapterNumber,
+  getSceneDataChapterNumber,
   isChapterThreeOrLater,
   isChapterTwo,
 } from "../chapters/progression.js";
@@ -30,7 +30,7 @@ export class BattleScene extends Phaser.Scene {
     this.skipChapterThreeTitleCard = data.skipChapter3TitleCard === true;
     this.pendingChapterTwoTransitionData = data.pendingChapterTwoTransitionData || null;
     this.pendingChapterThreeTransitionData = data.pendingChapterThreeTransitionData || null;
-    this.currentChapterNumber = getSaveDataChapterNumber(this.loadedSaveData);
+    this.currentChapterNumber = getSceneDataChapterNumber(data);
   }
 
   preload() {
@@ -64,6 +64,7 @@ export class BattleScene extends Phaser.Scene {
     this.defeatedCivilians = [];
     this.chapterThreeFirstEnemyPhaseDone = false;
     this.chapterThreeBattleStartDialogueShown = false;
+    this.chapterThreeAshInterventionTriggered = false;
     this.chapterThreeDeploymentDone = false;
     this.chapterThreeDeploymentRoster = [];
     this.chapterThreeSelectedDeployIds = new Set();
@@ -94,6 +95,9 @@ export class BattleScene extends Phaser.Scene {
     this.selectionMenuSummaryText = null;
     this.pendingItemUse = null;
     this.pendingParleyUse = null;
+    this.tradeContainer = null;
+    this.tradeOpen = false;
+    this.tradeData = null;
     this.targetTileColor = null;
     this.targetTileStroke = null;
     this.skillBannerContainer = null;

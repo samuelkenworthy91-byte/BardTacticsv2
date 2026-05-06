@@ -146,10 +146,10 @@ export const CHAPTER_THREE_OPENING = [
       { speaker: "Izzy", portrait: "izzyPortrait", text: "Take your hand off her." },
       { speaker: "Mercenary", portrait: "mercenaryPortrait", text: "And there they are." },
       { type: "fullScreenScene", scene: "chapter3IzzyWindAttackScene", speaker: "SFX", text: "WHOOMPH! Izzy blasts the thug back with a burst of wind." },
-      { speaker: "Leon", portrait: "leonPortrait", text: "I'm a FAN of how you work..." },
-      { speaker: "Kane", portrait: "kanePortrait", text: "No." },
-      { speaker: "Leon", portrait: "leonPortrait", text: "But-" },
-      { speaker: "Izzy", portrait: "izzyPortrait", text: "No." },
+      { type: "fullScreenScene", scene: "chapter3IzzyWindAttackScene", speaker: "Leon", text: "I'm a FAN of how you work..." },
+      { type: "fullScreenScene", scene: "chapter3IzzyWindAttackScene", speaker: "Kane", text: "No." },
+      { type: "fullScreenScene", scene: "chapter3IzzyWindAttackScene", speaker: "Leon", text: "But-" },
+      { type: "fullScreenScene", scene: "chapter3IzzyWindAttackScene", speaker: "Izzy", text: "No." },
     ],
   },
   {
@@ -186,12 +186,27 @@ export const CHAPTER_THREE_BATTLE_START_DIALOGUE = [
   {
     speaker: "Mercenary",
     portrait: "mercenaryPortrait",
-    text: "Attack the townsfolk, they'll have to protect them",
+    text: "Go for the townsfolk. The Bards'll have to come running.",
   },
   {
     speaker: "Ambrose",
     portrait: "ambrosePortrait",
-    text: "I am sorry for my colleagues, they have no respect for their opponents and none for women it would seem. Guildlites have hired...poorly.",
+    text: "Sorry about this lot. No manners, no shame, and Guildlites clearly hired cheap.",
+  },
+  {
+    speaker: "Mercenary",
+    portrait: "mercenaryFemalePortrait",
+    text: "Who's that in the trees? Doesn't look like one of ours.",
+  },
+  {
+    speaker: "Mercenary",
+    portrait: "mercenaryPortrait",
+    text: "That's the Black Phoenix. New boss's right hand. Best not gawp.",
+  },
+  {
+    speaker: "Ash",
+    portrait: "ashPortrait",
+    text: "Oi. Picking on civilians now? That's not ambition, that's just pathetic.",
   },
 ];
 
@@ -314,7 +329,15 @@ export const CHAPTER_THREE_COTTAGE_VISITS = {
     id: "westCottage",
     speaker: "Townsperson",
     portrait: "maraPortrait",
-    text: "Please, keep them away from the road. We have nowhere else to go.",
+    text: "Here, love. Take this sausage roll. Gregg swears by them, and right now I'll take any miracle going.",
+    item: {
+      id: "greggsSausageRoll",
+      name: "Gregg's Sausage Roll",
+      heal: 10,
+      uses: 1,
+      targetType: "selfOrAdjacentAlly",
+      description: "Restore 10 HP to the user or an adjacent ally.",
+    },
   },
   "2,4": {
     id: "middleCottage",
@@ -327,7 +350,15 @@ export const CHAPTER_THREE_COTTAGE_VISITS = {
     id: "eastCottage",
     speaker: "Townsperson",
     portrait: "maraPortrait",
-    text: "If Ambrose is still standing, the town still has a chance.",
+    text: "Found this tucked over the door. Rabbit's Foot Tonic. Supposed to make your luck turn sharpish.",
+    item: {
+      id: "rabbitsFootTonic",
+      name: "The Rabbit's Foot Tonic",
+      uses: 1,
+      targetType: "self",
+      permanentLuckBoost: 3,
+      description: "Permanently adds +3 Luck.",
+    },
   },
 };
 
@@ -365,13 +396,13 @@ export function createMiloUnit(placement = {}) {
     spriteSet: "milo",
     facing: "down",
     move: 5,
-    hp: 12,
-    maxHp: 12,
+    hp: 14,
+    maxHp: 14,
     str: 1,
     mag: 1,
     def: 1,
     res: 1,
-    spd: 4,
+    spd: 3,
     luck: 8,
     sigilPoints: 3,
     maxSigilPoints: 3,
@@ -443,6 +474,49 @@ function createTownsperson(id, placement, spriteSet, portraitKey) {
   };
 }
 
+function createAsh(placement) {
+  return {
+    id: "ash",
+    name: "Ash",
+    title: "Black Phoenix",
+    team: "enemy",
+    className: "Flame Sigilist",
+    level: 7,
+    xp: 0,
+    portraitKey: "ashPortrait",
+    spriteSet: "ash",
+    facing: "down",
+    move: 4,
+    hp: 30,
+    maxHp: 30,
+    str: 1,
+    mag: 9,
+    def: 1,
+    res: 8,
+    spd: 2,
+    luck: 6,
+    sigilPoints: 3,
+    maxSigilPoints: 3,
+    weapons: [{ id: "ashenFlameSigil", name: "Ashen Flame Sigil", baseDamage: 4, range: 1, damageType: "magical", stat: "mag", hitRate: 95 }],
+    skills: [{
+      id: "phoenixReckoning",
+      name: "Phoenix Reckoning",
+      cost: 1,
+      type: "cardinalLine",
+      range: 3,
+      targetTeam: "enemy",
+      damageFormula: "ashMissingHpMag",
+      animationState: "attack",
+      hitEffectKey: "phoenixReckoningHitEffect",
+    }],
+    acted: false,
+    color: 0xdc2626,
+    stationary: true,
+    adjacentOnlyEnemy: true,
+    ...placement,
+  };
+}
+
 export const CHAPTER_THREE_UNITS = [
   cloneUnit(leon, { x: 0, y: 7, facing: "up" }),
   cloneUnit(izzy, { x: 1, y: 7, facing: "up" }),
@@ -483,6 +557,7 @@ export const CHAPTER_THREE_UNITS = [
   createMercenary("chapter3_mercenary_male_4", { x: 7, y: 0 }, "male"),
   createMercenary("chapter3_mercenary_female_1", { x: 0, y: 1 }, "female"),
   createMercenary("chapter3_mercenary_female_2", { x: 2, y: 1 }, "female"),
+  createAsh({ x: 3, y: 1 }),
   createMercenary("chapter3_mercenary_female_3", { x: 4, y: 1 }, "female"),
   createMercenary("chapter3_mercenary_female_4", { x: 6, y: 1 }, "female"),
   createTownsperson("townsperson_1", { x: 2, y: 6 }, "civ_man_1", "gusPortrait"),

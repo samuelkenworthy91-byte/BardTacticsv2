@@ -32,6 +32,8 @@ export const BROTHERS_BLIGH_CUTIN_KEY = "brothersBlighCutin";
 export const BROTHERS_BLIGH_CUTIN_PATH = "/effects/brothers_bligh_cutin.png";
 export const BROTHERS_BLIGH_HIT_EFFECT_KEY = "brothersBlighHitEffect";
 export const BROTHERS_BLIGH_HIT_EFFECT_PATH = "/effects/brothers_bligh_hit.png";
+export const PHOENIX_RECKONING_HIT_EFFECT_KEY = "phoenixReckoningHitEffect";
+export const PHOENIX_RECKONING_HIT_EFFECT_PATH = "/effects/phoenix_reckoning_hit.png";
 export const BROTHERS_BLIGH_SKILL = {
   id: "brothersBligh",
   name: "Brother's Bligh",
@@ -66,11 +68,22 @@ export const RECRUITMENT_CONFIG = {
     recruitable: true,
     positiveClose: ["izzy"],
     negativeClose: ["leon"],
+    parleyBoosts: {
+      ash: 50,
+    },
     lockoutFailureUnits: ["leon"],
     lockoutLine: "I've heard tell of Edwin Bligh, and that is enough for me.",
     successLine: "If the town stands with you, then so will I.",
+    successOpeners: {
+      ash: {
+        speaker: "Ash",
+        portrait: "ashPortrait",
+        text: "Ambrose, the wars ahead will not forgive hesitation. We must choose the right side before the wrong one chooses for us.",
+      },
+    },
     successLines: {
       izzy: "A measured argument, Isabella. Very well. I will stand with you.",
+      ash: "You were always the righteous one.",
     },
   },
 };

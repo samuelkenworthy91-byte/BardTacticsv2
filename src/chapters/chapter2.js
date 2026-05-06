@@ -136,7 +136,7 @@ export const CHAPTER_TWO_ALLY_UNITS = [
     res: 5,
     spd: 3,
     luck: 4,
-    weapons: [{ name: "Water Whips", baseDamage: 3, range: 2, damageType: "magical", stat: "mag", hitRate: 100 }],
+    weapons: [{ name: "Water Whips", baseDamage: 3, minRange: 1, maxRange: 2, damageType: "magical", stat: "mag", hitRate: 100 }],
     skills: [],
     acted: false,
     color: 0x38bdf8,

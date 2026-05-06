@@ -321,7 +321,7 @@ export const playerActionMethods = {
       title: "Skills",
       entries: this.getAvailableSkills(unit),
       emptyText: `${unit.name} has no skills yet.`,
-      getLabel: (skill) => `${skill.name} (${skill.cost || 0} SP)`,
+      getLabel: (skill) => skill.type === "passive" ? `${skill.name} (Passive)` : `${skill.name} (${skill.cost || 0} SP)`,
       layout: "leftPanel",
       getSummary: (skill) => this.getSkillSummary(unit, skill),
       getTargets: (skill) => skill.id === "parley"
@@ -335,10 +335,10 @@ export const playerActionMethods = {
           ? this.getMiloRescueAllies(unit)
           : this.getSkillHitTilesAt(unit, skill, unit.x, unit.y),
       canChoose: (skill) => this.canUseSkill(unit, skill),
-      disabledText: (skill) => `${skill.name} needs ${skill.cost} Sigil Points.`,
+      disabledText: (skill) => skill.type === "passive" ? `${skill.name} is always active.` : `${skill.name} needs ${skill.cost} Sigil Points.`,
       onChoose: (skill) => {
         if (!this.canUseSkill(unit, skill)) {
-          this.helpText.setText(`${skill.name} needs ${skill.cost} Sigil Points.`);
+          this.helpText.setText(skill.type === "passive" ? `${skill.name} is always active.` : `${skill.name} needs ${skill.cost} Sigil Points.`);
           return;
         }
         if (skill.id === "parley") {
@@ -552,27 +552,28 @@ export const playerActionMethods = {
   getParleyRelationship(unit, target) {
     const config = this.getRecruitmentConfig(target);
     if (!unit || !target || !config) return { type: "neutral", boost: 0 };
+    const configuredBoost = config.parleyBoosts?.[unit.id] || 0;
     if (Array.isArray(config.terribleHistory) && config.terribleHistory.includes(unit.id)) {
       return { type: "terrible", boost: 0 };
     }
     if (config.terribleHistory === "all") return { type: "terrible", boost: 0 };
     if (Array.isArray(config.positiveClose) && config.positiveClose.includes(unit.id)) {
-      return { type: "positiveClose", boost: 25 };
+      return { type: "positiveClose", boost: 25 + configuredBoost };
     }
-    if (config.positiveClose === "all") return { type: "positiveClose", boost: 25 };
+    if (config.positiveClose === "all") return { type: "positiveClose", boost: 25 + configuredBoost };
     if (Array.isArray(config.negativeClose) && config.negativeClose.includes(unit.id)) {
-      return { type: "negativeClose", boost: -25 };
+      return { type: "negativeClose", boost: -25 + configuredBoost };
     }
-    if (config.negativeClose === "all") return { type: "negativeClose", boost: -25 };
+    if (config.negativeClose === "all") return { type: "negativeClose", boost: -25 + configuredBoost };
     if (Array.isArray(config.positive) && config.positive.includes(unit.id)) {
-      return { type: "positive", boost: 12 };
+      return { type: "positive", boost: 12 + configuredBoost };
     }
-    if (config.positive === "all") return { type: "positive", boost: 12 };
+    if (config.positive === "all") return { type: "positive", boost: 12 + configuredBoost };
     if (Array.isArray(config.negative) && config.negative.includes(unit.id)) {
-      return { type: "negative", boost: -12 };
+      return { type: "negative", boost: -12 + configuredBoost };
     }
-    if (config.negative === "all") return { type: "negative", boost: -12 };
-    return { type: "neutral", boost: 0 };
+    if (config.negative === "all") return { type: "negative", boost: -12 + configuredBoost };
+    return { type: "neutral", boost: configuredBoost };
   },
 
   getParleyChance(unit, target) {
@@ -726,32 +727,46 @@ export const playerActionMethods = {
     }
 
     const successLine = config?.successLines?.[unit.id] || config?.successLine || "Fine. I'm with you.";
-    this.showChapterTwoSetupDialogue({
-      speaker: target.name,
-      portrait: target.portraitKey,
-      text: successLine,
-      onContinue: () => {
-        this.awardParleyXp(unit, target, true);
-        const shouldRecruitHeal = target.boss === true;
-        target.team = "player";
-        target.acted = true;
-        target.sigilPoints = target.sigilPoints ?? target.maxSigilPoints ?? 3;
-        if (shouldRecruitHeal) {
-          const maxHp = Math.max(1, target.maxHp || target.hp || 1);
-          const healed = Math.min(Math.ceil(maxHp * 0.25), Math.max(0, maxHp - (target.hp || 0)));
-          target.hp = Math.min(maxHp, (target.hp || 0) + healed);
-          if (healed > 0) {
-            this.showFloatingText(this.boardX + target.x * TILE_SIZE + TILE_SIZE / 2, this.boardY + target.y * TILE_SIZE + 8, `+${healed} HP`, "#86efac");
-          }
+    const completeRecruitment = () => {
+      this.awardParleyXp(unit, target, true);
+      const shouldRecruitHeal = target.boss === true;
+      target.team = "player";
+      target.acted = true;
+      target.sigilPoints = target.sigilPoints ?? target.maxSigilPoints ?? 3;
+      if (shouldRecruitHeal) {
+        const maxHp = Math.max(1, target.maxHp || target.hp || 1);
+        const healed = Math.min(Math.ceil(maxHp * 0.5), Math.max(0, maxHp - (target.hp || 0)));
+        target.hp = Math.min(maxHp, (target.hp || 0) + healed);
+        if (healed > 0) {
+          this.showFloatingText(this.boardX + target.x * TILE_SIZE + TILE_SIZE / 2, this.boardY + target.y * TILE_SIZE + 8, `+${healed} HP`, "#86efac");
         }
-        target.spriteState = "idle";
-        this.refreshUnitSprite(target);
-        this.setUnitSpriteFrame(target, "idle", target.facing || "down");
-        this.showCenteredPopup(`${target.name} joined The Bards!`, () => {
-          this.finishParleyAttempt(unit, `${target.name} joined The Bards!`);
-        });
-      },
-    });
+      }
+      target.spriteState = "idle";
+      this.refreshUnitSprite(target);
+      this.setUnitSpriteFrame(target, "idle", target.facing || "down");
+      this.showCenteredPopup(`${target.name} joined The Bards!`, () => {
+        this.finishParleyAttempt(unit, `${target.name} joined The Bards!`);
+      });
+    };
+    const showTargetSuccessLine = () => {
+      this.showChapterTwoSetupDialogue({
+        speaker: target.name,
+        portrait: target.portraitKey,
+        text: successLine,
+        onContinue: completeRecruitment,
+      });
+    };
+    const successOpener = config?.successOpeners?.[unit.id];
+    if (successOpener) {
+      this.showChapterTwoSetupDialogue({
+        speaker: successOpener.speaker || unit.name,
+        portrait: successOpener.portrait || unit.portraitKey,
+        text: successOpener.text,
+        onContinue: showTargetSuccessLine,
+      });
+      return true;
+    }
+    showTargetSuccessLine();
     return true;
   },
 
@@ -769,6 +784,11 @@ export const playerActionMethods = {
       return `${skill.name}: requires 3 Sigil Points and spends all current SP. Attempts to recruit an adjacent boss. ${targetText}`;
     }
 
+    if (skill.id === "phoenixReckoning") {
+      const missingHp = Math.max(0, (unit.maxHp || unit.hp || 0) - (unit.hp || 0));
+      return `${skill.name}: costs 1 Sigil Point. Hits 3 tiles straight ahead for MAG + missing HP damage. Current bonus: +${missingHp}.`;
+    }
+
     if (skill.id === "brothersBligh") {
       const partner = this.getBrotherSkillPartner(unit);
       const power = this.getCombinedBrotherPower();
@@ -781,6 +801,9 @@ export const playerActionMethods = {
       effect = "Stores damage Milo takes during the next enemy phase and adds it to his first attack next turn.";
     } else if (skill.damageFormula === "resHeal") {
       effect = `Restores ${unit.res || 0} HP to allies in the surrounding squares.`;
+    } else if (skill.damageFormula === "ashMissingHpMag") {
+      const missingHp = Math.max(0, (unit.maxHp || unit.hp || 0) - (unit.hp || 0));
+      effect = `Deals ${(unit.mag || 0) + missingHp} damage in a 3-tile line straight ahead.`;
     } else if (skill.type === "selfBuff") {
       effect = "Focuses the user for a personal follow-up effect.";
     } else if (skill.damageFormula === "mag") {
@@ -812,6 +835,8 @@ export const playerActionMethods = {
         (unit.sigilPoints ?? 0) >= (skill.cost ?? 0) &&
         (partner.sigilPoints ?? 0) >= (skill.partnerCost ?? skill.cost ?? 0);
     }
+
+    if (skill.type === "passive") return false;
 
     if (skill.id === "rescueSprint") {
       return unit.id === "milo" && (unit.sigilPoints ?? 0) >= (skill.cost ?? 0) && this.getMiloRescueAllies(unit).length > 0;
@@ -852,6 +877,24 @@ export const playerActionMethods = {
           if (this.isInBounds(tileX, tileY)) tiles.push({ x: tileX, y: tileY });
         }
       }
+      return tiles;
+    }
+
+    if (skill.type === "cardinalLine") {
+      const tiles = [];
+      const facing = CARDINAL_DIRECTIONS.includes(unit.facing) ? unit.facing : "down";
+      const range = skill.range || 3;
+
+      for (let step = 1; step <= range; step += 1) {
+        let tileX = x;
+        let tileY = y;
+        if (facing === "down") tileY = y + step;
+        else if (facing === "up") tileY = y - step;
+        else if (facing === "right") tileX = x + step;
+        else if (facing === "left") tileX = x - step;
+        if (this.isInBounds(tileX, tileY)) tiles.push({ x: tileX, y: tileY });
+      }
+
       return tiles;
     }
 
@@ -915,6 +958,7 @@ export const playerActionMethods = {
     if (skill.damageFormula === "strPlusSpd") return Math.max(0, (unit.str || 0) + (unit.spd || 0));
     if (skill.damageFormula === "strPlusMag") return Math.max(0, (unit.str || 0) + (unit.mag || 0));
     if (skill.damageFormula === "brothersCombinedStrMag") return Math.max(0, this.getCombinedBrotherPower());
+    if (skill.damageFormula === "ashMissingHpMag") return Math.max(0, (unit.mag || 0) + Math.max(0, (unit.maxHp || unit.hp || 0) - (unit.hp || 0)));
     if (skill.damageFormula === "resHeal") return -Math.max(0, unit.res || 0);
     if (skill.damageFormula === "none") return 0;
     return Math.max(0, skill.baseDamage || 0);
@@ -1105,6 +1149,188 @@ export const playerActionMethods = {
     this.showItemMenu(unit);
   },
 
+  getTradePartners(unit) {
+    if (!unit || unit.team !== "player" || unit.acted || unit.hp <= 0) return [];
+    return this.units.filter((other) => (
+      other &&
+      other.id !== unit.id &&
+      other.team === "player" &&
+      other.hp > 0 &&
+      other.isMiloDecoy !== true &&
+      distance(unit, other) === 1
+    ));
+  },
+
+  chooseActionTrade(unitId) {
+    const unit = this.units.find((u) => u.id === unitId);
+    if (!unit || unit.team !== "player" || unit.acted) return;
+    const partners = this.getTradePartners(unit);
+    if (partners.length === 0) {
+      this.helpText.setText("No adjacent ally to trade with.");
+      return;
+    }
+    if (partners.length === 1) {
+      this.openTradeWindow(unit.id, partners[0].id);
+      return;
+    }
+    this.showChoiceMenu(unit, {
+      type: "item",
+      title: "Trade With",
+      entries: partners,
+      getLabel: (partner) => partner.name,
+      getSummary: (partner) => `${partner.name}'s items: ${(partner.items || []).map((item) => item.name).join(", ") || "None"}`,
+      getTargets: (partner) => [partner],
+      onChoose: (partner) => this.openTradeWindow(unit.id, partner.id),
+    });
+  },
+
+  closeTradeWindow() {
+    if (this.tradeContainer) this.tradeContainer.destroy(true);
+    this.tradeContainer = null;
+    this.tradeOpen = false;
+    this.tradeData = null;
+  },
+
+  openTradeWindow(unitId, partnerId) {
+    const unit = this.units.find((candidate) => candidate.id === unitId);
+    const partner = this.units.find((candidate) => candidate.id === partnerId);
+    if (!unit || !partner || !this.getTradePartners(unit).some((candidate) => candidate.id === partner.id)) return;
+    this.closeActionMenu();
+    this.closeSelectionMenu(false);
+    this.pendingItemUse = null;
+    this.pendingParleyUse = null;
+    this.pendingMiloRescue = null;
+    this.tradeData = { unitId: unit.id, partnerId: partner.id, selected: null };
+    this.tradeOpen = true;
+    this.renderTradeWindow();
+  },
+
+  getTradeSlotCount(unit, partner) {
+    return Math.max(4, (unit?.items || []).length + 1, (partner?.items || []).length + 1);
+  },
+
+  renderTradeWindow() {
+    if (this.tradeContainer) this.tradeContainer.destroy(true);
+    const unit = this.units.find((candidate) => candidate.id === this.tradeData?.unitId);
+    const partner = this.units.find((candidate) => candidate.id === this.tradeData?.partnerId);
+    if (!unit || !partner) {
+      this.closeTradeWindow();
+      return;
+    }
+
+    const container = this.add.container(0, 0).setDepth(16000);
+    const dim = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.48).setInteractive();
+    const panel = createBannerPanel(this, GAME_WIDTH / 2, GAME_HEIGHT / 2, 700, 400, { innerInset: 16 });
+    const title = this.add.text(GAME_WIDTH / 2, 100, "Trade", {
+      fontSize: "28px",
+      fontStyle: "bold",
+      color: "#f7ecd3",
+      stroke: "#0b0811",
+      strokeThickness: 4,
+    }).setOrigin(0.5);
+    const hint = this.add.text(GAME_WIDTH / 2, 132, "Choose an item, then choose a slot in the other inventory.", {
+      fontSize: "13px",
+      color: "#d8c4f0",
+    }).setOrigin(0.5);
+    container.add([dim, panel.container, title, hint]);
+
+    const slotCount = this.getTradeSlotCount(unit, partner);
+    const drawInventory = (owner, side, x) => {
+      const name = this.add.text(x, 166, owner.name, {
+        fontSize: "20px",
+        fontStyle: "bold",
+        color: side === "unit" ? "#93c5fd" : "#86efac",
+        stroke: "#0b0811",
+        strokeThickness: 3,
+      }).setOrigin(0.5);
+      container.add(name);
+
+      for (let index = 0; index < slotCount; index += 1) {
+        const item = owner.items?.[index] || null;
+        const y = 204 + index * 42;
+        const selected = this.tradeData?.selected?.side === side && this.tradeData.selected.index === index;
+        const bg = this.add.rectangle(x, y, 276, 34, selected ? 0x315f3c : 0x1e1030, selected ? 1 : 0.92);
+        bg.setStrokeStyle(2, selected ? 0x86efac : 0x70558c);
+        bg.setInteractive({ useHandCursor: true });
+        bg.on("pointerdown", () => this.chooseTradeSlot(side, index));
+        const label = item ? `${item.name}${item.uses ? ` x${item.uses}` : ""}` : "Empty";
+        const text = this.add.text(x - 126, y - 9, label, {
+          fontSize: "13px",
+          color: item ? "#f7ecd3" : "#8c7a9f",
+        });
+        container.add([bg, text]);
+      }
+    };
+
+    drawInventory(unit, "unit", GAME_WIDTH / 2 - 176);
+    drawInventory(partner, "partner", GAME_WIDTH / 2 + 176);
+
+    const done = createBannerButton(this, GAME_WIDTH / 2, 486, 190, 38, "Done", () => this.finishTrade(), "16px");
+    container.add(done.container);
+    this.tradeContainer = container;
+    this.uiLayer.add(container);
+    this.helpText.setText(`${unit.name} is trading with ${partner.name}.`);
+  },
+
+  chooseTradeSlot(side, index) {
+    const unit = this.units.find((candidate) => candidate.id === this.tradeData?.unitId);
+    const partner = this.units.find((candidate) => candidate.id === this.tradeData?.partnerId);
+    if (!unit || !partner) return;
+    const inventories = { unit: unit.items || [], partner: partner.items || [] };
+    unit.items = inventories.unit;
+    partner.items = inventories.partner;
+    const item = inventories[side]?.[index] || null;
+    const selected = this.tradeData?.selected;
+
+    if (!selected) {
+      if (!item) return;
+      this.tradeData.selected = { side, index };
+      this.renderTradeWindow();
+      return;
+    }
+
+    if (selected.side === side && selected.index === index) {
+      this.tradeData.selected = null;
+      this.renderTradeWindow();
+      return;
+    }
+
+    const fromInventory = inventories[selected.side];
+    const toInventory = inventories[side];
+    const movingItem = fromInventory[selected.index] || null;
+    if (!movingItem) {
+      this.tradeData.selected = null;
+      this.renderTradeWindow();
+      return;
+    }
+
+    const targetItem = toInventory[index] || null;
+    if (targetItem) fromInventory[selected.index] = targetItem;
+    else fromInventory.splice(selected.index, 1);
+    toInventory[index] = movingItem;
+    unit.items = inventories.unit.filter(Boolean);
+    partner.items = inventories.partner.filter(Boolean);
+    this.tradeData.selected = null;
+    this.refreshUnitSprite(unit);
+    this.refreshUnitSprite(partner);
+    this.updateSelectedPanel();
+    this.renderTradeWindow();
+  },
+
+  finishTrade() {
+    const unit = this.units.find((candidate) => candidate.id === this.tradeData?.unitId);
+    const partner = this.units.find((candidate) => candidate.id === this.tradeData?.partnerId);
+    this.closeTradeWindow();
+    if (unit) {
+      delete unit.pendingMoveOrigin;
+      unit.acted = true;
+      this.refreshUnitSprite(unit);
+    }
+    if (partner) this.refreshUnitSprite(partner);
+    this.clearSelection(unit && partner ? `${unit.name} traded with ${partner.name}.` : "Trade finished.");
+    this.checkEndOfPlayerPhase();
+  },
+
   showItemMenu(unit) {
     this.showChoiceMenu(unit, {
       type: "item",
@@ -1142,6 +1368,7 @@ export const playerActionMethods = {
     }
     if (item.learnSkill) return `${item.name}: teaches ${this.getSkillTomeSkillForUnit(unit).name} to ${unit.name}.`;
     if (item.permanentStatBoost) return `${item.name}: permanently adds +${item.permanentStatBoost} to HP, STR, MAG, DEF, RES, SPD, and LUCK.`;
+    if (item.permanentLuckBoost) return `${item.name}: permanently adds +${item.permanentLuckBoost} Luck.`;
     return item.description || `${item.name}: item effect will be added later.`;
   },
 
@@ -1213,6 +1440,11 @@ export const playerActionMethods = {
       });
       this.showFloatingText(this.boardX + target.x * TILE_SIZE + TILE_SIZE / 2, this.boardY + target.y * TILE_SIZE + 8, `All stats +${boost}`, "#fde68a");
     }
+    if (item.permanentLuckBoost) {
+      const boost = item.permanentLuckBoost;
+      target.luck = (target.luck || 0) + boost;
+      this.showFloatingText(this.boardX + target.x * TILE_SIZE + TILE_SIZE / 2, this.boardY + target.y * TILE_SIZE + 8, `Luck +${boost}`, "#fde68a");
+    }
     item.uses = (item.uses ?? 1) - 1;
     if (item.uses <= 0) {
       unit.items = (unit.items || []).filter((candidate) => candidate.id !== item.id);
@@ -1259,6 +1491,84 @@ export const playerActionMethods = {
     this.checkEndOfPlayerPhase();
   },
 
+  canUseGlobalTurnAction() {
+    return this.phase === "player" &&
+      !this.busy &&
+      !this.previewOpen &&
+      !this.actionMenuOpen &&
+      !this.selectionMenuOpen &&
+      !this.levelUpAllocationOpen &&
+      !this.tradeOpen;
+  },
+
+  getUnactedPlayerUnits() {
+    return this.units.filter((unit) => (
+      unit?.team === "player" &&
+      unit.isMiloDecoy !== true &&
+      !unit.acted &&
+      unit.hp > 0
+    ));
+  },
+
+  clearGlobalTurnActionState() {
+    this.closeActionMenu();
+    this.closeSelectionMenu(false);
+    this.pendingItemUse = null;
+    this.pendingParleyUse = null;
+    this.pendingMiloRescue = null;
+    this.selectedUnitId = null;
+    this.moveTiles = [];
+    this.targetTiles = [];
+    this.targetTileColor = null;
+    this.targetTileStroke = null;
+    this.redrawSelection();
+  },
+
+  endPlayerTurnByWaitingAll() {
+    if (!this.canUseGlobalTurnAction()) return;
+
+    const units = this.getUnactedPlayerUnits();
+    if (units.length === 0) {
+      this.checkEndOfPlayerPhase();
+      return;
+    }
+
+    this.clearGlobalTurnActionState();
+    units.forEach((unit) => {
+      delete unit.pendingMoveOrigin;
+      unit.counterStance = false;
+      unit.counterUsed = false;
+      unit.acted = true;
+      this.refreshUnitSprite(unit);
+    });
+
+    this.updateSelectedPanel();
+    this.helpText.setText("All remaining allies wait.");
+    this.checkEndOfPlayerPhase();
+  },
+
+  endPlayerTurnWithAmbush() {
+    if (!this.canUseGlobalTurnAction()) return;
+
+    const units = this.getUnactedPlayerUnits();
+    if (units.length === 0) {
+      this.checkEndOfPlayerPhase();
+      return;
+    }
+
+    this.clearGlobalTurnActionState();
+    units.forEach((unit) => {
+      delete unit.pendingMoveOrigin;
+      unit.acted = true;
+      this.setCounterStance(unit, true);
+      this.refreshUnitSprite(unit);
+    });
+
+    this.updateSelectedPanel();
+    this.helpText.setText("All remaining allies prepare to counter.");
+    this.checkEndOfPlayerPhase();
+  },
+
   setupInput() {
     this.input.keyboard?.on("keydown-SPACE", (event) => {
       if (event?.preventDefault) event.preventDefault();
@@ -1266,7 +1576,7 @@ export const playerActionMethods = {
     });
 
     this.input.on("pointerdown", (pointer) => {
-      if (this.phase !== "player" || this.busy || this.previewOpen || this.actionMenuOpen || this.selectionMenuOpen || this.levelUpAllocationOpen) return;
+      if (this.phase !== "player" || this.busy || this.previewOpen || this.actionMenuOpen || this.selectionMenuOpen || this.levelUpAllocationOpen || this.tradeOpen) return;
       const tile = this.pointerToTile(pointer.x, pointer.y);
       if (!tile) return;
       const clickedUnit = this.getUnitAt(tile.x, tile.y);
@@ -1361,6 +1671,8 @@ export const playerActionMethods = {
 
   handleSpaceCancel() {
     if (this.levelUpAllocationOpen || this.busy) return;
+
+    if (this.tradeOpen) return;
 
     if (this.previewOpen) {
       this.closePreview();

@@ -5,6 +5,8 @@ import {
   BROTHERS_BLIGH_HIT_EFFECT_PATH,
   ICE_OF_AGES_HIT_EFFECT_KEY,
   ICE_OF_AGES_HIT_EFFECT_PATH,
+  PHOENIX_RECKONING_HIT_EFFECT_KEY,
+  PHOENIX_RECKONING_HIT_EFFECT_PATH,
   SMACK_SFX_KEY,
   SMACK_SFX_PATH,
   TILE_SIZE,
@@ -234,6 +236,13 @@ export const INDIVIDUAL_UNIT_SPRITE_SETS = {
     hurt: createDirectionalStateEntries("ambrose", "hurt"),
     death: createDeathEntries("ambrose"),
   },
+  ash: {
+    idle: createDirectionalStateEntries("ash", "idle"),
+    move: createDirectionalStateEntries("ash", "move"),
+    attack: createDirectionalStateEntries("ash", "attack"),
+    hurt: createDirectionalStateEntries("ash", "hurt"),
+    death: createDeathEntries("ash"),
+  },
   milo: {
     idle: createDirectionalStateEntries("milo", "idle"),
     move: createDirectionalStateEntries("milo", "move"),
@@ -414,6 +423,7 @@ export function queueChapterAssets(scene, levelData = LEVELS.chapter1) {
   queueImage(scene, "civWoman1Portrait", "/portraits/civ_woman_1.jpg");
   queueImage(scene, "civWoman2Portrait", "/portraits/civ_woman_2.jpg");
   queueImage(scene, "ambrosePortrait", "/portraits/Ambrose.jpg");
+  queueImage(scene, "ashPortrait", "/portraits/ash.jpg");
   queueImage(scene, "miloPortrait", "/portraits/milo.png");
   queueImage(scene, "prologueScene", "/scenes/prologue.jpg");
   queueImage(scene, "leonsHouseScene", "/scenes/leons_house.jpg");
@@ -438,6 +448,7 @@ export function queueChapterAssets(scene, levelData = LEVELS.chapter1) {
   queueImage(scene, ICE_OF_AGES_HIT_EFFECT_KEY, ICE_OF_AGES_HIT_EFFECT_PATH);
   queueImage(scene, BROTHERS_BLIGH_CUTIN_KEY, BROTHERS_BLIGH_CUTIN_PATH);
   queueImage(scene, BROTHERS_BLIGH_HIT_EFFECT_KEY, BROTHERS_BLIGH_HIT_EFFECT_PATH);
+  queueImage(scene, PHOENIX_RECKONING_HIT_EFFECT_KEY, PHOENIX_RECKONING_HIT_EFFECT_PATH);
   queueBiomeTileAssets(scene, levelData?.biome);
   queueIndividualDirectionalSpriteAssets(scene);
   queueAudio(scene, SMACK_SFX_KEY, SMACK_SFX_PATH);

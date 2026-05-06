@@ -108,7 +108,10 @@ export const combatMethods = {
     const attackStat = attacker[attackStatName] || 0;
     const baseDamage = weapon.baseDamage ?? weapon.damage ?? 0;
     const defense = this.getDefenseForAttack(defender, weapon);
-    return Math.max(0, baseDamage + attackStat + (attacker.nextAttackBonus || 0) - defense);
+    const phoenixBonus = (attacker.skills || []).some((skill) => skill.id === "phoenixReckoning")
+      ? Math.max(0, (attacker.maxHp || attacker.hp || 0) - (attacker.hp || 0))
+      : 0;
+    return Math.max(0, baseDamage + attackStat + phoenixBonus + (attacker.nextAttackBonus || 0) - defense);
   },
 
   calculateDamage(attacker, defender, weapon) {

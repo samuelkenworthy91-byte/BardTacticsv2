@@ -21,6 +21,7 @@ import {
   OPPORTUNITY_ATTACK_PAUSE,
   PLAYER_ACTION_PAUSE,
   PLAYER_MOVE_DURATION,
+  PHOENIX_RECKONING_HIT_EFFECT_KEY,
   SAVE_KEY,
   SAVE_SLOT_COUNT,
   SKILL_BANNER_DURATION,
@@ -702,10 +703,65 @@ export const boardSpriteMethods = {
     let effectKey = null;
     if (skill.id === "iceOfAges") effectKey = ICE_OF_AGES_HIT_EFFECT_KEY;
     if (skill.id === "brothersBligh") effectKey = BROTHERS_BLIGH_HIT_EFFECT_KEY;
+    if (skill.id === "phoenixReckoning") effectKey = skill.hitEffectKey || PHOENIX_RECKONING_HIT_EFFECT_KEY;
     if (!effectKey) return;
+
+    if (skill.id === "phoenixReckoning") {
+      this.playPhoenixReckoningBeam(unit, effectKey);
+      return;
+    }
 
     this.getSkillHitTilesAt(unit, skill, unit.x, unit.y).forEach((tile, index) => {
       this.time.delayedCall(index * SKILL_TILE_EFFECT_STAGGER, () => this.playTileEffect(tile.x, tile.y, effectKey));
+    });
+  },
+
+  getPhoenixReckoningBeamDirection(facing) {
+    switch (facing) {
+      case "left":
+      case "west":
+        return { dx: -1, dy: 0, rotation: 0, flipX: true };
+      case "right":
+      case "east":
+        return { dx: 1, dy: 0, rotation: 0, flipX: false };
+      case "up":
+      case "north":
+        return { dx: 0, dy: -1, rotation: -Math.PI / 2, flipX: false };
+      case "down":
+      case "south":
+      default:
+        return { dx: 0, dy: 1, rotation: Math.PI / 2, flipX: false };
+    }
+  },
+
+  playPhoenixReckoningBeam(unit, textureKey = PHOENIX_RECKONING_HIT_EFFECT_KEY) {
+    if (!unit || !textureKey || !this.textures.exists(textureKey)) return;
+
+    const facing = unit.facing || "down";
+    const direction = this.getPhoenixReckoningBeamDirection(facing);
+    const centerTileX = unit.x + direction.dx * 2;
+    const centerTileY = unit.y + direction.dy * 2;
+    const x = this.boardX + centerTileX * TILE_SIZE + TILE_SIZE / 2;
+    const y = this.boardY + centerTileY * TILE_SIZE + TILE_SIZE / 2;
+
+    const beam = this.add.image(x, y, textureKey)
+      .setOrigin(0.5)
+      .setDepth(9997)
+      .setRotation(direction.rotation)
+      .setFlipX(direction.flipX)
+      .setDisplaySize(TILE_SIZE * 3, TILE_SIZE * 1.2)
+      .setAlpha(0);
+
+    this.overlayLayer.add(beam);
+
+    this.tweens.add({
+      targets: beam,
+      alpha: 1,
+      duration: 80,
+      ease: "Quad.Out",
+      yoyo: true,
+      hold: 180,
+      onComplete: () => beam.destroy(),
     });
   },
 
@@ -925,6 +981,10 @@ export const boardSpriteMethods = {
       { label: "Wait & Counter", handler: () => this.waitAndCounterUnit(unit.id) },
       { label: "Wait", handler: () => this.waitUnit(unit.id) },
     ];
+
+    if (this.getTradePartners?.(unit).length > 0) {
+      actions.splice(3, 0, { label: "Trade", handler: () => this.chooseActionTrade(unit.id) });
+    }
 
     if (this.isEscapeTile(unit.x, unit.y)) {
       actions.unshift({ label: "Escape", handler: () => this.escapeUnit(unit.id) });
