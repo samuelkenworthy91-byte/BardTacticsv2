@@ -66,8 +66,10 @@ import {
   CHAPTER_TWO_OPENING,
   CHAPTER_TWO_TITLE,
 } from "../../chapters/chapter2.js";
+import { CHAPTER_THREE_GAIDEN_PLAYER_SPAWNS } from "../../chapters/chapter3Gaiden/index.js";
 import {
   buildChapterThreeSaveData,
+  buildChapterThreeGaidenSaveData,
   buildChapterTwoSaveData,
   CHAPTER_THREE_NUMBER,
   CHAPTER_TWO_NUMBER,
@@ -75,8 +77,12 @@ import {
   getSaveDataChapterNumber,
   isChapterOne,
   isChapterThree,
+  isChapterThreeGaiden,
+  isChapterThreeOrLater,
   isChapterTwoOrLater,
   isChapterTwo,
+  MYSTERIOUS_EGG_HATCH_MESSAGE,
+  normalizeMysteriousEggTracking,
 } from "../../chapters/progression.js";
 export const flowMethods = {
   getCurrentLevel() {
@@ -94,6 +100,7 @@ export const flowMethods = {
   },
 
   shouldRestoreResourcesForChapterStart(saveData = null) {
+    if (saveData?.inBattleSave === true) return false;
     const chapterNumber = getSaveDataChapterNumber(saveData, this.currentChapterNumber);
     return isChapterTwoOrLater(chapterNumber);
   },
@@ -103,22 +110,93 @@ export const flowMethods = {
     return JSON.parse(JSON.stringify(data));
   },
 
+  getMysteriousEggCarrierId(units = []) {
+    const carrier = (units || []).find((unit) => (
+      unit?.team === "player" &&
+      unit?.alive !== false &&
+      Array.isArray(unit.items) &&
+      unit.items.some((item) => item?.id === "mysteriousEgg")
+    ));
+    return carrier?.id || null;
+  },
+
+  isMysteriousEggHatchWindowReached(saveData = null) {
+    const completedCount = Array.isArray(saveData?.completedChapters) ? saveData.completedChapters.length : 0;
+    const chapterNumber = getSaveDataChapterNumber(saveData, this.currentChapterNumber);
+    return completedCount >= 6 || (Number.isFinite(chapterNumber) && chapterNumber >= 7);
+  },
+
+  buildMysteriousEggTrackingForUnits(units = [], options = {}) {
+    const incrementForChapterCompletion = options.incrementForChapterCompletion === true;
+    const nextSaveData = options.nextSaveData || null;
+    const previous = normalizeMysteriousEggTracking(this.mysteriousEggTracking || this.loadedSaveData?.mysteriousEggTracking);
+    const carrierId = this.getMysteriousEggCarrierId(units);
+    if (!carrierId) {
+      return normalizeMysteriousEggTracking();
+    }
+
+    const sameCarrier = carrierId === previous.carrierId;
+    const chaptersWithCarrier = incrementForChapterCompletion
+      ? (sameCarrier ? previous.chaptersWithCarrier + 1 : 1)
+      : (sameCarrier ? previous.chaptersWithCarrier : 0);
+    const hatchReady = (sameCarrier && previous.hatchReady === true) || (
+      chaptersWithCarrier >= 4 &&
+      this.isMysteriousEggHatchWindowReached(nextSaveData)
+    );
+
+    return {
+      carrierId,
+      chaptersWithCarrier,
+      hatchReady,
+    };
+  },
+
+  getRestartableSaveData(data = null) {
+    const saveData = this.cloneSceneData(data);
+    if (!saveData?.inBattleSave) return saveData;
+    delete saveData.inBattleSave;
+    delete saveData.openedFactoryContainers;
+    delete saveData.destroyedFactoryTerrain;
+    delete saveData.ignitedFactorySpills;
+    delete saveData.factoryTerrainHp;
+    delete saveData.chapterThreeBonusThorns;
+    delete saveData.visitedChapterThreeCottages;
+    delete saveData.defeatedCivilians;
+    saveData.lostChapterThreeGaidenChestItems = [];
+    saveData.marnieTalked = false;
+    saveData.marnieTemporarilyRecruited = false;
+    saveData.units = Array.isArray(saveData.units)
+      ? saveData.units
+        .filter((unit) => unit?.team === "player")
+        .map((unit) => ({
+          ...unit,
+          acted: false,
+          alive: true,
+          hp: unit.maxHp || unit.hp || 1,
+          sigilPoints: unit.maxSigilPoints ?? unit.sigilPoints ?? 3,
+        }))
+      : [];
+    return saveData;
+  },
+
   getChapterRestartSceneData() {
-    if (isChapterThree(this.currentChapterNumber)) {
-      const saveData = this.cloneSceneData(this.pendingChapterThreeTransitionData || this.loadedSaveData);
+    if (isChapterThree(this.currentChapterNumber) || isChapterThreeGaiden(this.currentChapterNumber)) {
+      const saveData = this.getRestartableSaveData(this.pendingChapterThreeTransitionData || this.loadedSaveData);
       if (saveData) {
         return {
           loadFromSave: true,
           saveData,
           slotNumber: saveData.slotNumber || this.loadedSlotNumber || null,
-          playChapterThreeOpening: true,
-          skipChapter3TitleCard: true,
+          playChapterThreeOpening: isChapterThree(this.currentChapterNumber),
+          playChapterThreeGaidenOpening: isChapterThreeGaiden(this.currentChapterNumber),
+          skipChapter3TitleCard: isChapterThree(this.currentChapterNumber),
+          skipChapter3GaidenTitleCard: isChapterThreeGaiden(this.currentChapterNumber),
         };
       }
     }
 
     if (isChapterTwo(this.currentChapterNumber)) {
-      const saveData = this.cloneSceneData(this.pendingChapterTwoTransitionData || this.loadedSaveData);
+      const saveData = this.getRestartableSaveData(this.pendingChapterTwoTransitionData || this.loadedSaveData);
       if (saveData) {
         return {
           loadFromSave: true,
@@ -137,11 +215,31 @@ export const flowMethods = {
     if (!saveData) return;
 
     this.defeatedAllies = Array.isArray(saveData.defeatedAllies) ? [...saveData.defeatedAllies] : [];
+    this.marnieTalked = saveData.marnieTalked === true;
+    this.marnieTemporarilyRecruited = saveData.marnieTemporarilyRecruited === true;
+    this.marniePermanentlyRecruited = saveData.marniePermanentlyRecruited === true;
+    this.lostChapterThreeGaidenChestItems = new Set(Array.isArray(saveData.lostChapterThreeGaidenChestItems) ? saveData.lostChapterThreeGaidenChestItems : []);
+    this.openedFactoryContainers = new Set(Array.isArray(saveData.openedFactoryContainers) ? saveData.openedFactoryContainers : [...(this.openedFactoryContainers || new Set())]);
+    this.destroyedFactoryTerrain = new Set(Array.isArray(saveData.destroyedFactoryTerrain) ? saveData.destroyedFactoryTerrain : [...(this.destroyedFactoryTerrain || new Set())]);
+    this.ignitedFactorySpills = new Set(Array.isArray(saveData.ignitedFactorySpills) ? saveData.ignitedFactorySpills : [...(this.ignitedFactorySpills || new Set())]);
+    this.factoryTerrainHp = saveData.factoryTerrainHp && typeof saveData.factoryTerrainHp === "object" ? { ...saveData.factoryTerrainHp } : (this.factoryTerrainHp || {});
+    this.chapterThreeBonusThorns = Array.isArray(saveData.chapterThreeBonusThorns) ? saveData.chapterThreeBonusThorns.map((thorn) => ({ ...thorn })) : (this.chapterThreeBonusThorns || []);
+    this.visitedChapterThreeCottages = new Set(Array.isArray(saveData.visitedChapterThreeCottages) ? saveData.visitedChapterThreeCottages : [...(this.visitedChapterThreeCottages || new Set())]);
+    this.defeatedCivilians = Array.isArray(saveData.defeatedCivilians) ? [...saveData.defeatedCivilians] : (this.defeatedCivilians || []);
+    this.chapterTwoTurns = Number.isFinite(saveData.chapterTwoTurns) ? saveData.chapterTwoTurns : (this.chapterTwoTurns || 0);
+    this.chapterThreeTurns = Number.isFinite(saveData.chapterThreeTurns) ? saveData.chapterThreeTurns : (this.chapterThreeTurns || 0);
+    this.chapterTwoSetupDone = saveData.chapterTwoSetupDone === true || this.chapterTwoSetupDone === true;
+    this.chapterThreeFirstEnemyPhaseDone = saveData.chapterThreeFirstEnemyPhaseDone === true || this.chapterThreeFirstEnemyPhaseDone === true;
+    this.chapterThreeBattleStartDialogueShown = saveData.chapterThreeBattleStartDialogueShown === true || this.chapterThreeBattleStartDialogueShown === true;
+    this.chapterThreeGaidenBattleStartEventShown = saveData.chapterThreeGaidenBattleStartEventShown === true || this.chapterThreeGaidenBattleStartEventShown === true;
+    this.chapterThreeGaidenRoundTwoReinforcementsSpawned = saveData.chapterThreeGaidenRoundTwoReinforcementsSpawned === true || this.chapterThreeGaidenRoundTwoReinforcementsSpawned === true;
+    this.chapterThreeAshInterventionTriggered = saveData.chapterThreeAshInterventionTriggered === true || this.chapterThreeAshInterventionTriggered === true;
+    this.mysteriousEggTracking = normalizeMysteriousEggTracking(saveData.mysteriousEggTracking);
 
     if (!Array.isArray(saveData.units)) return;
 
     const savedById = new Map(saveData.units.map((unitState) => [unitState.id, unitState]));
-    const preserveMapPositions = isChapterOne(this.currentChapterNumber);
+    const preserveMapPositions = saveData.inBattleSave === true || isChapterOne(this.currentChapterNumber);
     const restoreResources = this.shouldRestoreResourcesForChapterStart(saveData);
 
     this.units = this.units
@@ -159,7 +257,7 @@ export const flowMethods = {
           skills: Array.isArray(saved.skills) ? saved.skills.map((skill) => ({ ...skill })) : (unit.skills || []).map((skill) => ({ ...skill })),
           weapons: Array.isArray(saved.weapons) ? saved.weapons.map((weapon) => ({ ...weapon })) : (unit.weapons || []).map((weapon) => ({ ...weapon })),
           items: Array.isArray(saved.items) ? saved.items.map((item) => ({ ...item })) : (unit.items || []).map((item) => ({ ...item })),
-          acted: false,
+          acted: saveData.inBattleSave === true ? saved.acted === true : false,
           spriteState: "idle",
         };
         if (restoreResources && merged.team === "player") {
@@ -170,26 +268,41 @@ export const flowMethods = {
       })
       .filter(Boolean);
 
-    if (isChapterThree(this.currentChapterNumber)) {
+    if (isChapterThreeOrLater(this.currentChapterNumber)) {
       const existingIds = new Set(this.units.map((unit) => unit.id));
+      const occupiedTiles = new Set(this.units.map((unit) => `${unit.x},${unit.y}`));
+      const gaidenSpawnTiles = isChapterThreeGaiden(this.currentChapterNumber)
+        ? [
+          ...CHAPTER_THREE_GAIDEN_PLAYER_SPAWNS,
+          { x: 1, y: 6, facing: "up" },
+          { x: 2, y: 6, facing: "up" },
+          { x: 3, y: 6, facing: "up" },
+          { x: 4, y: 6, facing: "up" },
+          { x: 5, y: 6, facing: "up" },
+        ]
+        : [];
       saveData.units
         .filter((unitState) => unitState.team === "player" && unitState.alive !== false && !existingIds.has(unitState.id))
         .forEach((unitState) => {
+          const gaidenPlacement = gaidenSpawnTiles.find((tile) => !occupiedTiles.has(`${tile.x},${tile.y}`));
           this.units.push({
             ...unitState,
             team: "player",
             portraitKey: unitState.portraitKey || (String(unitState.id).startsWith("shade") ? "shadePortrait" : unitState.portraitKey),
             spriteSet: unitState.spriteSet || (String(unitState.id).startsWith("shade") ? "shade" : unitState.id),
+            x: gaidenPlacement?.x ?? unitState.x,
+            y: gaidenPlacement?.y ?? unitState.y,
             hp: restoreResources ? (unitState.maxHp || unitState.hp || 1) : Math.max(1, unitState.hp || 1),
             sigilPoints: restoreResources ? (unitState.maxSigilPoints ?? unitState.sigilPoints ?? 3) : (unitState.sigilPoints ?? 0),
-            facing: unitState.facing || "up",
-            acted: false,
+            facing: gaidenPlacement?.facing || unitState.facing || "up",
+            acted: saveData.inBattleSave === true ? unitState.acted === true : false,
             spriteState: "idle",
             skills: (unitState.skills || []).map((skill) => ({ ...skill })),
             weapons: (unitState.weapons || []).map((weapon) => ({ ...weapon })),
             items: (unitState.items || []).map((item) => ({ ...item })),
           });
           existingIds.add(unitState.id);
+          if (gaidenPlacement) occupiedTiles.add(`${gaidenPlacement.x},${gaidenPlacement.y}`);
         });
     }
   },
@@ -238,28 +351,109 @@ export const flowMethods = {
   },
 
   buildChapterSaveData(slotNumber = null) {
-    const buildNextChapterSaveData = isChapterTwo(this.currentChapterNumber) || isChapterThree(this.currentChapterNumber)
-      ? buildChapterThreeSaveData
-      : buildChapterTwoSaveData;
+    const buildNextChapterSaveData = isChapterThree(this.currentChapterNumber) && this.shouldRouteToChapterThreeGaiden?.()
+      ? buildChapterThreeGaidenSaveData
+      : isChapterTwo(this.currentChapterNumber)
+        ? buildChapterThreeSaveData
+        : isChapterThree(this.currentChapterNumber) || isChapterThreeGaiden(this.currentChapterNumber)
+          ? buildChapterThreeSaveData
+          : buildChapterTwoSaveData;
 
     const reserveUnits = Array.isArray(this.chapterThreeReserveUnits) ? this.chapterThreeReserveUnits : [];
+    const includeMarnie = this.marniePermanentlyRecruited === true;
     const playerUnits = this.units.filter((unit) => (
       unit.team === "player" &&
       unit.isMiloDecoy !== true &&
+      (unit.id !== "marnie" || includeMarnie) &&
       (unit.id !== "milo" || unit.permanentRecruit === true)
     ));
     const seenPlayerIds = new Set(playerUnits.map((unit) => unit.id));
     const unitsToSave = [
       ...playerUnits,
-      ...reserveUnits.filter((unit) => unit?.team === "player" && !seenPlayerIds.has(unit.id)),
+      ...reserveUnits.filter((unit) => (
+        unit?.team === "player" &&
+        !seenPlayerIds.has(unit.id) &&
+        (unit.id !== "marnie" || includeMarnie)
+      )),
     ];
 
-    return buildNextChapterSaveData({
+    const serializedUnits = unitsToSave
+      .map((unit) => this.serializeUnitForSave(unit, { restoreForChapterStart: true }));
+    const baseSaveData = buildNextChapterSaveData({
       slotNumber,
       defeatedAllies: this.defeatedAllies || [],
-      units: unitsToSave
-        .map((unit) => this.serializeUnitForSave(unit, { restoreForChapterStart: true })),
+      marnieTalked: this.marnieTalked === true,
+      marnieTemporarilyRecruited: this.marnieTemporarilyRecruited === true,
+      marniePermanentlyRecruited: this.marniePermanentlyRecruited === true,
+      lostChapterThreeGaidenChestItems: [...(this.lostChapterThreeGaidenChestItems || new Set())],
+      mysteriousEggTracking: this.mysteriousEggTracking,
+      units: serializedUnits,
     });
+    const previousEggTracking = normalizeMysteriousEggTracking(this.mysteriousEggTracking);
+    const mysteriousEggTracking = this.buildMysteriousEggTrackingForUnits(serializedUnits, {
+      incrementForChapterCompletion: true,
+      nextSaveData: baseSaveData,
+    });
+    const hatchJustReadied = previousEggTracking.hatchReady !== true && mysteriousEggTracking.hatchReady === true;
+    if (hatchJustReadied && this.mysteriousEggHatchMessageShown !== true) {
+      this.mysteriousEggHatchMessageShown = true;
+      this.helpText?.setText(MYSTERIOUS_EGG_HATCH_MESSAGE);
+      this.showCenteredPopup?.(MYSTERIOUS_EGG_HATCH_MESSAGE);
+    }
+
+    return {
+      ...baseSaveData,
+      mysteriousEggTracking,
+    };
+  },
+
+  buildCurrentTurnSaveData(slotNumber = null) {
+    const chapterNumber = getSaveDataChapterNumber({ currentChapter: this.currentChapterNumber }, this.currentChapterNumber);
+    const chapterTitle = this.levelData?.title || this.levelData?.name || "Battle";
+    const serializedUnits = this.units
+      .filter((unit) => unit && unit.isMiloDecoy !== true)
+      .map((unit) => ({
+        ...this.serializeUnitForSave(unit, { restoreForChapterStart: false }),
+        acted: unit.acted === true,
+        counterStance: unit.counterStance === true,
+        counterUsed: unit.counterUsed === true,
+        unconsciousTurns: unit.unconsciousTurns || 0,
+        immobilizedTurns: unit.immobilizedTurns || 0,
+        trapped: unit.trapped === true,
+      }));
+    this.mysteriousEggTracking = this.buildMysteriousEggTrackingForUnits(serializedUnits);
+    return {
+      version: 6,
+      inBattleSave: true,
+      slotNumber,
+      currentChapter: chapterNumber,
+      chapter: chapterNumber,
+      chapterTitle,
+      completedChapters: Array.isArray(this.loadedSaveData?.completedChapters) ? [...this.loadedSaveData.completedChapters] : [],
+      savedAt: new Date().toISOString(),
+      defeatedAllies: [...new Set(this.defeatedAllies || [])],
+      defeatedCivilians: [...(this.defeatedCivilians || [])],
+      marnieTalked: this.marnieTalked === true,
+      marnieTemporarilyRecruited: this.marnieTemporarilyRecruited === true,
+      marniePermanentlyRecruited: this.marniePermanentlyRecruited === true,
+      lostChapterThreeGaidenChestItems: [...(this.lostChapterThreeGaidenChestItems || new Set())],
+      openedFactoryContainers: [...(this.openedFactoryContainers || new Set())],
+      destroyedFactoryTerrain: [...(this.destroyedFactoryTerrain || new Set())],
+      ignitedFactorySpills: [...(this.ignitedFactorySpills || new Set())],
+      factoryTerrainHp: { ...(this.factoryTerrainHp || {}) },
+      chapterThreeBonusThorns: (this.chapterThreeBonusThorns || []).map((thorn) => ({ ...thorn })),
+      visitedChapterThreeCottages: [...(this.visitedChapterThreeCottages || new Set())],
+      chapterTwoTurns: this.chapterTwoTurns || 0,
+      chapterThreeTurns: this.chapterThreeTurns || 0,
+      chapterTwoSetupDone: this.chapterTwoSetupDone === true,
+      chapterThreeFirstEnemyPhaseDone: this.chapterThreeFirstEnemyPhaseDone === true,
+      chapterThreeBattleStartDialogueShown: this.chapterThreeBattleStartDialogueShown === true,
+      chapterThreeGaidenBattleStartEventShown: this.chapterThreeGaidenBattleStartEventShown === true,
+      chapterThreeGaidenRoundTwoReinforcementsSpawned: this.chapterThreeGaidenRoundTwoReinforcementsSpawned === true,
+      chapterThreeAshInterventionTriggered: this.chapterThreeAshInterventionTriggered === true,
+      mysteriousEggTracking: this.mysteriousEggTracking,
+      units: serializedUnits,
+    };
   },
 
   startLoadedBattle() {
@@ -267,6 +461,23 @@ export const flowMethods = {
 
     const saveData = this.loadedSaveData || this.getSavedGameData();
     const savedChapter = getSaveDataChapterNumber(saveData);
+
+    if (saveData?.inBattleSave === true) {
+      this.phase = "player";
+      this.setObjectiveDisplayVisible(true);
+      this.busy = false;
+      this.selectedUnitId = this.units.find((unit) => unit.team === "player" && unit.hp > 0)?.id || null;
+      this.redrawSelection();
+      this.updateSelectedPanel();
+      this.helpText.setText("Loaded current turn.");
+      return;
+    }
+
+    if (isChapterThreeGaiden(savedChapter)) {
+      this.pendingChapterThreeTransitionData = saveData || this.pendingChapterThreeTransitionData;
+      this.startChapterThreeGaidenOpening();
+      return;
+    }
 
     if (isChapterThree(savedChapter)) {
       this.pendingChapterThreeTransitionData = saveData || this.pendingChapterThreeTransitionData;

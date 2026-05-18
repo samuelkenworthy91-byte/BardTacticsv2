@@ -5,7 +5,8 @@ export function getWeaponForTarget(attacker, defender) {
   const dist = distance(attacker, defender);
   return attacker.weapons.find((weapon) => {
     const minRange = weapon.minRange ?? weapon.range;
-    const maxRange = weapon.maxRange ?? weapon.range;
+    const baseMaxRange = weapon.maxRange ?? weapon.range;
+    const maxRange = baseMaxRange + ((baseMaxRange > 1 || weapon.range > 1) ? (attacker.rangeBonus || 0) : 0);
     return dist >= minRange && dist <= maxRange;
   }) || null;
 }
@@ -17,7 +18,7 @@ export function getDefaultWeapon(unit) {
 export function getWeaponRangeLabel(weapon) {
   if (!weapon) return "-";
   const minRange = weapon.minRange ?? weapon.range;
-  const maxRange = weapon.maxRange ?? weapon.range;
+  const maxRange = (weapon.maxRange ?? weapon.range) + (weapon.rangeBonus || 0);
   return minRange === maxRange ? `${minRange}` : `${minRange}-${maxRange}`;
 }
 

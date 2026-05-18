@@ -54,6 +54,12 @@ export const PARLEY_SKILL = {
   cost: 3,
   type: "adjacentRecruit",
 };
+export const STEAL_SKILL = {
+  id: "steal",
+  name: "Steal",
+  cost: 0,
+  type: "passive",
+};
 export const RECRUITMENT_CONFIG = {
   falan: {
     recruitable: false,
@@ -85,6 +91,18 @@ export const RECRUITMENT_CONFIG = {
       izzy: "A measured argument, Isabella. Very well. I will stand with you.",
       ash: "You were always the righteous one.",
     },
+  },
+  harold: {
+    recruitable: true,
+    parleyBoosts: {
+      kane: 25,
+      ambrose: 25,
+      leon: -25,
+      grimmy: -25,
+    },
+    lockoutFailureUnits: ["leon", "grimmy"],
+    lockoutLine: "I don't respect any organisation that would put kids on the front line against the likes of me ARRGGH!",
+    successLine: "Fine. You have made your point. Harold works with winners.",
   },
 };
 export const OPPORTUNITY_ATTACK_HIT_RATE = 50;

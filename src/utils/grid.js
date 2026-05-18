@@ -13,6 +13,14 @@ export function tileColor(type) {
   if (type === "chinese") return 0xb91c1c;
   if (type === "forest") return 0x14532d;
   if (type === "church") return 0x78716c;
+  if (type === "floor") return 0x4b5563;
+  if (type === "catwalk") return 0x64748b;
+  if (type === "crates") return 0x92400e;
+  if (type === "container") return 0x1d4ed8;
+  if (type === "spill") return 0x365314;
+  if (type === "conveyorUp" || type === "conveyorRight" || type === "conveyorDown" || type === "conveyorLeft") return 0x334155;
+  if (type === "machinery") return 0x57534e;
+  if (type === "bayDoor") return 0xfacc15;
   return 0x1f2937;
 }
 
@@ -31,6 +39,17 @@ export function tileLabel(type) {
   if (type === "chinese") return "CH";
   if (type === "forest") return "FO";
   if (type === "church") return "CR";
+  if (type === "floor") return "FL";
+  if (type === "catwalk") return "CW";
+  if (type === "crates") return "BX";
+  if (type === "container") return "LC";
+  if (type === "spill") return "SP";
+  if (type === "conveyorUp") return "^";
+  if (type === "conveyorRight") return ">";
+  if (type === "conveyorDown") return "v";
+  if (type === "conveyorLeft") return "<";
+  if (type === "machinery") return "MC";
+  if (type === "bayDoor") return "BD";
   return "?";
 }
 

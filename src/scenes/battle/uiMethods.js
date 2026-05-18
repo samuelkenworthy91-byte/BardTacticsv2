@@ -77,32 +77,33 @@ import {
 } from "../../chapters/progression.js";
 export const uiMethods = {
   createTopUI() {
-    const panel = createBannerPanel(this, 88, 64, 170, 112, { innerInset: 14 });
+    const panel = createBannerPanel(this, 36, 64, 74, 112, { innerInset: 8 });
     this.topInfoPanel = panel.container;
-    this.objectiveHeader = this.add.text(-68, -42, "Objective", {
-      fontSize: "13px",
+    this.topInfoPanel.setVisible(false);
+    this.objectiveHeader = this.add.text(-27, -42, "Obj", {
+      fontSize: "10px",
       fontStyle: "bold",
       color: "#e8c98b",
       stroke: "#0b0811",
       strokeThickness: 2,
     });
-    this.objectiveText = this.add.text(-68, -20, this.levelData?.objective || "Escape through the glowing gate tile.", {
-      fontSize: "11px",
+    this.objectiveText = this.add.text(-27, -20, this.levelData?.objective || "Escape through the glowing gate tile.", {
+      fontSize: "8px",
       color: "#f7ecd3",
-      wordWrap: { width: 136 },
+      wordWrap: { width: 54 },
       lineSpacing: 2,
     });
-    this.phaseText = this.add.text(-68, 14, "Opening", {
-      fontSize: "16px",
+    this.phaseText = this.add.text(-27, 14, "Opening", {
+      fontSize: "10px",
       fontStyle: "bold",
       color: "#f7ecd3",
       stroke: "#0b0811",
       strokeThickness: 3,
     });
-    this.helpText = this.add.text(-68, 40, "Watch the chapter opening.", {
-      fontSize: "11px",
+    this.helpText = this.add.text(-27, 40, "Watch the chapter opening.", {
+      fontSize: "8px",
       color: "#d8c4f0",
-      wordWrap: { width: 136 },
+      wordWrap: { width: 54 },
       lineSpacing: 2,
     });
     this.phaseText.setVisible(false);
@@ -110,19 +111,188 @@ export const uiMethods = {
     panel.container.add([this.objectiveHeader, this.objectiveText, this.phaseText, this.helpText]);
     this.uiLayer.add(panel.container);
 
-    this.endTurnButton = createBannerButton(this, 88, 140, 148, 30, "End Turn", () => this.endPlayerTurnByWaitingAll(), "13px");
-    this.setAmbushButton = createBannerButton(this, 88, 176, 148, 30, "Set Ambush", () => this.endPlayerTurnWithAmbush(), "13px");
+    this.endTurnButton = createBannerButton(this, 36, 140, 70, 26, "End", () => this.endPlayerTurnByWaitingAll(), "10px");
+    this.setAmbushButton = createBannerButton(this, 36, 172, 70, 26, "Ambush", () => this.endPlayerTurnWithAmbush(), "9px");
     this.endTurnButton.container.setVisible(false);
     this.setAmbushButton.container.setVisible(false);
     this.uiLayer.add([this.endTurnButton.container, this.setAmbushButton.container]);
   },
 
   setObjectiveDisplayVisible(visible) {
-    const shouldShow = !!visible;
+    const shouldShow = false;
+    if (this.topInfoPanel) this.topInfoPanel.setVisible(shouldShow);
     if (this.objectiveHeader) this.objectiveHeader.setVisible(shouldShow);
     if (this.objectiveText) this.objectiveText.setVisible(shouldShow);
     if (this.endTurnButton?.container) this.endTurnButton.container.setVisible(shouldShow);
     if (this.setAmbushButton?.container) this.setAmbushButton.container.setVisible(shouldShow);
+  },
+
+  closeBattleContextMenu() {
+    if (this.battleContextMenuContainer) this.battleContextMenuContainer.destroy();
+    this.battleContextMenuContainer = null;
+    this.battleContextMenuOpen = false;
+  },
+
+  canOpenBattleContextMenu() {
+    return this.phase === "player" &&
+      !this.busy &&
+      !this.previewOpen &&
+      !this.actionMenuOpen &&
+      !this.selectionMenuOpen &&
+      !this.levelUpAllocationOpen &&
+      !this.tradeOpen &&
+      !this.battleSaveSlotContainer &&
+      !this.standardBattleSceneOpen &&
+      !this.postBattleStarted;
+  },
+
+  runBattleContextCommand(command) {
+    this.closeBattleContextMenu();
+    if (command === "endTurn") {
+      this.endPlayerTurnByWaitingAll();
+      return;
+    }
+    if (command === "ambush") {
+      this.endPlayerTurnWithAmbush();
+      return;
+    }
+    if (command === "mainMenu") {
+      this.scene.start("MainMenuScene");
+      return;
+    }
+    if (command === "loadSave") {
+      this.scene.start("LoadGameScene", { restartSceneData: this.getChapterRestartSceneData?.() || null });
+      return;
+    }
+    if (command === "saveExit") {
+      this.showBattleSaveAndExitSlotSelection();
+      return;
+    }
+    if (command === "restart") {
+      const restartData = this.getChapterRestartSceneData?.();
+      if (!restartData) {
+        this.helpText.setText("Chapter restart data is unavailable.");
+        return;
+      }
+      this.scene.start("LoadingScene", restartData);
+    }
+  },
+
+  openBattleContextMenu(screenX, screenY) {
+    if (!this.canOpenBattleContextMenu()) return;
+    this.closeBattleContextMenu();
+
+    const menuWidth = 210;
+    const menuHeight = 270;
+    const objectiveWidth = 250;
+    const objectiveHeight = 142;
+    const gap = 8;
+    const menuX = Phaser.Math.Clamp(screenX, 12, GAME_WIDTH - menuWidth - objectiveWidth - gap - 12);
+    const menuY = Phaser.Math.Clamp(screenY, 12, GAME_HEIGHT - menuHeight - 12);
+
+    const container = this.add.container(0, 0).setDepth(LEVEL_UP_PANEL_DEPTH + 20);
+    const panel = createBannerPanel(this, menuX + menuWidth / 2, menuY + menuHeight / 2, menuWidth, menuHeight, { innerInset: 10 });
+    const title = this.add.text(menuX + 18, menuY + 16, "Commands", {
+      fontSize: "18px",
+      fontStyle: "bold",
+      color: "#f7ecd3",
+      stroke: "#0b0811",
+      strokeThickness: 3,
+    });
+    container.add([panel.container, title]);
+
+    const commands = [
+      ["End Turn", "endTurn"],
+      ["Ambush", "ambush"],
+      ["Main Menu", "mainMenu"],
+      ["Load Save", "loadSave"],
+      ["Save & Exit", "saveExit"],
+      ["Restart Chapter", "restart"],
+    ];
+    commands.forEach(([label, command], index) => {
+      const button = createBannerButton(this, menuX + menuWidth / 2, menuY + 54 + index * 34, 176, 28, label, () => {
+        this.runBattleContextCommand(command);
+      }, "13px");
+      container.add(button.container);
+    });
+
+    const objectiveX = menuX + menuWidth + gap;
+    const objectivePanel = createBannerPanel(this, objectiveX + objectiveWidth / 2, menuY + objectiveHeight / 2, objectiveWidth, objectiveHeight, { innerInset: 10 });
+    const objectiveTitle = this.add.text(objectiveX + 16, menuY + 16, "Objective", {
+      fontSize: "15px",
+      fontStyle: "bold",
+      color: "#e8c98b",
+      stroke: "#0b0811",
+      strokeThickness: 3,
+    });
+    const objective = this.add.text(objectiveX + 16, menuY + 42, this.levelData?.objective || "", {
+      fontSize: "12px",
+      color: "#f7ecd3",
+      wordWrap: { width: objectiveWidth - 32 },
+      lineSpacing: 3,
+    });
+    const status = this.add.text(objectiveX + 16, menuY + 90, this.helpText?.text || this.phaseText?.text || "", {
+      fontSize: "11px",
+      color: "#d8c4f0",
+      wordWrap: { width: objectiveWidth - 32 },
+      lineSpacing: 2,
+    });
+    container.add([objectivePanel.container, objectiveTitle, objective, status]);
+
+    this.battleContextMenuContainer = container;
+    this.battleContextMenuOpen = true;
+    this.uiLayer.add(container);
+  },
+
+  showBattleSaveAndExitSlotSelection() {
+    this.closeBattleContextMenu();
+    if (this.battleSaveSlotContainer) this.battleSaveSlotContainer.destroy();
+
+    const container = this.add.container(GAME_WIDTH / 2, GAME_HEIGHT / 2).setDepth(LEVEL_UP_PANEL_DEPTH + 30);
+    const dim = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.62).setInteractive();
+    const panel = createBannerPanel(this, 0, 0, 560, 292, { innerInset: 14 });
+    const title = this.add.text(0, -112, "Save Current Turn", {
+      fontSize: "24px",
+      fontStyle: "bold",
+      color: "#f7ecd3",
+      stroke: "#0b0811",
+      strokeThickness: 5,
+    }).setOrigin(0.5);
+    const subtitle = this.add.text(0, -78, "Choose a slot. The game will return to the main menu after saving.", {
+      fontSize: "13px",
+      color: "#d8c4f0",
+      align: "center",
+      wordWrap: { width: 490 },
+    }).setOrigin(0.5);
+    const status = this.add.text(0, 112, "", {
+      fontSize: "13px",
+      color: "#f4d7d7",
+      align: "center",
+      wordWrap: { width: 500 },
+    }).setOrigin(0.5);
+    container.add([dim, panel.container, title, subtitle, status]);
+
+    for (let slotNumber = 1; slotNumber <= SAVE_SLOT_COUNT; slotNumber += 1) {
+      const button = createBannerButton(this, 0, -42 + (slotNumber - 1) * 44, 470, 34, getSaveSlotLabel(slotNumber), () => {
+        const saveData = this.buildCurrentTurnSaveData(slotNumber);
+        try {
+          window.localStorage.setItem(getSaveSlotKey(slotNumber), JSON.stringify(saveData));
+          status.setText(`Saved to Slot ${slotNumber}. Returning to main menu...`);
+          this.time.delayedCall(450, () => this.scene.start("MainMenuScene"));
+        } catch (error) {
+          status.setText("Save failed in this browser preview.");
+        }
+      }, "13px");
+      container.add(button.container);
+    }
+
+    const backButton = createBannerButton(this, 0, 82, 150, 32, "Back", () => {
+      container.destroy();
+      this.battleSaveSlotContainer = null;
+    }, "15px");
+    container.add(backButton.container);
+    this.battleSaveSlotContainer = container;
+    this.uiLayer.add(container);
   },
 
   createSidePanel() {

@@ -169,6 +169,64 @@ export const CHAPTER_THREE_OPENING = [
 ];
 
 export const CHAPTER_THREE_POST_BATTLE_SCENE = [
+  {
+    type: "sceneDialogue",
+    sceneName: "Tipen Whippet Aftermath",
+    scene: "chapter3MaraAfterwardScene",
+    speaker: "Leon",
+    portrait: "leonPortrait",
+    text: "Well. Nothing says victory like a half-burned street, a takeaway gone cold, and several new pals who definitely need a lie down.",
+  },
+  {
+    type: "sceneDialogue",
+    sceneName: "Tipen Whippet Aftermath",
+    scene: "chapter3MaraAfterwardScene",
+    speaker: "Kane",
+    portrait: "kanePortrait",
+    text: "That is your victory speech?",
+  },
+  {
+    type: "sceneDialogue",
+    sceneName: "Tipen Whippet Aftermath",
+    scene: "chapter3MaraAfterwardScene",
+    speaker: "Leon",
+    portrait: "leonPortrait",
+    text: "I was going to say we take all these new pals back to the farm and introduce them to Edwin.",
+  },
+  {
+    type: "overlapDialogue",
+    requiresRecruitedUnit: "ambrose",
+    sceneName: "Tipen Whippet Aftermath",
+    scene: "chapter3MaraAfterwardScene",
+    speaker: "Ambrose",
+    portrait: "ambrosePortrait",
+    overlapPortrait: "leonPortrait",
+    text: "Edwin Bligh?",
+  },
+  {
+    type: "sceneDialogue",
+    sceneName: "Tipen Whippet Aftermath",
+    scene: "chapter3MaraAfterwardScene",
+    speaker: "Leon",
+    portrait: "leonPortrait",
+    text: "Why does everyone say my brother's name like they just found it written on a cursed teapot?",
+  },
+  {
+    type: "sceneNarration",
+    sceneName: "Tipen Whippet Aftermath",
+    scene: "chapter3MaraAfterwardScene",
+    speaker: "Narration",
+    portrait: null,
+    text: "The town is alive, but the trail goes cold. Whatever the mercenaries came from, the Bards have missed the clue that would have pointed them there.",
+  },
+  {
+    type: "sceneDialogue",
+    sceneName: "Tipen Whippet Aftermath",
+    scene: "chapter3MaraAfterwardScene",
+    speaker: "Izzy",
+    portrait: "izzyPortrait",
+    text: "Then we move before more of them arrive.",
+  },
   { type: "savePrompt", title: "Chapter 3 Complete", text: "Save game?" },
 ];
 
@@ -535,7 +593,7 @@ export const CHAPTER_THREE_UNITS = [
     facing: "down",
     x: 3,
     y: 0,
-    move: 0,
+    move: 5,
     hp: 28,
     maxHp: 28,
     str: 8,

@@ -66,7 +66,14 @@ import {
   CHAPTER_TWO_OPENING,
   CHAPTER_TWO_TITLE,
 } from "../../chapters/chapter2.js";
-import { CHAPTER_THREE_SURVIVAL_TURNS } from "../../chapters/chapter3.js";
+import {
+  CHAPTER_THREE_SURVIVAL_TURNS,
+} from "../../chapters/chapter3.js";
+import {
+  CHAPTER_THREE_GAIDEN_BOSS_ID,
+  CHAPTER_THREE_GAIDEN_CHESTS,
+  CHAPTER_THREE_GAIDEN_ITEMS,
+} from "../../chapters/chapter3Gaiden/index.js";
 import {
   buildChapterTwoSaveData,
   CHAPTER_TWO_NUMBER,
@@ -74,6 +81,7 @@ import {
   getSaveDataChapterNumber,
   isChapterOne,
   isChapterThree,
+  isChapterThreeGaiden,
   isChapterTwoOrLater,
   isChapterTwo,
 } from "../../chapters/progression.js";
@@ -84,10 +92,13 @@ export const enemyAiMethods = {
       return;
     }
 
+    if (this.checkChapterThreeGaidenVictory?.()) return;
     if (this.checkChapterThreeRoutVictory?.()) return;
-
-    const remaining = this.units.filter((u) => u.team === "player" && u.isMiloDecoy !== true && !u.acted && u.hp > 0);
-    if (remaining.length === 0) this.startEnemyPhase();
+    const remaining = this.units.filter((unit) => this.isControllablePlayerUnit?.(unit) && !unit.acted);
+    if (remaining.length === 0) {
+      this.busy = true;
+      this.startEnemyPhase();
+    }
   },
 
   removeMiloDecoy(decoy) {
@@ -134,8 +145,12 @@ export const enemyAiMethods = {
       if (this.shouldSpawnChapterThreeReinforcements?.()) this.spawnChapterThreeReinforcements();
       this.enemyIndex = 0;
       this.enemyPhaseNoMove = isChapterThree(this.currentChapterNumber) && !this.chapterThreeFirstEnemyPhaseDone && (this.chapterThreeTurns || 0) === 1;
-      this.enemyTurnOrder = this.units.filter((u) => u.team === "enemy" && u.hp > 0);
+      this.enemyTurnOrder = this.units.filter((u) => (u.team === "enemy" || this.isChapterThreeGaidenNeutralMarnie?.(u)) && u.hp > 0);
       this.enemyTurnOrder.forEach((enemy) => {
+        if (enemy.immobilizedTurns > 0) {
+          enemy.immobilizedTurns -= 1;
+          if (enemy.immobilizedTurns <= 0) enemy.trapped = false;
+        }
         enemy.counterStance = false;
         enemy.counterUsed = false;
         this.applyTurnStartTerrainEffects(enemy);
@@ -149,6 +164,11 @@ export const enemyAiMethods = {
       return;
     }
 
+    if (isChapterThreeGaiden(this.currentChapterNumber)) {
+      this.resolveFactoryConveyors?.(beginEnemyActions);
+      return;
+    }
+
     beginEnemyActions();
   },
 
@@ -158,7 +178,10 @@ export const enemyAiMethods = {
       return;
     }
 
+    if (this.checkChapterThreeGaidenVictory?.()) return;
+
     if (this.enemyIndex >= this.enemyTurnOrder.length) {
+      if (this.checkChapterThreeGaidenVictory?.()) return;
       if (this.checkChapterThreeRoutVictory?.()) return;
       if (isChapterThree(this.currentChapterNumber) && (this.chapterThreeTurns || 0) >= CHAPTER_THREE_SURVIVAL_TURNS) {
         this.finishMiloEnemyPhaseEffects();
@@ -178,11 +201,21 @@ export const enemyAiMethods = {
       isChapterThree(this.currentChapterNumber) &&
       enemy.skipEnemyPhaseTurn != null &&
       enemy.skipEnemyPhaseTurn >= (this.chapterThreeTurns || 0);
-    if (!enemy || enemy.hp <= 0 || enemy.team !== "enemy" || shouldSkipDelayedEnemy) {
+    if (enemy?.unconsciousTurns > 0) {
+      enemy.unconsciousTurns = Math.max(0, enemy.unconsciousTurns - 1);
+      this.refreshUnitSprite(enemy);
+      this.helpText.setText(`${enemy.name} is unconscious.`);
+      this.enemyIndex += 1;
+      this.time.delayedCall(ENEMY_ACTION_PAUSE, () => this.runNextEnemy());
+      return;
+    }
+    if (!enemy || enemy.hp <= 0 || (enemy.team !== "enemy" && !this.isChapterThreeGaidenNeutralMarnie?.(enemy)) || shouldSkipDelayedEnemy) {
       this.enemyIndex += 1;
       this.runNextEnemy();
       return;
     }
+    if (this.tryHandleChapterThreeGaidenThiefEscape?.(enemy)) return;
+    if (this.tryHandleChapterThreeGaidenThiefChestSteal?.(enemy)) return;
     this.selectedUnitId = enemy.id;
     this.updateSelectedPanel();
     this.helpText.setText(`${enemy.name} is acting...`);
@@ -201,6 +234,7 @@ export const enemyAiMethods = {
         this.time.delayedCall(ENEMY_ACTION_PAUSE, () => this.runNextEnemy());
         return;
       }
+      if (this.tryHandleChapterThreeGaidenThiefEscape?.(actingEnemy)) return;
 
       if (plan.action) this.time.delayedCall(ENEMY_ACTION_PAUSE, () => this.executeEnemyAction(actingEnemy, plan.action));
       else {
@@ -224,7 +258,7 @@ export const enemyAiMethods = {
       return;
     }
     if (action.type === "skill") {
-      this.useSkill(enemy.id, action.skill.id, { endTurn: false, onComplete: () => {
+      this.useSkill(enemy.id, action.skill.id, { endTurn: false, targetId: action.target?.id, onComplete: () => {
         this.enemyIndex += 1;
         this.time.delayedCall(ENEMY_ACTION_PAUSE, () => this.runNextEnemy());
       } });
@@ -269,7 +303,14 @@ export const enemyAiMethods = {
         onComplete: () => {
           this.refreshUnitSprite(enemy);
           this.setUnitSpriteFrame(enemy, "idle", enemy.facing || "down");
-          if (typeof onComplete === "function") onComplete();
+          this.applyFactorySpillSlide?.(enemy, Math.sign(moveTarget.x - oldX), Math.sign(moveTarget.y - oldY), () => {
+            this.triggerThornAt?.(enemy);
+            if (enemy.hp <= 0) {
+              if (typeof onComplete === "function") onComplete();
+              return;
+            }
+            if (typeof onComplete === "function") onComplete();
+          });
         },
       });
     };
@@ -286,6 +327,7 @@ export const enemyAiMethods = {
     if (!unit || unit.hp <= 0) return;
     const terrain = this.getTerrainAt(unit.x, unit.y);
     unit.turnMoveBonus = terrain === "road" ? 2 : 0;
+    unit.rangeBonus = terrain === "catwalk" ? 1 : 0;
 
     const healAmount = terrain === "chinese" || terrain === "church" ? 3 : 0;
     if (healAmount <= 0) return;
@@ -306,6 +348,7 @@ export const enemyAiMethods = {
 
   getLivingOpponents(unit) {
     if (unit?.team === "civilian") return this.units.filter((other) => other.team === "enemy" && other.hp > 0);
+    if (this.isChapterThreeGaidenNeutralMarnie?.(unit)) return this.units.filter((other) => (other.team === "player" || other.team === "enemy") && other.hp > 0);
     if (unit?.team === "enemy") return this.units.filter((other) => (other.team === "player" || other.team === "civilian") && other.hp > 0);
     return this.units.filter((other) => other.team !== unit.team && other.hp > 0);
   },
@@ -321,7 +364,8 @@ export const enemyAiMethods = {
     const dist = Math.abs(x - defender.x) + Math.abs(y - defender.y);
     return attacker.weapons.find((weapon) => {
       const minRange = weapon.minRange ?? weapon.range;
-      const maxRange = weapon.maxRange ?? weapon.range;
+      const baseMaxRange = weapon.maxRange ?? weapon.range;
+      const maxRange = baseMaxRange + ((baseMaxRange > 1 || weapon.range > 1) ? (attacker.rangeBonus || 0) : 0);
       return dist >= minRange && dist <= maxRange;
     }) || null;
   },
@@ -377,12 +421,35 @@ export const enemyAiMethods = {
   evaluateEnemyActionAt(enemy, x, y) {
     const opponents = this.getLivingOpponents(enemy);
     const actions = [];
+    const positionedEnemy = {
+      ...enemy,
+      x,
+      y,
+      rangeBonus: this.getTerrainAt(x, y) === "catwalk" ? 1 : (enemy.rangeBonus || 0),
+    };
     if (enemy.adjacentOnlyEnemy !== true) {
       (enemy.skills || []).forEach((skill) => {
         if (!this.canUseSkill(enemy, skill)) return;
-        const allTargets = this.getSkillTargetsAt(enemy, skill, x, y);
+        const allTargets = this.getSkillTargetsAt(positionedEnemy, skill, x, y);
         const opponentTargets = allTargets.filter((target) => target.team !== enemy.team);
         if (opponentTargets.length === 0) return;
+        if (skill.id === "allTheTrappings") {
+          opponentTargets.forEach((target) => {
+            const damage = this.calculateSkillDamage(enemy, target, skill);
+            const trapBonus = target.immobilizedTurns > 0 || target.trapped === true ? 0 : 250;
+            actions.push({
+              type: "skill",
+              skill,
+              target,
+              targets: [target],
+              canKill: damage >= target.hp,
+              totalDamage: damage,
+              expectedDamage: damage,
+              score: (damage >= target.hp ? 120000 : 0) + damage * 115 + trapBonus + (target.isMiloDecoy ? 250000 : 0),
+            });
+          });
+          return;
+        }
         let totalDamage = 0;
         let canKill = false;
         opponentTargets.forEach((target) => {
@@ -396,11 +463,12 @@ export const enemyAiMethods = {
     }
     opponents.forEach((target) => {
       if (enemy.adjacentOnlyEnemy === true && Math.abs(x - target.x) + Math.abs(y - target.y) !== 1) return;
-      const weapon = this.getWeaponForPosition(enemy, target, x, y);
+      const weapon = this.getWeaponForPosition(positionedEnemy, target, x, y);
       if (!weapon) return;
-      const attackScore = this.calculateAttackScoreAt({ ...enemy, x, y }, target, weapon);
+      const attackScore = this.calculateAttackScoreAt(positionedEnemy, target, weapon);
       if (!attackScore || attackScore.totalDamage <= 0) return;
-      actions.push({ type: "attack", target, weapon, ...attackScore, score: attackScore.score + (target.isMiloDecoy ? 250000 : 0) });
+      const gaidenPriority = this.getChapterThreeGaidenEnemyTargetBonus(enemy, target);
+      actions.push({ type: "attack", target, weapon, ...attackScore, score: attackScore.score + (target.isMiloDecoy ? 250000 : 0) + gaidenPriority });
     });
     if (actions.length === 0) return null;
     actions.sort((a, b) => {
@@ -417,19 +485,29 @@ export const enemyAiMethods = {
     enemy.opportunityThreatIdsAtTurnStart = this.getAdjacentOpponents(enemy).map((opponent) => opponent.id);
 
     const allowMove = options.allowMove !== false && !enemy.stationary && enemy.adjacentOnlyEnemy !== true;
+    if (this.isChapterThreeGaidenNeutralMarnie?.(enemy)) {
+      return this.chooseChapterThreeGaidenMarniePlan(enemy, allowMove);
+    }
+    if (this.isChapterThreeGaidenEscapingThief?.(enemy)) {
+      const move = allowMove ? this.chooseChapterThreeGaidenThiefEscapeMove(enemy) : { x: enemy.x, y: enemy.y };
+      return move ? { move, action: null, score: 1000000 } : null;
+    }
     const moveOptions = allowMove ? [{ x: enemy.x, y: enemy.y }, ...this.reachableTiles(enemy)] : [{ x: enemy.x, y: enemy.y }];
-    const nearest = this.getNearestOpponent(enemy);
+    const priorityTarget = this.getChapterThreeGaidenEnemyPriorityTarget(enemy);
+    const nearest = priorityTarget || this.getNearestOpponent(enemy);
     let bestPlan = null;
 
     moveOptions.forEach((option) => {
       const action = this.evaluateEnemyActionAt(enemy, option.x, option.y);
       const moveDistance = Math.abs(option.x - enemy.x) + Math.abs(option.y - enemy.y);
       const approachScore = nearest ? -1 * (Math.abs(option.x - nearest.x) + Math.abs(option.y - nearest.y)) : 0;
-      const actionScore = action ? action.score : -100000;
+      const actionPriorityPenalty = priorityTarget && action?.target && !this.isChapterThreeGaidenHaroldPriorityTarget(action.target) ? 115000 : 0;
+      const actionScore = action ? action.score - actionPriorityPenalty : -100000;
       const threat = this.getIncomingThreatScoreAt(enemy, option.x, option.y);
       const opportunityRisk = this.getOpportunityRiskForMove(enemy, option.x, option.y);
       const dangerPenalty = threat.expectedDamage * 85 + opportunityRisk * 120 + threat.adjacentThreats * 12 + (threat.lethal ? 65000 : 0);
-      const score = actionScore + approachScore - moveDistance * 3 - dangerPenalty;
+      const gaidenMoveBonus = this.getChapterThreeGaidenEnemyMoveBonus(enemy, option, priorityTarget);
+      const score = actionScore + approachScore + gaidenMoveBonus - moveDistance * 3 - dangerPenalty;
 
       if (!bestPlan || score > bestPlan.score) {
         bestPlan = { move: option, action, score, threat, opportunityRisk };
@@ -445,6 +523,202 @@ export const enemyAiMethods = {
 
     const enRouteAction = this.evaluateEnemyActionAt(enemy, move.x, move.y);
     return { move, action: enRouteAction, score: bestPlan?.score || 0 };
+  },
+
+  isChapterThreeGaidenChestItem(item) {
+    if (!item) return false;
+    if (item.fromBonusChest === true) return true;
+    return CHAPTER_THREE_GAIDEN_ITEMS.some((chestItem) => chestItem.id === item.id);
+  },
+
+  isChapterThreeGaidenStolenChestItem(item) {
+    if (!item) return false;
+    if (!this.isChapterThreeGaidenChestItem(item)) return false;
+    return item.stolenChestItem === true || item.stolenItem === true || item.stolen === true;
+  },
+
+  getChapterThreeGaidenLostChestCount() {
+    return this.lostChapterThreeGaidenChestItems?.size || 0;
+  },
+
+  getChapterThreeGaidenLostChestSummary() {
+    return `${this.getChapterThreeGaidenLostChestCount()}/${CHAPTER_THREE_GAIDEN_CHESTS.length} chest items lost`;
+  },
+
+  isChapterThreeGaidenThief(unit) {
+    return isChapterThreeGaiden(this.currentChapterNumber) && (unit?.team === "enemy" || unit?.team === "neutral") && unit?.className === "Thief" && unit.hp > 0;
+  },
+
+  isChapterThreeGaidenNeutralMarnie(unit) {
+    return isChapterThreeGaiden(this.currentChapterNumber) && unit?.id === "marnie" && unit.team === "neutral" && unit.hp > 0;
+  },
+
+  isChapterThreeGaidenEscapingThief(unit) {
+    return this.isChapterThreeGaidenThief(unit) &&
+      (unit.hasStolenChestItem === true || (unit.items || []).some((item) => this.isChapterThreeGaidenStolenChestItem(item)));
+  },
+
+  getChapterThreeGaidenGateTiles() {
+    if (!isChapterThreeGaiden(this.currentChapterNumber)) return [];
+    const gates = [];
+    for (let y = 0; y < this.mapRows; y += 1) {
+      for (let x = 0; x < this.mapCols; x += 1) {
+        if (this.getTerrainAt(x, y) === "bayDoor") gates.push({ x, y });
+      }
+    }
+    return gates;
+  },
+
+  getNearestChapterThreeGaidenGate(unit) {
+    const gates = this.getChapterThreeGaidenGateTiles();
+    if (!unit || !gates.length) return null;
+    return gates.reduce((best, gate) => distance(unit, gate) < distance(unit, best) ? gate : best, gates[0]);
+  },
+
+  chooseChapterThreeGaidenThiefEscapeMove(enemy) {
+    const gate = this.getNearestChapterThreeGaidenGate(enemy);
+    if (!gate) return { x: enemy.x, y: enemy.y };
+    const options = [{ x: enemy.x, y: enemy.y }, ...this.reachableTiles(enemy)];
+    return options.reduce((best, option) => {
+      const bestDistance = Math.abs(best.x - gate.x) + Math.abs(best.y - gate.y);
+      const optionDistance = Math.abs(option.x - gate.x) + Math.abs(option.y - gate.y);
+      if (optionDistance !== bestDistance) return optionDistance < bestDistance ? option : best;
+      const bestMoveDistance = Math.abs(best.x - enemy.x) + Math.abs(best.y - enemy.y);
+      const optionMoveDistance = Math.abs(option.x - enemy.x) + Math.abs(option.y - enemy.y);
+      return optionMoveDistance > bestMoveDistance ? option : best;
+    }, options[0]);
+  },
+
+  getNearestUnopenedChapterThreeGaidenChest(unit) {
+    const chests = CHAPTER_THREE_GAIDEN_CHESTS.filter((chest) => !this.openedFactoryContainers?.has(tileKey(chest.x, chest.y)));
+    if (!unit || !chests.length) return null;
+    return chests.reduce((best, chest) => distance(unit, chest) < distance(unit, best) ? chest : best, chests[0]);
+  },
+
+  getChapterThreeGaidenMarnieGoal(unit) {
+    if (this.isChapterThreeGaidenEscapingThief(unit)) return this.getNearestChapterThreeGaidenGate(unit);
+    return this.getNearestUnopenedChapterThreeGaidenChest(unit);
+  },
+
+  getChapterThreeGaidenMarnieBlockingTarget(unit, goal) {
+    if (!unit || !goal) return null;
+    const currentDistance = distance(unit, goal);
+    return this.units.find((other) => (
+      other &&
+      other.hp > 0 &&
+      (other.team === "player" || other.team === "enemy") &&
+      distance(unit, other) === 1 &&
+      distance(other, goal) < currentDistance &&
+      getWeaponForTarget(unit, other)
+    )) || null;
+  },
+
+  chooseChapterThreeGaidenMarniePlan(unit, allowMove) {
+    const goal = this.getChapterThreeGaidenMarnieGoal(unit);
+    const blockingTarget = this.getChapterThreeGaidenMarnieBlockingTarget(unit, goal);
+    if (blockingTarget) {
+      return { move: { x: unit.x, y: unit.y }, action: { type: "attack", target: blockingTarget }, score: 1000000 };
+    }
+    if (!allowMove || !goal) return { move: { x: unit.x, y: unit.y }, action: null, score: 0 };
+    const move = this.isChapterThreeGaidenEscapingThief(unit)
+      ? this.chooseChapterThreeGaidenThiefEscapeMove(unit)
+      : this.chooseEnemyMoveToward(unit, goal);
+    return { move: move || { x: unit.x, y: unit.y }, action: null, score: 0 };
+  },
+
+  tryHandleChapterThreeGaidenThiefChestSteal(enemy) {
+    if (!this.isChapterThreeGaidenThief(enemy) || this.isChapterThreeGaidenEscapingThief(enemy)) return false;
+    const target = this.getOpenableFactoryContainers?.(enemy)?.[0];
+    if (!target) return false;
+    this.selectedUnitId = enemy.id;
+    this.updateSelectedPanel();
+    this.helpText.setText(`${enemy.name} is stealing from a chest...`);
+    this.openFactoryContainer(enemy.id, target);
+    if (this.tryHandleChapterThreeGaidenThiefEscape(enemy)) return true;
+    this.enemyIndex += 1;
+    this.time.delayedCall(ENEMY_ACTION_PAUSE + 500, () => this.runNextEnemy());
+    return true;
+  },
+
+  tryHandleChapterThreeGaidenThiefEscape(enemy) {
+    if (!this.isChapterThreeGaidenEscapingThief(enemy)) return false;
+    if (this.getTerrainAt(enemy.x, enemy.y) !== "bayDoor") return false;
+    const escapedItems = (enemy.items || []).filter((item) => this.isChapterThreeGaidenStolenChestItem(item));
+    if (!escapedItems.length) return false;
+    this.lostChapterThreeGaidenChestItems = this.lostChapterThreeGaidenChestItems || new Set();
+    escapedItems.forEach((item) => this.lostChapterThreeGaidenChestItems.add(item.id));
+    enemy.escapedWithItems = true;
+    const itemNames = escapedItems.map((item) => item.name).join(", ");
+    const message = `${enemy.name} escaped with ${itemNames}! ${this.getChapterThreeGaidenLostChestSummary()}.`;
+    this.helpText.setText(message);
+    this.showCenteredPopup?.(message);
+    this.showFloatingText(this.boardX + enemy.x * TILE_SIZE + TILE_SIZE / 2, this.boardY + enemy.y * TILE_SIZE + 8, "ESCAPED", "#fca5a5");
+    this.removeChapterThreeGaidenEscapedThief(enemy, () => {
+      this.enemyIndex += 1;
+      this.time.delayedCall(ENEMY_ACTION_PAUSE, () => this.runNextEnemy());
+    });
+    return true;
+  },
+
+  removeChapterThreeGaidenEscapedThief(enemy, onComplete = null) {
+    const sprite = this.unitSprites[enemy.id];
+    const finish = () => {
+      if (sprite) {
+        sprite.container.destroy();
+        delete this.unitSprites[enemy.id];
+      }
+      this.units = this.units.filter((unit) => unit.id !== enemy.id);
+      if (typeof onComplete === "function") onComplete();
+    };
+    if (!sprite) {
+      finish();
+      return;
+    }
+    this.tweens.add({
+      targets: sprite.container,
+      alpha: 0,
+      duration: 520,
+      ease: "Quad.Out",
+      onComplete: finish,
+    });
+  },
+
+  isAdjacentToUnopenedChapterThreeGaidenChest(unit) {
+    if (!unit || !isChapterThreeGaiden(this.currentChapterNumber)) return false;
+    return CHAPTER_THREE_GAIDEN_CHESTS.some((chest) => (
+      !this.openedFactoryContainers?.has(tileKey(chest.x, chest.y)) &&
+      Math.abs(unit.x - chest.x) + Math.abs(unit.y - chest.y) === 1
+    ));
+  },
+
+  isChapterThreeGaidenHaroldPriorityTarget(unit) {
+    if (!unit || unit.team !== "player" || unit.hp <= 0) return false;
+    return this.isAdjacentToUnopenedChapterThreeGaidenChest(unit) ||
+      (unit.items || []).some((item) => this.isChapterThreeGaidenChestItem(item));
+  },
+
+  getChapterThreeGaidenEnemyPriorityTarget(enemy) {
+    if (!isChapterThreeGaiden(this.currentChapterNumber) || enemy?.id !== CHAPTER_THREE_GAIDEN_BOSS_ID) return null;
+    const targets = this.getLivingOpponents(enemy).filter((unit) => this.isChapterThreeGaidenHaroldPriorityTarget(unit));
+    if (!targets.length) return null;
+    return targets.reduce((best, target) => distance(enemy, target) < distance(enemy, best) ? target : best, targets[0]);
+  },
+
+  getChapterThreeGaidenEnemyTargetBonus(enemy, target) {
+    if (!isChapterThreeGaiden(this.currentChapterNumber) || enemy?.id !== CHAPTER_THREE_GAIDEN_BOSS_ID) return 0;
+    return this.isChapterThreeGaidenHaroldPriorityTarget(target) ? 90000 : 0;
+  },
+
+  getChapterThreeGaidenEnemyMoveBonus(enemy, option, priorityTarget) {
+    if (!isChapterThreeGaiden(this.currentChapterNumber) || !enemy || !option) return 0;
+    let bonus = 0;
+    if (enemy.id === CHAPTER_THREE_GAIDEN_BOSS_ID && priorityTarget) {
+      bonus += Math.max(0, 16 - (Math.abs(option.x - priorityTarget.x) + Math.abs(option.y - priorityTarget.y))) * 900;
+    }
+    if (enemy.className === "Mage" && this.getTerrainAt(option.x, option.y) === "catwalk") {
+      bonus += 450;
+    }
+    return bonus;
   },
 
   chooseEnemyMoveToward(enemy, target) {
@@ -545,7 +819,7 @@ export const enemyAiMethods = {
         const nx = current.x + dx;
         const ny = current.y + dy;
         const key = tileKey(nx, ny);
-        const nextSteps = current.steps + 1;
+        const nextSteps = current.steps + this.getTerrainMovementCost(nx, ny);
         if (visited.has(key) || nextSteps > range || !this.isWalkable(nx, ny)) continue;
         const occupant = this.getUnitAt(nx, ny);
         if (occupant && occupant.id !== unit.id) continue;
@@ -635,6 +909,54 @@ export const enemyAiMethods = {
     return true;
   },
 
+  checkChapterThreeGaidenVictory() {
+    if (!isChapterThreeGaiden(this.currentChapterNumber) || this.postBattleStarted) return false;
+    if (!this.areAllChapterThreeGaidenSuppliesResolved()) return false;
+    const allChestItemsLost = this.areAllChapterThreeGaidenChestItemsLost();
+    this.helpText.setText(allChestItemsLost ? "All six chest items were lost through the gates." : "All supplies are secured.");
+    this.phaseText.setText("Victory");
+    this.phaseText.setColor("#86efac");
+    this.busy = true;
+    this.time.delayedCall(650, () => this.startPostBattleScene());
+    return true;
+  },
+
+  getChapterThreeGaidenChestItemState(itemId) {
+    if (!isChapterThreeGaiden(this.currentChapterNumber) || !itemId) return null;
+    if (this.lostChapterThreeGaidenChestItems?.has(itemId)) return "lost/escaped";
+
+    const holder = this.units.find((unit) => (
+      unit &&
+      unit.hp > 0 &&
+      (unit.items || []).some((item) => item.id === itemId && this.isChapterThreeGaidenChestItem(item))
+    ));
+    if (holder?.team === "player") return "held by player/allied unit";
+    if ((holder?.team === "enemy" || holder?.team === "neutral") && holder.className === "Thief") return "held by enemy thief";
+
+    const chest = CHAPTER_THREE_GAIDEN_CHESTS.find((entry) => entry.itemId === itemId);
+    if (chest && !this.openedFactoryContainers?.has(tileKey(chest.x, chest.y))) return "in chest";
+    return "lost/escaped";
+  },
+
+  getChapterThreeGaidenChestItemStates() {
+    return CHAPTER_THREE_GAIDEN_CHESTS.map((chest) => ({
+      itemId: chest.itemId,
+      state: this.getChapterThreeGaidenChestItemState(chest.itemId),
+    }));
+  },
+
+  areAllChapterThreeGaidenSuppliesResolved() {
+    if (!isChapterThreeGaiden(this.currentChapterNumber)) return false;
+    return this.getChapterThreeGaidenChestItemStates().every((entry) => (
+      entry.state === "held by player/allied unit" || entry.state === "lost/escaped"
+    ));
+  },
+
+  areAllChapterThreeGaidenChestItemsLost() {
+    if (!isChapterThreeGaiden(this.currentChapterNumber)) return false;
+    return CHAPTER_THREE_GAIDEN_CHESTS.every((chest) => this.lostChapterThreeGaidenChestItems?.has(chest.itemId));
+  },
+
   enemyAttack(attacker, defender) {
     const weapon = getWeaponForTarget(attacker, defender);
     if (!weapon) {
@@ -651,6 +973,7 @@ export const enemyAiMethods = {
 
     const defenderStartHp = defender.hp;
     const sequence = this.resolveAttackSequence(attacker, defender, weapon);
+    this.applyFactoryAttackReactions?.(weapon, (sequence.targets || [defender]).map((target) => ({ x: target.x, y: target.y })));
     const shouldTriggerAshIntervention = this.shouldTriggerAshCivilianIntervention(attacker, sequence);
 
     const finishEnemyAttack = () => {
@@ -777,6 +1100,7 @@ export const enemyAiMethods = {
   },
 
   startPlayerPhase() {
+    this.closeBattleContextMenu?.();
     this.pendingItemUse = null;
     this.pendingParleyUse = null;
     this.targetTileColor = null;
@@ -785,12 +1109,21 @@ export const enemyAiMethods = {
     this.phaseText.setText("Player Phase");
     this.phaseText.setColor("#c4b5fd");
     this.setObjectiveDisplayVisible(true);
-    if (isChapterThree(this.currentChapterNumber)) {
+    if (isChapterThree(this.currentChapterNumber) || isChapterThreeGaiden(this.currentChapterNumber)) {
       this.chapterThreeTurns = (this.chapterThreeTurns || 0) + 1;
     }
+    this.tickThornTurns?.();
     for (const unit of this.units) {
-      if (unit.team === "player") {
+      if (this.isControllablePlayerUnit?.(unit)) {
         unit.acted = false;
+        if (unit.immobilizedTurns > 0) {
+          unit.immobilizedTurns -= 1;
+          if (unit.immobilizedTurns <= 0) unit.trapped = false;
+        }
+        if (unit.unconsciousTurns > 0) {
+          unit.acted = true;
+          unit.unconsciousTurns = Math.max(0, unit.unconsciousTurns - 1);
+        }
         unit.counterStance = false;
         unit.counterUsed = false;
         delete unit.pendingMoveOrigin;
@@ -802,15 +1135,31 @@ export const enemyAiMethods = {
     }
     this.helpText.setText(isChapterThree(this.currentChapterNumber)
       ? `Player Phase ${this.chapterThreeTurns}/${CHAPTER_THREE_SURVIVAL_TURNS}. Survive and protect the 5 townsfolk.`
-      : isChapterTwo(this.currentChapterNumber)
-        ? "Player Phase. Capture all four forts. Fences block movement."
-        : "Player Phase. Reach the glowing gate tile and choose Escape.");
+      : isChapterThreeGaiden(this.currentChapterNumber)
+        ? `Player Phase ${this.chapterThreeTurns}. Take the supplies you can before it is too late. ${this.getChapterThreeGaidenLostChestSummary?.() || "0/6 chest items lost"}.`
+        : isChapterTwo(this.currentChapterNumber)
+          ? "Player Phase. Capture all four forts. Fences block movement."
+          : "Player Phase. Reach the glowing gate tile and choose Escape.");
     if (isChapterThree(this.currentChapterNumber) && (this.chapterThreeTurns || 0) > 5 && this.isAmbroseStillEnemy()) {
       this.showChapterTwoSetupDialogue({
         speaker: "Townsperson",
         portrait: "maraPortrait",
         text: "look out they're hiding in the tree",
       });
+    }
+    if (isChapterThreeGaiden(this.currentChapterNumber) && (this.chapterThreeTurns || 0) === 2 && !this.chapterThreeGaidenRoundTwoReinforcementsSpawned) {
+      this.spawnChapterThreeGaidenRoundTwoReinforcements?.(() => {
+        this.resolveFactoryConveyors?.(() => {
+          this.busy = false;
+        });
+      });
+      return;
+    }
+    if (isChapterThreeGaiden(this.currentChapterNumber)) {
+      this.resolveFactoryConveyors?.(() => {
+        this.busy = false;
+      });
+      return;
     }
     this.busy = false;
     if (isChapterTwo(this.currentChapterNumber)) {

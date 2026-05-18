@@ -73,16 +73,39 @@ import {
   createMiloUnit,
 } from "../../chapters/chapter3.js";
 import {
+  CHAPTER_THREE_GAIDEN_BATTLE_START_DIALOGUE,
+  CHAPTER_THREE_GAIDEN_ENEMY_SPAWNS,
+  CHAPTER_THREE_GAIDEN_MARNIE_ENTRANCE_DIALOGUE,
+  CHAPTER_THREE_GAIDEN_PLAYER_SPAWNS,
+  CHAPTER_THREE_GAIDEN_ROUND_TWO_REINFORCEMENT_SPAWNS,
+  createChapterThreeGaidenHarold,
+  createChapterThreeGaidenMage,
+  createChapterThreeGaidenMarnie,
+  createChapterThreeGaidenSwordThug,
+  createChapterThreeGaidenThief,
+} from "../../chapters/chapter3Gaiden/index.js";
+import {
   buildChapterTwoSaveData,
   CHAPTER_TWO_NUMBER,
   getLevelForChapter,
   getSaveDataChapterNumber,
   isChapterOne,
+  isChapterThreeGaiden,
   isChapterTwoOrLater,
   isChapterTwo,
 } from "../../chapters/progression.js";
 export const chapterSetupMethods = {
   getChapterThreeDeploySlots() {
+    if (isChapterThreeGaiden(this.currentChapterNumber)) {
+      return [
+        ...CHAPTER_THREE_GAIDEN_PLAYER_SPAWNS,
+        { x: 1, y: 6, facing: "up" },
+        { x: 2, y: 6, facing: "up" },
+        { x: 3, y: 6, facing: "up" },
+        { x: 4, y: 6, facing: "up" },
+        { x: 5, y: 6, facing: "up" },
+      ];
+    }
     return [
       { x: 0, y: 7 },
       { x: 1, y: 7 },
@@ -102,6 +125,7 @@ export const chapterSetupMethods = {
       maxSigilPoints: unit.maxSigilPoints ?? unit.sigilPoints ?? 3,
       acted: false,
       spriteState: "idle",
+      move: unit.id === "ambrose" ? 5 : (unit.move ?? 0),
       weapons: (unit.weapons || []).map((weapon) => ({ ...weapon })),
       skills: (unit.skills || []).map((skill) => ({ ...skill })),
       items: (unit.items || []).map((item) => ({ ...item })),
@@ -111,24 +135,32 @@ export const chapterSetupMethods = {
   getChapterThreeDeploymentRoster() {
     const defeated = new Set(this.defeatedAllies || []);
     const byId = new Map();
+    const isGaiden = isChapterThreeGaiden(this.currentChapterNumber);
 
     this.units
       .filter((unit) => unit.team === "player" && unit.hp > 0 && !defeated.has(unit.id))
       .forEach((unit) => byId.set(unit.id, this.cloneDeployableUnit(unit)));
 
-    const leon = this.units.find((unit) => unit.id === "leon") || UNITS.find((unit) => unit.id === "leon");
-    if (leon && !defeated.has("leon")) byId.set("leon", this.cloneDeployableUnit({ ...leon, team: "player" }));
+    if (isGaiden) {
+      const edwin = this.units.find((unit) => unit.id === "edwin") || UNITS.find((unit) => unit.id === "edwin");
+      if (edwin && !byId.has("edwin")) byId.set("edwin", this.cloneDeployableUnit({ ...edwin, team: "player" }));
+    } else {
+      const leon = this.units.find((unit) => unit.id === "leon") || UNITS.find((unit) => unit.id === "leon");
+      if (leon && !defeated.has("leon")) byId.set("leon", this.cloneDeployableUnit({ ...leon, team: "player" }));
 
-    CHAPTER_TWO_ALLY_UNITS.forEach((ally) => {
-      if (defeated.has(ally.id)) return;
-      if (!byId.has(ally.id)) byId.set(ally.id, this.cloneDeployableUnit({ ...ally, team: "player" }));
-    });
+      CHAPTER_TWO_ALLY_UNITS.forEach((ally) => {
+        if (defeated.has(ally.id)) return;
+        if (!byId.has(ally.id)) byId.set(ally.id, this.cloneDeployableUnit({ ...ally, team: "player" }));
+      });
+    }
 
     this.units
       .filter((unit) => unit.team === "player" && unit.hp > 0 && (unit.spriteSet === "shade" || unit.id === "shade" || unit.id === "shade_leader"))
       .forEach((unit) => byId.set(unit.id, this.cloneDeployableUnit(unit)));
 
-    const order = ["leon", "izzy", "heath", "grimmy", "kane"];
+    const order = isGaiden
+      ? ["edwin", "leon", "izzy", "heath", "grimmy", "kane", "shade", "shade_leader", "ambrose", "ash", "milo"]
+      : ["leon", "izzy", "heath", "grimmy", "kane"];
     return [...byId.values()].sort((a, b) => {
       const aIndex = order.indexOf(a.id);
       const bIndex = order.indexOf(b.id);
@@ -150,25 +182,57 @@ export const chapterSetupMethods = {
     this.showChapterThreeDeploymentScreen();
   },
 
+  getDeploymentLimitForCurrentChapter() {
+    return isChapterThreeGaiden(this.currentChapterNumber) ? 8 : 5;
+  },
+
+  getDeploymentChapterLabel() {
+    return isChapterThreeGaiden(this.currentChapterNumber) ? "Chapter 3: Gaiden" : "Tipen Whippet";
+  },
+
+  canConfirmDeployment(selectedCount, deployLimit) {
+    if (isChapterThreeGaiden(this.currentChapterNumber)) return selectedCount >= 1 && selectedCount <= deployLimit;
+    return selectedCount === deployLimit && deployLimit > 0;
+  },
+
+  getDeploymentInventorySummary(unit) {
+    const inventory = [
+      ...(unit.weapons || []).map((weapon) => weapon.name),
+      ...(unit.items || []).map((item) => item.name),
+    ].filter(Boolean);
+    if (inventory.length === 0) return "Inventory: none";
+    const shown = inventory.slice(0, 3).join(", ");
+    return inventory.length > 3 ? `Inventory: ${shown}, +${inventory.length - 3}` : `Inventory: ${shown}`;
+  },
+
+  getDeploymentStatSummary(unit) {
+    return `HP ${unit.hp || unit.maxHp || 0}/${unit.maxHp || unit.hp || 0}  STR ${unit.str || 0}  MAG ${unit.mag || 0}  DEF ${unit.def || 0}  RES ${unit.res || 0}  SPD ${unit.spd || 0}  LCK ${unit.luck || 0}  MOV ${unit.move || 0}`;
+  },
+
   showChapterThreeDeploymentScreen() {
     if (this.chapterThreeDeploymentContainer) this.chapterThreeDeploymentContainer.destroy(true);
 
     const roster = this.chapterThreeDeploymentRoster || [];
-    const deployLimit = Math.min(5, roster.length);
+    const maxDeploy = this.getDeploymentLimitForCurrentChapter();
+    const deployLimit = Math.min(maxDeploy, roster.length);
     const selected = this.chapterThreeSelectedDeployIds || new Set();
+    const canConfirm = this.canConfirmDeployment(selected.size, deployLimit);
     const container = this.add.container(0, 0).setDepth(23000);
     const dim = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.72).setInteractive();
-    const panel = createBannerPanel(this, GAME_WIDTH / 2, GAME_HEIGHT / 2, 760, 430, { innerInset: 16 });
-    const title = this.add.text(GAME_WIDTH / 2, 70, `Deploy ${deployLimit} Unit${deployLimit === 1 ? "" : "s"}`, {
+    const panel = createBannerPanel(this, GAME_WIDTH / 2, GAME_HEIGHT / 2, 840, 500, { innerInset: 16 });
+    const titleText = isChapterThreeGaiden(this.currentChapterNumber)
+      ? `Deploy Up To ${deployLimit} Units`
+      : `Deploy ${deployLimit} Unit${deployLimit === 1 ? "" : "s"}`;
+    const title = this.add.text(GAME_WIDTH / 2, 42, titleText, {
       fontSize: "30px",
       fontStyle: "bold",
       color: "#f7ecd3",
       stroke: "#0b0811",
       strokeThickness: 4,
     }).setOrigin(0.5);
-    const subtitle = this.add.text(GAME_WIDTH / 2, 108, `${selected.size}/${deployLimit} selected (max 5)`, {
+    const subtitle = this.add.text(GAME_WIDTH / 2, 80, `${selected.size} / ${deployLimit} selected`, {
       fontSize: "17px",
-      color: selected.size === deployLimit ? "#86efac" : "#d8c4f0",
+      color: canConfirm ? "#86efac" : "#d8c4f0",
     }).setOrigin(0.5);
 
     container.add([dim, panel.container, title, subtitle]);
@@ -177,51 +241,62 @@ export const chapterSetupMethods = {
       const isSelected = selected.has(unit.id);
       const col = index % 3;
       const row = Math.floor(index / 3);
-      const x = GAME_WIDTH / 2 - 230 + col * 230;
-      const y = 170 + row * 74;
-      const bg = this.add.rectangle(x, y, 202, 56, isSelected ? 0x315f3c : 0x1e1030, isSelected ? 0.98 : 0.68);
+      const x = GAME_WIDTH / 2 - 260 + col * 260;
+      const y = 142 + row * 82;
+      const bg = this.add.rectangle(x, y, 238, 70, isSelected ? 0x315f3c : 0x1e1030, isSelected ? 0.98 : 0.68);
       bg.setStrokeStyle(2, isSelected ? 0x86efac : 0x70558c);
       bg.setInteractive({ useHandCursor: true });
       bg.on("pointerdown", () => this.toggleChapterThreeDeploymentUnit(unit.id));
-      const name = this.add.text(x - 82, y - 16, unit.name || unit.id, {
-        fontSize: "17px",
+      const name = this.add.text(x - 104, y - 28, `${unit.name || unit.id}  Lv ${unit.level || 1}`, {
+        fontSize: "15px",
         fontStyle: "bold",
         color: isSelected ? "#f7ecd3" : "#8c7a9f",
       });
-      const weapon = unit.weapons?.[0];
-      const details = this.add.text(x - 82, y + 8, weapon ? `${unit.title || unit.className} | ${weapon.name}` : `${unit.title || unit.className}`, {
-        fontSize: "11px",
+      const details = this.add.text(x - 104, y - 6, this.getDeploymentStatSummary(unit), {
+        fontSize: "9px",
         color: isSelected ? "#d8c4f0" : "#6b5c78",
+        wordWrap: { width: 210 },
       });
-      const state = this.add.text(x + 76, y - 16, isSelected ? "Selected" : "", {
+      const inventory = this.add.text(x - 104, y + 16, this.getDeploymentInventorySummary(unit), {
+        fontSize: "9px",
+        color: isSelected ? "#eadff7" : "#6b5c78",
+        wordWrap: { width: 210 },
+      });
+      const state = this.add.text(x + 106, y - 28, isSelected ? "Selected" : "", {
         fontSize: "11px",
         fontStyle: "bold",
         color: "#86efac",
       }).setOrigin(1, 0);
-      container.add([bg, name, details, state]);
+      container.add([bg, name, details, inventory, state]);
     });
 
-    if (selected.size === deployLimit && deployLimit > 0) {
-      const prompt = this.add.text(GAME_WIDTH / 2, 418, "Deploy selected units?", {
+    if (canConfirm) {
+      const prompt = this.add.text(GAME_WIDTH / 2, 436, "Deploy selected units?", {
         fontSize: "16px",
         color: "#eadff7",
       }).setOrigin(0.5);
-      const yes = createBannerButton(this, GAME_WIDTH / 2 - 82, 468, 130, 36, "Yes", () => this.confirmChapterThreeDeployment(), "15px");
-      const no = createBannerButton(this, GAME_WIDTH / 2 + 82, 468, 130, 36, "No", () => {
+      const yes = createBannerButton(this, GAME_WIDTH / 2 - 82, 486, 130, 36, "Yes", () => this.confirmChapterThreeDeployment(), "15px");
+      const no = createBannerButton(this, GAME_WIDTH / 2 + 82, 486, 130, 36, "No", () => {
         this.chapterThreeSelectedDeployIds = new Set();
         this.showChapterThreeDeploymentScreen();
       }, "15px");
       container.add([prompt, yes.container, no.container]);
+    } else if (isChapterThreeGaiden(this.currentChapterNumber)) {
+      const prompt = this.add.text(GAME_WIDTH / 2, 466, "Select at least 1 unit to start.", {
+        fontSize: "15px",
+        color: "#f4d7d7",
+      }).setOrigin(0.5);
+      container.add(prompt);
     }
 
     this.chapterThreeDeploymentContainer = container;
     this.uiLayer.add(container);
-    this.helpText.setText(`Choose ${deployLimit} unit${deployLimit === 1 ? "" : "s"} to deploy for Tipen Whippet.`);
+    this.helpText.setText(`Choose units to deploy for ${this.getDeploymentChapterLabel()}.`);
   },
 
   toggleChapterThreeDeploymentUnit(unitId) {
     const selected = this.chapterThreeSelectedDeployIds || new Set();
-    const deployLimit = Math.min(5, (this.chapterThreeDeploymentRoster || []).length);
+    const deployLimit = Math.min(this.getDeploymentLimitForCurrentChapter(), (this.chapterThreeDeploymentRoster || []).length);
     if (selected.has(unitId)) selected.delete(unitId);
     else if (selected.size < deployLimit) selected.add(unitId);
     this.chapterThreeSelectedDeployIds = selected;
@@ -230,8 +305,8 @@ export const chapterSetupMethods = {
 
   confirmChapterThreeDeployment() {
     const selectedIds = [...(this.chapterThreeSelectedDeployIds || new Set())];
-    const deployLimit = Math.min(5, (this.chapterThreeDeploymentRoster || []).length);
-    if (selectedIds.length !== deployLimit) return;
+    const deployLimit = Math.min(this.getDeploymentLimitForCurrentChapter(), (this.chapterThreeDeploymentRoster || []).length);
+    if (!this.canConfirmDeployment(selectedIds.length, deployLimit)) return;
     const slots = this.getChapterThreeDeploySlots();
     const roster = this.chapterThreeDeploymentRoster || [];
     const selectedUnits = selectedIds
@@ -242,7 +317,7 @@ export const chapterSetupMethods = {
           ...this.cloneDeployableUnit(source),
           x: slots[index].x,
           y: slots[index].y,
-          facing: "up",
+          facing: slots[index].facing || "up",
         };
       })
       .filter(Boolean);
@@ -385,6 +460,106 @@ export const chapterSetupMethods = {
       });
     };
     showNext();
+  },
+
+  spawnChapterThreeGaidenUnit(unit) {
+    if (!unit || !this.isInBounds(unit.x, unit.y) || this.getUnitAt(unit.x, unit.y)) return false;
+    this.units.push(unit);
+    const sprite = this.createUnitSprite(unit);
+    this.unitSprites[unit.id] = sprite;
+    this.unitLayer.add(sprite.container);
+    this.refreshUnitSprite(unit);
+    this.setUnitSpriteFrame(unit, "idle", unit.facing || "down");
+    return true;
+  },
+
+  getChapterThreeGaidenSafeSpawnTile(preferred) {
+    if (!preferred || !this.isInBounds(preferred.x, preferred.y)) return null;
+    const isSafe = (x, y) => {
+      if (!this.isInBounds(x, y) || this.getUnitAt(x, y) || !this.isWalkable(x, y)) return false;
+      const terrain = this.getTerrainAt(x, y);
+      return terrain !== "container" && terrain !== "crates" && terrain !== "machinery";
+    };
+    if (isSafe(preferred.x, preferred.y)) return { ...preferred };
+
+    for (let radius = 1; radius <= 3; radius += 1) {
+      for (let dy = -radius; dy <= radius; dy += 1) {
+        for (let dx = -radius; dx <= radius; dx += 1) {
+          if (Math.abs(dx) + Math.abs(dy) !== radius) continue;
+          const x = preferred.x + dx;
+          const y = preferred.y + dy;
+          if (isSafe(x, y)) return { ...preferred, x, y };
+        }
+      }
+    }
+    return null;
+  },
+
+  spawnChapterThreeGaidenStartEnemies(includeHarold = false) {
+    CHAPTER_THREE_GAIDEN_ENEMY_SPAWNS.forEach((spawn, index) => {
+      if (spawn.kind === "harold" && !includeHarold) return;
+      let unit = null;
+      if (spawn.kind === "harold") {
+        unit = createChapterThreeGaidenHarold(spawn);
+      } else if (spawn.kind === "mage") {
+        unit = createChapterThreeGaidenMage(`chapter3_gaiden_mage_${index}`, spawn);
+      } else {
+        unit = createChapterThreeGaidenSwordThug(`chapter3_gaiden_sword_thug_${index}`, spawn);
+      }
+      this.spawnChapterThreeGaidenUnit(unit);
+    });
+  },
+
+  spawnChapterThreeGaidenRoundTwoReinforcements(onComplete = null) {
+    if (!isChapterThreeGaiden(this.currentChapterNumber) || this.chapterThreeGaidenRoundTwoReinforcementsSpawned) {
+      if (typeof onComplete === "function") onComplete();
+      return;
+    }
+
+    this.chapterThreeGaidenRoundTwoReinforcementsSpawned = true;
+    this.busy = true;
+
+    CHAPTER_THREE_GAIDEN_ROUND_TWO_REINFORCEMENT_SPAWNS.forEach((spawn, index) => {
+      const tile = this.getChapterThreeGaidenSafeSpawnTile(spawn);
+      if (!tile) return;
+      const placement = { ...spawn, ...tile };
+      const unit = spawn.kind === "marnie"
+        ? createChapterThreeGaidenMarnie(placement)
+        : createChapterThreeGaidenThief(`chapter3_gaiden_thief_${index}`, placement);
+      this.spawnChapterThreeGaidenUnit(unit);
+    });
+
+    this.showChapterTwoSetupDialogue({
+      ...CHAPTER_THREE_GAIDEN_MARNIE_ENTRANCE_DIALOGUE,
+      onContinue: () => {
+        this.helpText.setText("Marnie and the thieves enter the warehouse.");
+        if (typeof onComplete === "function") onComplete();
+      },
+    });
+  },
+
+  beginChapterThreeGaidenBattleStartEvent(onComplete = null) {
+    if (!isChapterThreeGaiden(this.currentChapterNumber) || this.chapterThreeGaidenBattleStartEventShown) {
+      if (typeof onComplete === "function") onComplete();
+      return;
+    }
+
+    this.chapterThreeGaidenBattleStartEventShown = true;
+    this.busy = true;
+    this.spawnChapterThreeGaidenStartEnemies(true);
+
+    const line = CHAPTER_THREE_GAIDEN_BATTLE_START_DIALOGUE[0];
+    this.showChapterTwoSetupDialogue({
+      speaker: line.speaker,
+      portrait: line.portrait,
+      text: line.text,
+      onContinue: () => {
+        this.spawnChapterThreeGaidenStartEnemies(false);
+        this.helpText.setText("Harold's gang is grabbing what they can.");
+        this.busy = false;
+        if (typeof onComplete === "function") onComplete();
+      },
+    });
   },
 
   canVisitChapterThreeCottage(unit) {

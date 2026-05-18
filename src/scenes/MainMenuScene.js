@@ -9,6 +9,7 @@ import {
 } from "../config/constants.js";
 import { queueImage } from "../data/assets.js";
 import { createBannerButton, createBannerPanel, fitImageToBounds } from "../ui/banner.js";
+import { buildChapterThreeGaidenTestSaveData } from "../utils/devTestSaves.js";
 export class MainMenuScene extends Phaser.Scene {
   constructor() {
     super("MainMenuScene");
@@ -27,7 +28,7 @@ export class MainMenuScene extends Phaser.Scene {
       bg.setAlpha(0.45);
     }
     this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x06030b, 0.58);
-    const panel = createBannerPanel(this, GAME_WIDTH / 2, GAME_HEIGHT / 2, 390, 250, { innerInset: 16 });
+    const panel = createBannerPanel(this, GAME_WIDTH / 2, GAME_HEIGHT / 2, 430, 318, { innerInset: 16 });
     const heading = this.add.text(0, -82, "Main Menu", {
       fontSize: "34px",
       fontStyle: "bold",
@@ -36,12 +37,19 @@ export class MainMenuScene extends Phaser.Scene {
       strokeThickness: 4,
     }).setOrigin(0.5);
     const subtitle = this.add.text(0, -48, "Choose your path.", { fontSize: "16px", color: "#d8c4f0" }).setOrigin(0.5);
-    const newGameButton = createBannerButton(this, 0, 12, 220, 48, "New Game", () => this.scene.start("LoadingScene", { loadFromSave: false }), "24px");
-    const loadGameButton = createBannerButton(this, 0, 72, 220, 48, "Load Game", () => {
+    const newGameButton = createBannerButton(this, 0, 4, 220, 48, "New Game", () => this.scene.start("LoadingScene", { loadFromSave: false }), "24px");
+    const loadGameButton = createBannerButton(this, 0, 64, 220, 48, "Load Game", () => {
       this.scene.start("LoadGameScene");
     }, "24px");
-    this.statusText = this.add.text(0, 118, "", { fontSize: "14px", color: "#f4d7d7", align: "center", wordWrap: { width: 280 } }).setOrigin(0.5, 0);
-    panel.container.add([heading, subtitle, newGameButton.container, loadGameButton.container, this.statusText]);
+    const chapterThreeGaidenTestButton = createBannerButton(this, 0, 124, 310, 42, "Chapter 3 Gaiden Test", () => {
+      this.scene.start("LoadingScene", {
+        loadFromSave: true,
+        saveData: buildChapterThreeGaidenTestSaveData(),
+        playChapterThreeGaidenOpening: true,
+      });
+    }, "18px");
+    this.statusText = this.add.text(0, 156, "", { fontSize: "14px", color: "#f4d7d7", align: "center", wordWrap: { width: 280 } }).setOrigin(0.5, 0);
+    panel.container.add([heading, subtitle, newGameButton.container, loadGameButton.container, chapterThreeGaidenTestButton.container, this.statusText]);
   }
 }
-
+

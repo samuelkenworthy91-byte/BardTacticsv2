@@ -75,6 +75,13 @@ import {
   CHAPTER_THREE_TITLE,
 } from "../../chapters/chapter3.js";
 import {
+  CHAPTER_THREE_GAIDEN_DISPLAY_NAME,
+  CHAPTER_THREE_GAIDEN_ID,
+  CHAPTER_THREE_GAIDEN_OPENING,
+  CHAPTER_THREE_GAIDEN_POST_BATTLE_SCENE,
+  CHAPTER_THREE_GAIDEN_TITLE,
+} from "../../chapters/chapter3Gaiden/index.js";
+import {
   buildChapterThreeSaveData,
   buildChapterTwoSaveData,
   CHAPTER_THREE_NUMBER,
@@ -83,6 +90,7 @@ import {
   getSaveDataChapterNumber,
   isChapterOne,
   isChapterThree,
+  isChapterThreeGaiden,
   isChapterTwoOrLater,
   isChapterTwo,
 } from "../../chapters/progression.js";
@@ -179,6 +187,7 @@ export const narrativeMethods = {
 
   startPostBattleScene() {
     if (this.postBattleStarted) return;
+    if (isChapterThreeGaiden(this.currentChapterNumber) && this.resolveMarnieChapterThreeGaidenRecruitment?.(() => this.startPostBattleScene())) return;
     this.closeActionMenu();
     this.stopBattleMusic();
     this.postBattleStarted = true;
@@ -203,6 +212,24 @@ export const narrativeMethods = {
 
   getChapterThreeLivingTownsfolkCount() {
     return CHAPTER_THREE_TOWNSFOLK_IDS.filter((id) => this.units.some((unit) => unit.id === id && unit.hp > 0)).length;
+  },
+
+  isUnitRecruitedAndAlive(unitId) {
+    return this.units.some((unit) => unit.id === unitId && unit.team === "player" && unit.hp > 0);
+  },
+
+  shouldRouteToChapterThreeGaiden() {
+    if (!isChapterThree(this.currentChapterNumber)) return false;
+    const ambroseRecruited = this.isUnitRecruitedAndAlive("ambrose");
+    const ashRecruited = this.isUnitRecruitedAndAlive("ash");
+    const civiliansSurvived = this.getChapterThreeLivingTownsfolkCount() >= 3;
+    return ambroseRecruited && ashRecruited && civiliansSurvived;
+  },
+
+  getChapterThreeNormalOutroScene() {
+    return CHAPTER_THREE_POST_BATTLE_SCENE.filter((line) => (
+      !line.requiresRecruitedUnit || this.isUnitRecruitedAndAlive(line.requiresRecruitedUnit)
+    ));
   },
 
   getChapterThreeEarnedRewards() {
@@ -280,6 +307,96 @@ export const narrativeMethods = {
       },
     });
     return true;
+  },
+
+  resolveMarnieChapterThreeGaidenRecruitment(onComplete = null) {
+    if (!isChapterThreeGaiden(this.currentChapterNumber)) return false;
+    if (this.chapterThreeGaidenMarnieResolutionHandled) return false;
+    this.chapterThreeGaidenMarnieResolutionHandled = true;
+
+    const marnie = this.units.find((unit) => unit.id === "marnie");
+    const wasTalkedTo = this.marnieTalked === true || this.chapterThreeBonusMarnieTalked === true;
+    const joinedTemporarily = this.marnieTemporarilyRecruited === true || (marnie?.team === "player" && marnie?.temporaryRecruit === true);
+    const lostCount = this.getChapterThreeGaidenLostChestCount?.() || 0;
+
+    if (!wasTalkedTo || !joinedTemporarily || !marnie || lostCount > 2) {
+      this.removeMarnieAfterGaiden();
+      if (typeof onComplete === "function") onComplete();
+      return true;
+    }
+
+    this.busy = true;
+    this.showChapterTwoSetupDialogue({
+      speaker: "Marnie",
+      portrait: "marniePortrait",
+      text: "Looks like you guys might be able to help me keep hold what I rob, mind if I tag along?",
+      onContinue: () => this.showMarniePermanentRecruitmentChoice(marnie, onComplete),
+    });
+    return true;
+  },
+
+  showMarniePermanentRecruitmentChoice(marnie, onComplete = null) {
+    const container = this.add.container(0, 0).setDepth(24000);
+    const dim = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.66).setInteractive();
+    const panel = createBannerPanel(this, GAME_WIDTH / 2, GAME_HEIGHT / 2, 520, 230, { innerInset: 16 });
+    const title = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 72, "Marnie", {
+      fontSize: "28px",
+      fontStyle: "bold",
+      color: "#f7ecd3",
+      stroke: "#0b0811",
+      strokeThickness: 4,
+    }).setOrigin(0.5);
+    const body = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 32, "Let Marnie tag along with the Bards?", {
+      fontSize: "18px",
+      color: "#eadff7",
+      align: "center",
+      wordWrap: { width: 440 },
+    }).setOrigin(0.5);
+    const agree = createBannerButton(this, GAME_WIDTH / 2 - 94, GAME_HEIGHT / 2 + 56, 150, 38, "Agree", () => {
+      container.destroy(true);
+      this.completeMarnieGaidenRecruitment(marnie, true, onComplete);
+    }, "15px");
+    const disagree = createBannerButton(this, GAME_WIDTH / 2 + 94, GAME_HEIGHT / 2 + 56, 150, 38, "Disagree", () => {
+      container.destroy(true);
+      this.completeMarnieGaidenRecruitment(marnie, false, onComplete);
+    }, "15px");
+
+    container.add([dim, panel.container, title, body, agree.container, disagree.container]);
+    this.uiLayer.add(container);
+  },
+
+  completeMarnieGaidenRecruitment(marnie, accepted, onComplete = null) {
+    if (accepted && marnie) {
+      marnie.team = "player";
+      marnie.neutral = false;
+      marnie.temporaryRecruit = false;
+      marnie.recruitedThisChapter = false;
+      marnie.permanentRecruit = true;
+      this.marniePermanentlyRecruited = true;
+      this.showCenteredPopup("Marnie joined The Bards!", () => {
+        this.busy = false;
+        if (typeof onComplete === "function") onComplete();
+      });
+      return;
+    }
+
+    this.marniePermanentlyRecruited = false;
+    this.removeMarnieAfterGaiden();
+    this.busy = false;
+    if (typeof onComplete === "function") onComplete();
+  },
+
+  removeMarnieAfterGaiden() {
+    const marnie = this.units.find((unit) => unit.id === "marnie");
+    if (!marnie) return;
+    marnie.permanentRecruit = false;
+    marnie.temporaryRecruit = false;
+    this.units = this.units.filter((unit) => unit.id !== "marnie");
+    const sprite = this.unitSprites?.marnie;
+    if (sprite) {
+      sprite.container.destroy();
+      delete this.unitSprites.marnie;
+    }
   },
 
   showChapterThreeRewardAssignment() {
@@ -363,7 +480,13 @@ export const narrativeMethods = {
   },
 
   getPostBattleScene() {
-    if (isChapterThree(this.currentChapterNumber)) return CHAPTER_THREE_POST_BATTLE_SCENE;
+    if (isChapterThreeGaiden(this.currentChapterNumber)) {
+      return CHAPTER_THREE_GAIDEN_POST_BATTLE_SCENE;
+    }
+    if (isChapterThree(this.currentChapterNumber)) {
+      this.pendingChapterThreeDestination = this.shouldRouteToChapterThreeGaiden() ? CHAPTER_THREE_GAIDEN_ID : "chapter4";
+      return this.getChapterThreeNormalOutroScene();
+    }
     if (isChapterTwo(this.currentChapterNumber)) return CHAPTER_TWO_POST_BATTLE_SCENE;
     return POST_BATTLE_SCENE;
   },
@@ -566,11 +689,14 @@ export const narrativeMethods = {
 
     try {
       window.localStorage.setItem(getSaveSlotKey(slotNumber), JSON.stringify(saveData));
-      this.pendingChapterTwoTransitionData = saveData;
+      if (isChapterThree(this.currentChapterNumber) || isChapterThreeGaiden(this.currentChapterNumber)) this.pendingChapterThreeTransitionData = saveData;
+      else this.pendingChapterTwoTransitionData = saveData;
       const statusText = isChapterTwo(this.currentChapterNumber)
         ? `Saved to Slot ${slotNumber}. Moving to Chapter 3...`
-        : isChapterThree(this.currentChapterNumber)
-          ? `Saved to Slot ${slotNumber}.`
+        : isChapterThree(this.currentChapterNumber) || isChapterThreeGaiden(this.currentChapterNumber)
+          ? this.pendingChapterThreeDestination === CHAPTER_THREE_GAIDEN_ID
+            ? `Saved to Slot ${slotNumber}. Starting Chapter 3: Gaiden...`
+            : `Saved to Slot ${slotNumber}. Chapter 4 next. Returning to menu.`
           : `Saved to Slot ${slotNumber}. Moving to Chapter 2...`;
       if (this.saveSlotStatusText) this.saveSlotStatusText.setText(statusText);
       this.time.delayedCall(550, () => this.finishCurrentChapter());
@@ -610,6 +736,30 @@ export const narrativeMethods = {
   },
 
   finishCurrentChapter() {
+    if (isChapterThree(this.currentChapterNumber) && this.shouldRouteToChapterThreeGaiden()) {
+      if (this.saveSlotContainer) {
+        this.saveSlotContainer.destroy();
+        this.saveSlotContainer = null;
+      }
+      this.pendingChapterThreeTransitionData = this.pendingChapterThreeTransitionData || this.buildChapterSaveData(this.loadedSlotNumber || null);
+      this.currentChapterNumber = CHAPTER_THREE_GAIDEN_ID;
+      this.phaseText.setText(CHAPTER_THREE_GAIDEN_TITLE.chapter);
+      this.phaseText.setColor("#fcd34d");
+      this.helpText.setText(`${CHAPTER_THREE_GAIDEN_DISPLAY_NAME}.`);
+      this.busy = true;
+      this.showChapterThreeGaidenTitleCard();
+      return;
+    }
+
+    if (isChapterThreeGaiden(this.currentChapterNumber)) {
+      if (this.saveSlotContainer) {
+        this.saveSlotContainer.destroy();
+        this.saveSlotContainer = null;
+      }
+      this.scene.start("MainMenuScene");
+      return;
+    }
+
     if (isChapterThree(this.currentChapterNumber)) {
       if (this.saveSlotContainer) {
         this.saveSlotContainer.destroy();
@@ -890,10 +1040,42 @@ export const narrativeMethods = {
     });
   },
 
+  showChapterThreeGaidenTitleCard(message) {
+    const displayMessage = message || "";
+
+    if (this.postBattleContainer) this.postBattleContainer.setVisible(false);
+    if (this.openingContainer) this.openingContainer.setVisible(false);
+    if (this.previewContainer) this.previewContainer.setVisible(false);
+
+    this.phase = "chapter3Gaiden";
+    this.busy = true;
+    this.pendingChapterTransitionTarget = CHAPTER_THREE_GAIDEN_ID;
+
+    this.setObjectiveDisplayVisible(false);
+    this.phaseText.setText(CHAPTER_THREE_GAIDEN_TITLE.chapter);
+    this.phaseText.setColor("#fcd34d");
+    this.helpText.setText(displayMessage || `${CHAPTER_THREE_GAIDEN_DISPLAY_NAME}.`);
+
+    if (this.chapterTransitionChapterText) this.chapterTransitionChapterText.setText(CHAPTER_THREE_GAIDEN_TITLE.chapter);
+    if (this.chapterTransitionSubtitleText) this.chapterTransitionSubtitleText.setText(CHAPTER_THREE_GAIDEN_TITLE.subtitle);
+    if (this.chapterTransitionHintText) this.chapterTransitionHintText.setText(displayMessage || "Continue into the Chapter 3: Gaiden opening.");
+
+    this.chapterTransitionContainer.setVisible(true);
+    this.chapterTransitionContainer.setAlpha(0);
+
+    this.tweens.add({
+      targets: this.chapterTransitionContainer,
+      alpha: 1,
+      duration: 420,
+      ease: "Quad.easeOut"
+    });
+  },
+
   continueFromChapterTransition() {
     const transitionTarget = this.pendingChapterTransitionTarget || CHAPTER_TWO_NUMBER;
     const isChapterThreeTransition = transitionTarget === CHAPTER_THREE_NUMBER;
-    var saveData = isChapterThreeTransition ? this.pendingChapterThreeTransitionData : this.pendingChapterTwoTransitionData;
+    const isChapterThreeGaidenTransition = transitionTarget === CHAPTER_THREE_GAIDEN_ID;
+    var saveData = isChapterThreeTransition || isChapterThreeGaidenTransition ? this.pendingChapterThreeTransitionData : this.pendingChapterTwoTransitionData;
 
     if (!saveData) {
       saveData = this.buildChapterSaveData(this.loadedSlotNumber || null);
@@ -919,10 +1101,12 @@ export const narrativeMethods = {
       loadFromSave: true,
       saveData: saveData,
       slotNumber: slotNumber,
-      playChapterTwoOpening: !isChapterThreeTransition,
+      playChapterTwoOpening: !isChapterThreeTransition && !isChapterThreeGaidenTransition,
       playChapterThreeOpening: isChapterThreeTransition,
+      playChapterThreeGaidenOpening: isChapterThreeGaidenTransition,
       skipChapter2TitleCard: !isChapterThreeTransition,
-      skipChapter3TitleCard: isChapterThreeTransition
+      skipChapter3TitleCard: isChapterThreeTransition,
+      skipChapter3GaidenTitleCard: isChapterThreeGaidenTransition
     });
   },
 
@@ -1320,21 +1504,44 @@ export const narrativeMethods = {
     this.updateOpeningUI();
   },
 
+  startChapterThreeGaidenOpening() {
+    this.chapterTransitionContainer.setVisible(false).setAlpha(0);
+    this.phase = "intro";
+    this.busy = false;
+    this.setObjectiveDisplayVisible(false);
+    this.activeOpeningSequence = CHAPTER_THREE_GAIDEN_OPENING;
+    this.openingStep = 0;
+    this.openingLine = 0;
+    this.openingContainer.setVisible(true);
+    this.helpText.setText("Watch the Chapter 3: Gaiden opening.");
+    this.updateOpeningUI();
+  },
+
   finishOpening() {
     this.openingContainer.setVisible(false);
     this.openingFullSceneImage.setVisible(false);
+    if (isChapterThreeGaiden(this.currentChapterNumber)) {
+      this.beginChapterThreeDeployment(() => {
+        this.beginChapterThreeGaidenBattleStartEvent(() => {
+          this.startPlayerPhase();
+          this.selectedUnitId = this.units.find((unit) => this.isControllablePlayerUnit?.(unit))?.id || null;
+          this.updateSelectedPanel();
+        });
+      });
+      return;
+    }
     if (isChapterThree(this.currentChapterNumber)) {
       this.beginChapterThreeDeployment(() => {
         this.beginChapterThreeBattleStartDialogue(() => {
           this.startPlayerPhase();
-          this.selectedUnitId = this.units.find((unit) => unit.team === "player")?.id || null;
+          this.selectedUnitId = this.units.find((unit) => this.isControllablePlayerUnit?.(unit))?.id || null;
           this.updateSelectedPanel();
         });
       });
       return;
     }
     this.startPlayerPhase();
-    this.selectedUnitId = this.units.find((unit) => unit.team === "player")?.id || null;
+    this.selectedUnitId = this.units.find((unit) => this.isControllablePlayerUnit?.(unit))?.id || null;
     this.updateSelectedPanel();
   },
 

@@ -250,6 +250,35 @@ export const INDIVIDUAL_UNIT_SPRITE_SETS = {
     hurt: createDirectionalStateEntries("milo", "hurt"),
     death: createDeathEntries("milo"),
   },
+  harold: {
+    idle: createDirectionalStateEntries("harold", "idle"),
+    move: createDirectionalStateEntries("harold", "move"),
+    attack: createDirectionalStateEntries("harold", "attack"),
+    hurt: createDirectionalStateEntries("harold", "hurt"),
+    death: createDeathEntries("harold"),
+  },
+  mage: {
+    idle: createDirectionalStateEntries("mage", "idle"),
+    move: createDirectionalStateEntries("mage", "move"),
+    attack: createDirectionalStateEntries("mage", "attack"),
+    magic: createDirectionalStateEntries("mage", "magic"),
+    hurt: createDirectionalStateEntries("mage", "hurt"),
+    death: createDeathEntries("mage"),
+  },
+  thief: {
+    idle: createDirectionalStateEntries("thief", "idle"),
+    move: createDirectionalStateEntries("thief", "move"),
+    attack: createDirectionalStateEntries("thief", "attack"),
+    hurt: createDirectionalStateEntries("thief", "hurt"),
+    death: createDeathEntries("thief"),
+  },
+  marnie: {
+    idle: createDirectionalStateEntries("marnie", "idle"),
+    move: createDirectionalStateEntries("marnie", "move"),
+    attack: createDirectionalStateEntries("marnie", "attack"),
+    hurt: createDirectionalStateEntries("marnie", "hurt"),
+    death: createDeathEntries("marnie"),
+  },
 };
 
 export const UNIT_SPRITE_RENDER = {
@@ -351,6 +380,22 @@ export const BIOMES = {
       default: { key: "townGrassTile", path: "/tiles/town/grass.png" },
     },
   },
+  factory: {
+    terrainTextures: {
+      floor: { key: "factoryFloorTile", path: "/tiles/factory/floor.png" },
+      catwalk: { key: "factoryCatwalkTile", path: "/tiles/factory/raised_platform.png" },
+      crates: { key: "factoryCratesTile", path: "/tiles/factory/boxes.png" },
+      container: { key: "factoryContainerTile", path: "/tiles/factory/chest.png" },
+      spill: { key: "factorySpillTile", path: "/tiles/factory/spill.png" },
+      conveyorUp: { key: "factoryConveyorTile", path: "/tiles/factory/conveyer.png" },
+      conveyorRight: { key: "factoryConveyorTile", path: "/tiles/factory/conveyer.png" },
+      conveyorDown: { key: "factoryConveyorTile", path: "/tiles/factory/conveyer.png" },
+      conveyorLeft: { key: "factoryConveyorTile", path: "/tiles/factory/conveyer.png" },
+      machinery: { key: "factoryMachineryTile", path: "/tiles/factory/forklift.png" },
+      bayDoor: { key: "factoryBayDoorTile", path: "/tiles/factory/gate.png" },
+      default: { key: "factoryFloorTile", path: "/tiles/factory/floor.png" },
+    },
+  },
 };
 
 export function queueImage(scene, key, path) {
@@ -425,6 +470,10 @@ export function queueChapterAssets(scene, levelData = LEVELS.chapter1) {
   queueImage(scene, "ambrosePortrait", "/portraits/Ambrose.jpg");
   queueImage(scene, "ashPortrait", "/portraits/ash.jpg");
   queueImage(scene, "miloPortrait", "/portraits/milo.png");
+  queueImage(scene, "haroldPortrait", "/portraits/harold.jpg");
+  queueImage(scene, "magePortrait", "/portraits/mage.jpg");
+  queueImage(scene, "thiefPortrait", "/portraits/thief.png");
+  queueImage(scene, "marniePortrait", "/portraits/marnie.jpg");
   queueImage(scene, "prologueScene", "/scenes/prologue.jpg");
   queueImage(scene, "leonsHouseScene", "/scenes/leons_house.jpg");
   queueImage(scene, "walkToSchoolScene", "/scenes/walk_to_school.jpg");

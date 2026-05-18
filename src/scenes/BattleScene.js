@@ -4,6 +4,7 @@ import { queueChapterAssets } from "../data/assets.js";
 import { CHAPTER_ONE_OPENING } from "../chapters/chapter1.js";
 import {
   getSceneDataChapterNumber,
+  isChapterThreeGaiden,
   isChapterThreeOrLater,
   isChapterTwo,
 } from "../chapters/progression.js";
@@ -26,6 +27,7 @@ export class BattleScene extends Phaser.Scene {
     this.loadedSlotNumber = data.slotNumber || null;
     this.playChapterTwoOpening = data.playChapterTwoOpening === true;
     this.playChapterThreeOpening = data.playChapterThreeOpening === true;
+    this.playChapterThreeGaidenOpening = data.playChapterThreeGaidenOpening === true;
     this.skipChapterTwoTitleCard = data.skipChapter2TitleCard === true;
     this.skipChapterThreeTitleCard = data.skipChapter3TitleCard === true;
     this.pendingChapterTwoTransitionData = data.pendingChapterTwoTransitionData || null;
@@ -64,6 +66,8 @@ export class BattleScene extends Phaser.Scene {
     this.defeatedCivilians = [];
     this.chapterThreeFirstEnemyPhaseDone = false;
     this.chapterThreeBattleStartDialogueShown = false;
+    this.chapterThreeGaidenBattleStartEventShown = false;
+    this.chapterThreeGaidenRoundTwoReinforcementsSpawned = false;
     this.chapterThreeAshInterventionTriggered = false;
     this.chapterThreeDeploymentDone = false;
     this.chapterThreeDeploymentRoster = [];
@@ -74,8 +78,20 @@ export class BattleScene extends Phaser.Scene {
     this.pendingChapterThreeRewards = [];
     this.chapterThreeRewardIndex = 0;
     this.chapterThreeMiloResolutionHandled = false;
+    this.chapterThreeGaidenMarnieResolutionHandled = false;
+    this.marnieTalked = false;
+    this.marnieTemporarilyRecruited = false;
+    this.marniePermanentlyRecruited = false;
     this.pendingMiloRescue = null;
     this.miloSigilContainer = null;
+    this.openedFactoryContainers = new Set();
+    this.destroyedFactoryTerrain = new Set();
+    this.ignitedFactorySpills = new Set();
+    this.factoryTerrainHp = {};
+    this.chapterThreeBonusThorns = [];
+    this.lostChapterThreeGaidenChestItems = new Set();
+    this.mysteriousEggTracking = { carrierId: null, chaptersWithCarrier: 0, hatchReady: false };
+    this.mysteriousEggHatchMessageShown = false;
     this.applyLoadedSaveData(this.loadedSaveData);
 
     this.selectedUnitId = null;
@@ -93,8 +109,14 @@ export class BattleScene extends Phaser.Scene {
     this.selectionMenuType = null;
     this.selectionMenuContainer = null;
     this.selectionMenuSummaryText = null;
+    this.battleContextMenuOpen = false;
+    this.battleContextMenuContainer = null;
+    this.battleSaveSlotContainer = null;
     this.pendingItemUse = null;
     this.pendingParleyUse = null;
+    this.pendingPhoenixReckoningUse = null;
+    this.pendingFieldOfThornsUse = null;
+    this.pendingSingleTargetSkillUse = null;
     this.tradeContainer = null;
     this.tradeOpen = false;
     this.tradeData = null;
@@ -123,10 +145,11 @@ export class BattleScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor("#0f172a");
     this.boardWidth = this.mapCols * TILE_SIZE;
     this.boardHeight = this.mapRows * TILE_SIZE;
-    this.boardX = 200;
+    this.boardX = Math.max(14, Math.floor((722 - this.boardWidth) / 2));
     this.boardY = 14;
     this.tileLayer = this.add.layer();
     this.escapeLayer = this.add.layer();
+    this.thornLayer = this.add.layer();
     this.overlayLayer = this.add.layer();
     this.unitLayer = this.add.layer();
     this.uiLayer = this.add.layer();
@@ -149,7 +172,9 @@ export class BattleScene extends Phaser.Scene {
     this.updateSelectedPanel();
     this.setObjectiveDisplayVisible(false);
 
-    if (isChapterThreeOrLater(this.currentChapterNumber) && this.playChapterThreeOpening) {
+    if (isChapterThreeGaiden(this.currentChapterNumber) && this.playChapterThreeGaidenOpening) {
+      this.startChapterThreeGaidenOpening();
+    } else if (isChapterThreeOrLater(this.currentChapterNumber) && this.playChapterThreeOpening) {
       this.startChapterThreeOpening();
     } else if (isChapterTwo(this.currentChapterNumber) && this.playChapterTwoOpening) {
       this.startChapterTwoOpening();

@@ -88,6 +88,12 @@ export const boardSpriteMethods = {
 
   getTerrainAt(x, y) {
     if (!this.isInBounds(x, y)) return null;
+    if (this.destroyedFactoryTerrain?.has(tileKey(x, y))) return "floor";
+    return this.map[y][x];
+  },
+
+  getRawTerrainAt(x, y) {
+    if (!this.isInBounds(x, y)) return null;
     return this.map[y][x];
   },
 
@@ -232,7 +238,7 @@ export const boardSpriteMethods = {
         }
 
         this.playUnitDeath(attacker, () => {
-          this.removeUnitSpriteAndData(attacker.id);
+          this.removeUnitSpriteAndData(attacker.id, counterUnit.team === "player" ? counterUnit.id : null);
           completeAfterDeaths();
         });
       };
@@ -249,7 +255,7 @@ export const boardSpriteMethods = {
               return;
             }
             if (target.team === "civilian") this.defeatedCivilians = [...new Set([...(this.defeatedCivilians || []), target.id])];
-            this.playUnitDeath(target, () => this.removeUnitSpriteAndData(target.id));
+            this.playUnitDeath(target, () => this.removeUnitSpriteAndData(target.id, counterUnit.team === "player" ? counterUnit.id : null));
           } else {
             this.refreshUnitSprite(target);
             this.setUnitSpriteFrame(target, "idle", target.facing || "down");
@@ -342,7 +348,7 @@ export const boardSpriteMethods = {
 
       const continueAfterLevelUp = () => {
         if (defender.hp <= 0) {
-          this.handleOpportunityDefeat(defender, onComplete);
+          this.handleOpportunityDefeat(defender, onComplete, attacker);
           return;
         }
 
@@ -358,7 +364,7 @@ export const boardSpriteMethods = {
     });
   },
 
-  handleOpportunityDefeat(unit, onComplete = null) {
+  handleOpportunityDefeat(unit, onComplete = null, defeatedBy = null) {
     if (!unit) {
       if (typeof onComplete === "function") onComplete();
       return;
@@ -382,7 +388,7 @@ export const boardSpriteMethods = {
     }
 
     this.playUnitDeath(unit, () => {
-      this.removeUnitSpriteAndData(unit.id);
+      this.removeUnitSpriteAndData(unit.id, defeatedBy?.team === "player" ? defeatedBy.id : null);
       if (typeof onComplete === "function") onComplete();
     });
   },
@@ -447,6 +453,10 @@ export const boardSpriteMethods = {
         if (textureKey && this.textures.exists(textureKey)) {
           const tileImage = this.add.image(x + TILE_SIZE / 2, y + TILE_SIZE / 2, textureKey);
           tileImage.setDisplaySize(TILE_SIZE, TILE_SIZE);
+          if (type === "conveyorUp") tileImage.setAngle(90);
+          if (type === "conveyorRight") tileImage.setAngle(180);
+          if (type === "conveyorDown") tileImage.setAngle(270);
+          if (type === "conveyorLeft") tileImage.setAngle(0);
           this.tileLayer.add(tileImage);
         } else {
           const tile = this.add.rectangle(x + TILE_SIZE / 2, y + TILE_SIZE / 2, TILE_SIZE - 2, TILE_SIZE - 2, tileColor(type));
@@ -460,6 +470,7 @@ export const boardSpriteMethods = {
         this.tileLayer.add(border);
       }
     }
+    this.renderThornMarkers?.();
   },
 
   drawUnits() {
@@ -502,7 +513,11 @@ export const boardSpriteMethods = {
     if (!sprite) return;
     sprite.container.x = this.boardX + unit.x * TILE_SIZE + TILE_SIZE / 2;
     sprite.container.y = this.boardY + unit.y * TILE_SIZE + TILE_SIZE / 2;
-    sprite.hpText.setText(`HP ${unit.hp}`);
+    const statuses = [];
+    if (this.isUnitUnconscious?.(unit)) statuses.push(`UNCON ${unit.unconsciousTurns}`);
+    if ((unit.immobilizedTurns || 0) > 0 || unit.trapped === true) statuses.push(`TRAP ${unit.immobilizedTurns || 1}`);
+    const statusLine = statuses.length ? `\n${statuses.join(" ")}` : "";
+    sprite.hpText.setText(`HP ${unit.hp}${statusLine}`);
     sprite.container.alpha = unit.team === "player" && unit.acted ? 0.55 : 1;
   },
 
@@ -928,7 +943,10 @@ export const boardSpriteMethods = {
     });
   },
 
-  removeUnitSpriteAndData(unitId) {
+  removeUnitSpriteAndData(unitId, defeatedByUnitId = null) {
+    const unit = this.units.find((candidate) => candidate.id === unitId);
+    if (unit?.team === "enemy" && defeatedByUnitId) unit.defeatedByUnitId = defeatedByUnitId;
+    if (unit?.team === "enemy") this.recoverStolenItemsFromUnit?.(unit);
     const sprite = this.unitSprites[unitId];
     if (sprite) {
       sprite.container.destroy();
@@ -961,7 +979,7 @@ export const boardSpriteMethods = {
   },
 
   showActionMenu(unit, message = null) {
-    if (!unit || unit.team !== "player" || unit.acted || unit.hp <= 0) return;
+    if (!unit || unit.team !== "player" || unit.acted || unit.hp <= 0 || this.isUnitUnconscious?.(unit)) return;
     this.closeActionMenu();
     this.pendingItemUse = null;
     this.selectedUnitId = unit.id;
@@ -985,9 +1003,21 @@ export const boardSpriteMethods = {
     if (this.getTradePartners?.(unit).length > 0) {
       actions.splice(3, 0, { label: "Trade", handler: () => this.chooseActionTrade(unit.id) });
     }
+    if (this.getAdjacentMarnieTalkTargets?.(unit).length > 0) {
+      actions.unshift({ label: "Talk", handler: () => this.talkToMarnie(unit.id) });
+    }
+    if (this.canUseStealAction?.(unit)) {
+      actions.unshift({ label: "Steal", handler: () => this.chooseActionSteal(unit.id) });
+    }
 
     if (this.isEscapeTile(unit.x, unit.y)) {
       actions.unshift({ label: "Escape", handler: () => this.escapeUnit(unit.id) });
+    }
+    if (this.canOpenFactoryChest?.(unit) && this.getOpenableFactoryContainers?.(unit).length > 0) {
+      actions.unshift({ label: "Open Chest", handler: () => this.openFactoryContainer(unit.id) });
+    }
+    if (this.getBreakableFactoryTerrain?.(unit).length > 0) {
+      actions.unshift({ label: "Break", handler: () => this.breakFactoryTerrain(unit.id) });
     }
     if (this.canVisitChapterThreeCottage(unit)) {
       actions.unshift({ label: "Visit", handler: () => this.visitChapterThreeCottage(unit.id) });

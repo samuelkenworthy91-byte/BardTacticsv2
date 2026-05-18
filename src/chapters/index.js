@@ -1,6 +1,7 @@
 import { CHAPTER_ONE_MAP, CHAPTER_ONE_UNITS } from "./chapter1.js";
 import { CHAPTER_TWO_MAP, CHAPTER_TWO_UNITS } from "./chapter2.js";
 import { CHAPTER_THREE_MAP, CHAPTER_THREE_UNITS } from "./chapter3.js";
+import { CHAPTER_THREE_GAIDEN_MAP, CHAPTER_THREE_GAIDEN_OBJECTIVE, CHAPTER_THREE_GAIDEN_UNITS } from "./chapter3Gaiden/index.js";
 
 export const LEVELS = {
   chapter1: {
@@ -21,5 +22,11 @@ export const LEVELS = {
     map: CHAPTER_THREE_MAP,
     units: CHAPTER_THREE_UNITS,
     objective: "Survive 10 turns and protect the 5 townsfolk. Recruit Ambrose and defeat every enemy to end it early.",
+  },
+  chapter3Gaiden: {
+    biome: "factory",
+    map: CHAPTER_THREE_GAIDEN_MAP,
+    units: CHAPTER_THREE_GAIDEN_UNITS,
+    objective: CHAPTER_THREE_GAIDEN_OBJECTIVE,
   },
 };

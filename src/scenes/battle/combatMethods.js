@@ -81,6 +81,7 @@ export const combatMethods = {
     if (terrain === "cover") return 5;
     if (terrain === "fort") return 5;
     if (terrain === "gate") return 5;
+    if (terrain === "catwalk") return 2;
     if (terrain === "church" && weapon?.damageType === "magical") return 5;
     return 0;
   },
@@ -107,7 +108,12 @@ export const combatMethods = {
     const attackStatName = weapon.stat || "str";
     const attackStat = attacker[attackStatName] || 0;
     const baseDamage = weapon.baseDamage ?? weapon.damage ?? 0;
-    const defense = this.getDefenseForAttack(defender, weapon);
+    const itemPierce = (attacker.items || []).reduce((total, item) => {
+      const pierce = Number(item?.passiveDefensePierce);
+      return total + (Number.isFinite(pierce) && pierce > 0 ? pierce : 0);
+    }, 0);
+    const effectiveWeapon = itemPierce > 0 ? { ...weapon, defPierce: (weapon.defPierce || 0) + itemPierce } : weapon;
+    const defense = this.getDefenseForAttack(defender, effectiveWeapon);
     const phoenixBonus = (attacker.skills || []).some((skill) => skill.id === "phoenixReckoning")
       ? Math.max(0, (attacker.maxHp || attacker.hp || 0) - (attacker.hp || 0))
       : 0;
@@ -149,7 +155,9 @@ export const combatMethods = {
 
   getTerrainDodgeChance(attacker, defender, weapon) {
     if (!attacker || !defender || !weapon) return 0;
-    if (this.getTerrainAt(defender.x, defender.y) !== "forest") return 0;
+    const terrain = this.getTerrainAt(defender.x, defender.y);
+    if (terrain === "catwalk") return 10;
+    if (terrain !== "forest") return 0;
     const attackRange = Math.abs(attacker.x - defender.x) + Math.abs(attacker.y - defender.y);
     return attackRange <= 1 ? 10 : 25;
   },
@@ -212,6 +220,9 @@ export const combatMethods = {
         const critical = this.rollCritical(attacker, target);
         const damage = critical ? baseDamage * 3 : baseDamage;
         target.hp = Math.max(0, target.hp - damage);
+        if (damage > 0 && target.unconsciousTurns > 0) {
+          target.unconsciousTurns = 0;
+        }
         if (target.id === "milo" && target.slowRebukeGuard === true && this.phase === "enemy" && damage > 0) {
           target.slowRebukeDamageTaken = (target.slowRebukeDamageTaken || 0) + damage;
         }

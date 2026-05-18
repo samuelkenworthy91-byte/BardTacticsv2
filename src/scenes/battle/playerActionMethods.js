@@ -68,19 +68,30 @@ import {
   CHAPTER_TWO_OPENING,
   CHAPTER_TWO_TITLE,
 } from "../../chapters/chapter2.js";
-import { CHAPTER_THREE_TOME_SKILLS } from "../../chapters/chapter3.js";
+import {
+  CHAPTER_THREE_TOME_SKILLS,
+} from "../../chapters/chapter3.js";
+import {
+  CHAPTER_THREE_GAIDEN_CHESTS,
+  CHAPTER_THREE_GAIDEN_ITEMS,
+} from "../../chapters/chapter3Gaiden/index.js";
 import {
   buildChapterTwoSaveData,
   CHAPTER_TWO_NUMBER,
   getLevelForChapter,
   getSaveDataChapterNumber,
   isChapterOne,
+  isChapterThreeGaiden,
   isChapterTwoOrLater,
 } from "../../chapters/progression.js";
 export const playerActionMethods = {
+  isUnitUnconscious(unit) {
+    return (unit?.unconsciousTurns || 0) > 0;
+  },
+
   chooseActionAttack(unitId) {
     const unit = this.units.find((u) => u.id === unitId);
-    if (!unit || unit.team !== "player" || unit.acted) return;
+    if (!unit || unit.team !== "player" || unit.acted || this.isUnitUnconscious(unit)) return;
     const targets = this.attackableEnemies(unit);
     if (targets.length === 0) {
       this.helpText.setText("No enemies in range. Choose another action.");
@@ -306,7 +317,7 @@ export const playerActionMethods = {
 
   chooseActionSkill(unitId) {
     const unit = this.units.find((u) => u.id === unitId);
-    if (!unit || unit.team !== "player" || unit.acted) return;
+    if (!unit || unit.team !== "player" || unit.acted || this.isUnitUnconscious(unit)) return;
     const skills = this.getAvailableSkills(unit);
     if (skills.length === 0) {
       this.helpText.setText(`${unit.name} has no skills yet. Choose another action.`);
@@ -349,6 +360,18 @@ export const playerActionMethods = {
           this.beginMiloRescueAllySelection(unit, skill);
           return;
         }
+        if (skill.id === "phoenixReckoning" && unit.team === "player") {
+          this.beginPhoenixReckoningDirectionSelection(unit, skill);
+          return;
+        }
+        if (skill.id === "fieldOfThorns" && unit.id === "leon") {
+          this.beginFieldOfThornsSelection(unit, skill);
+          return;
+        }
+        if (skill.id === "allTheTrappings" && unit.team === "player") {
+          this.beginSingleTargetSkillSelection(unit, skill);
+          return;
+        }
         const hitTiles = this.getSkillHitTilesAt(unit, skill, unit.x, unit.y);
         if (hitTiles.length === 0) {
           this.helpText.setText(`No valid tiles are in range for ${skill.name}. Choose another action.`);
@@ -372,6 +395,9 @@ export const playerActionMethods = {
     this.closeSelectionMenu(false);
     this.pendingItemUse = null;
     this.pendingMiloRescue = null;
+    this.pendingPhoenixReckoningUse = null;
+    this.pendingFieldOfThornsUse = null;
+    this.pendingSingleTargetSkillUse = null;
     this.selectedUnitId = unit.id;
     this.moveTiles = [];
     this.targetTiles = [];
@@ -799,6 +825,10 @@ export const playerActionMethods = {
       effect = "Creates a decoy copy on an adjacent free tile for 2 enemy phases.";
     } else if (skill.id === "slowRebuke") {
       effect = "Stores damage Milo takes during the next enemy phase and adds it to his first attack next turn.";
+    } else if (skill.id === "fieldOfThorns") {
+      effect = `Select up to ${skill.maxTiles || 5} walkable tiles within ${skill.range || 4} range. Thorns deal Leon's DEF and expire after 3 turns or 3 triggers.`;
+    } else if (skill.id === "allTheTrappings") {
+      effect = `Targets one unit within ${skill.range || 3} tiles. Deals ${unit.luck || 0} damage and prevents movement next turn.`;
     } else if (skill.damageFormula === "resHeal") {
       effect = `Restores ${unit.res || 0} HP to allies in the surrounding squares.`;
     } else if (skill.damageFormula === "ashMissingHpMag") {
@@ -821,8 +851,187 @@ export const playerActionMethods = {
     return this.getAvailableSkills(unit).find((skill) => skill.id === skillId) || null;
   },
 
+  getPhoenixReckoningDirectionTiles(unit, skill) {
+    if (!unit || !skill) return [];
+    const range = skill.range || 3;
+    return CARDINAL_DIRECTIONS.flatMap((direction) => {
+      const tiles = [];
+      for (let step = 1; step <= range; step += 1) {
+        const tile = { x: unit.x, y: unit.y, phoenixDirection: direction };
+        if (direction === "down") tile.y += step;
+        if (direction === "up") tile.y -= step;
+        if (direction === "right") tile.x += step;
+        if (direction === "left") tile.x -= step;
+        if (this.isInBounds(tile.x, tile.y)) tiles.push(tile);
+      }
+      return tiles;
+    });
+  },
+
+  getPhoenixDirectionFromTile(unit, x, y) {
+    if (!unit) return null;
+    if (x === unit.x && y > unit.y) return "down";
+    if (x === unit.x && y < unit.y) return "up";
+    if (y === unit.y && x > unit.x) return "right";
+    if (y === unit.y && x < unit.x) return "left";
+    return null;
+  },
+
+  beginPhoenixReckoningDirectionSelection(unit, skill) {
+    const tiles = this.getPhoenixReckoningDirectionTiles(unit, skill);
+    if (!tiles.length) {
+      this.helpText.setText(`No valid direction for ${skill.name}.`);
+      return;
+    }
+    this.closeSelectionMenu(false);
+    this.pendingPhoenixReckoningUse = { unitId: unit.id, skillId: skill.id };
+    this.selectedUnitId = unit.id;
+    this.moveTiles = [];
+    this.targetTiles = tiles;
+    this.targetTileColor = TARGET_HIGHLIGHT.skill.fill;
+    this.targetTileStroke = TARGET_HIGHLIGHT.skill.stroke;
+    this.redrawSelection();
+    this.updateSelectedPanel();
+    this.helpText.setText("Choose a cardinal direction for Phoenix Reckoning. Press Space to cancel.");
+  },
+
+  usePhoenixReckoningInDirection(x, y) {
+    const pending = this.pendingPhoenixReckoningUse;
+    const unit = this.units.find((candidate) => candidate.id === pending?.unitId);
+    const skill = this.getSkillById(unit, pending?.skillId);
+    const direction = this.getPhoenixDirectionFromTile(unit, x, y);
+    if (!unit || !skill || !direction || !this.canUseSkill(unit, skill)) return false;
+    unit.facing = direction;
+    this.pendingPhoenixReckoningUse = null;
+    return this.useSkill(unit.id, skill.id, { endTurn: true });
+  },
+
+  beginFieldOfThornsSelection(unit, skill) {
+    const tiles = this.getSkillHitTilesAt(unit, skill, unit.x, unit.y);
+    if (!tiles.length) {
+      this.helpText.setText(`No valid tiles for ${skill.name}.`);
+      return;
+    }
+    this.closeSelectionMenu(false);
+    this.pendingFieldOfThornsUse = {
+      unitId: unit.id,
+      skillId: skill.id,
+      selectedTiles: [],
+    };
+    this.selectedUnitId = unit.id;
+    this.moveTiles = [];
+    this.targetTiles = tiles;
+    this.targetTileColor = TARGET_HIGHLIGHT.skill.fill;
+    this.targetTileStroke = TARGET_HIGHLIGHT.skill.stroke;
+    this.redrawSelection();
+    this.updateSelectedPanel();
+    this.helpText.setText(`Choose up to ${skill.maxTiles || 5} thorn tiles. Press Enter to confirm or Space to cancel.`);
+  },
+
+  beginSingleTargetSkillSelection(unit, skill) {
+    const targets = this.getSkillTargetsAt(unit, skill, unit.x, unit.y);
+    if (!targets.length) {
+      this.helpText.setText(`No valid target for ${skill.name}.`);
+      return;
+    }
+    this.closeSelectionMenu(false);
+    this.selectedUnitId = unit.id;
+    this.pendingSingleTargetSkillUse = { unitId: unit.id, skillId: skill.id };
+    this.moveTiles = [];
+    this.targetTiles = targets;
+    this.targetTileColor = TARGET_HIGHLIGHT.skill.fill;
+    this.targetTileStroke = TARGET_HIGHLIGHT.skill.stroke;
+    this.redrawSelection();
+    this.updateSelectedPanel();
+    this.helpText.setText(`Choose one target for ${skill.name}. Press Space to cancel.`);
+  },
+
+  useSingleTargetSkillOn(targetId) {
+    const pending = this.pendingSingleTargetSkillUse;
+    const unit = this.units.find((candidate) => candidate.id === pending?.unitId);
+    const target = this.units.find((candidate) => candidate.id === targetId);
+    const skill = this.getSkillById(unit, pending?.skillId);
+    if (!unit || !target || !skill || !this.canUseSkill(unit, skill)) return false;
+    if (!this.getSkillTargetsAt(unit, skill, unit.x, unit.y).some((candidate) => candidate.id === target.id)) {
+      this.helpText.setText(`${target.name} is not in range for ${skill.name}.`);
+      return false;
+    }
+    this.pendingSingleTargetSkillUse = null;
+    return this.useSkill(unit.id, skill.id, { endTurn: true, targetId: target.id });
+  },
+
+  toggleFieldOfThornsTile(x, y) {
+    const pending = this.pendingFieldOfThornsUse;
+    const unit = this.units.find((candidate) => candidate.id === pending?.unitId);
+    const skill = this.getSkillById(unit, pending?.skillId);
+    if (!pending || !unit || !skill) return false;
+    if (!this.isTargetTile(x, y)) {
+      this.helpText.setText("Choose a highlighted tile for Field of Thorns.");
+      return false;
+    }
+    const key = tileKey(x, y);
+    const selected = pending.selectedTiles || [];
+    const existingIndex = selected.findIndex((tile) => tileKey(tile.x, tile.y) === key);
+    if (existingIndex >= 0) {
+      selected.splice(existingIndex, 1);
+    } else {
+      const maxTiles = skill.maxTiles || 5;
+      if (selected.length >= maxTiles) {
+        this.helpText.setText(`Field of Thorns can select up to ${maxTiles} tiles.`);
+        return false;
+      }
+      selected.push({ x, y });
+    }
+    pending.selectedTiles = selected;
+    this.redrawSelection();
+    this.helpText.setText(`${selected.length}/${skill.maxTiles || 5} thorn tiles selected. Press Enter to confirm or Space to cancel.`);
+    return true;
+  },
+
+  confirmFieldOfThornsSelection() {
+    const pending = this.pendingFieldOfThornsUse;
+    const unit = this.units.find((candidate) => candidate.id === pending?.unitId);
+    const skill = this.getSkillById(unit, pending?.skillId);
+    const selectedTiles = pending?.selectedTiles || [];
+    if (!pending || !unit || !skill || !this.canUseSkill(unit, skill)) return false;
+    if (!selectedTiles.length) {
+      this.helpText.setText("Select at least one tile for Field of Thorns.");
+      return false;
+    }
+    this.closeActionMenu();
+    this.closeSelectionMenu(false);
+    this.pendingFieldOfThornsUse = null;
+    this.pendingItemUse = null;
+    this.pendingParleyUse = null;
+    this.pendingMiloRescue = null;
+    this.pendingPhoenixReckoningUse = null;
+    this.pendingFieldOfThornsUse = null;
+    this.pendingSingleTargetSkillUse = null;
+    delete unit.pendingMoveOrigin;
+    this.busy = true;
+    this.selectedUnitId = unit.id;
+    this.moveTiles = [];
+    this.targetTiles = [];
+    this.targetTileColor = null;
+    this.targetTileStroke = null;
+    this.redrawSelection();
+    this.spendSkillCost(unit, skill);
+    this.placeThornTiles(unit, selectedTiles);
+    unit.acted = true;
+    this.refreshUnitSprite(unit);
+    this.updateSelectedPanel();
+    this.showSkillBanner(skill.name);
+    this.time.delayedCall(520, () => {
+      this.busy = false;
+      this.clearSelection(`${unit.name} placed Field of Thorns.`);
+      this.checkEndOfPlayerPhase();
+    });
+    return true;
+  },
+
   canUseSkill(unit, skill) {
     if (!unit || !skill) return false;
+    if (this.isUnitUnconscious(unit)) return false;
 
     if (skill.id === "parley") {
       return unit.team === "player" && (unit.sigilPoints ?? 0) >= (skill.cost ?? 0);
@@ -846,6 +1055,14 @@ export const playerActionMethods = {
       return unit.id === "milo" && (unit.sigilPoints ?? 0) >= (skill.cost ?? 0) && this.getFreeAdjacentTiles(unit.x, unit.y, true).length > 0;
     }
 
+    if (skill.id === "fieldOfThorns") {
+      return unit.id === "leon" && (unit.sigilPoints ?? 0) >= (skill.cost ?? 0);
+    }
+
+    if (skill.id === "allTheTrappings") {
+      return unit.id === "harold" && (unit.sigilPoints ?? 0) >= (skill.cost ?? 0);
+    }
+
     return (unit.sigilPoints ?? 0) >= (skill.cost ?? 0);
   },
 
@@ -860,8 +1077,22 @@ export const playerActionMethods = {
       const tiles = [];
       for (let tileY = 0; tileY < this.mapRows; tileY += 1) {
         for (let tileX = 0; tileX < this.mapCols; tileX += 1) {
-          const dist = Math.abs(tileX - x) + Math.abs(tileY - y);
+          const dist = skill.squareRange
+            ? Math.max(Math.abs(tileX - x), Math.abs(tileY - y))
+            : Math.abs(tileX - x) + Math.abs(tileY - y);
           if (dist > 0 && dist <= range) tiles.push({ x: tileX, y: tileY });
+        }
+      }
+      return tiles;
+    }
+
+    if (skill.type === "fieldOfThorns") {
+      const tiles = [];
+      const range = skill.range || 4;
+      for (let tileY = 0; tileY < this.mapRows; tileY += 1) {
+        for (let tileX = 0; tileX < this.mapCols; tileX += 1) {
+          const dist = Math.abs(tileX - x) + Math.abs(tileY - y);
+          if (dist > 0 && dist <= range && this.isWalkable(tileX, tileY)) tiles.push({ x: tileX, y: tileY });
         }
       }
       return tiles;
@@ -941,6 +1172,7 @@ export const playerActionMethods = {
 
     if (skill.type === "selfBuff" || skill.type === "miloDecoy" || skill.type === "slowRebuke") return [unit];
     if (skill.type === "rescueSprint") return this.getMiloRescueAllies(unit);
+    if (skill.type === "fieldOfThorns") return [];
 
     return this.units.filter((other) => {
       if (!other || other.id === unit.id || other.hp <= 0) return false;
@@ -957,6 +1189,7 @@ export const playerActionMethods = {
     if (skill.damageFormula === "mag") return Math.max(0, unit.mag || 0);
     if (skill.damageFormula === "strPlusSpd") return Math.max(0, (unit.str || 0) + (unit.spd || 0));
     if (skill.damageFormula === "strPlusMag") return Math.max(0, (unit.str || 0) + (unit.mag || 0));
+    if (skill.damageFormula === "luck") return Math.max(0, unit.luck || 0);
     if (skill.damageFormula === "brothersCombinedStrMag") return Math.max(0, this.getCombinedBrotherPower());
     if (skill.damageFormula === "ashMissingHpMag") return Math.max(0, (unit.mag || 0) + Math.max(0, (unit.maxHp || unit.hp || 0) - (unit.hp || 0)));
     if (skill.damageFormula === "resHeal") return -Math.max(0, unit.res || 0);
@@ -969,13 +1202,27 @@ export const playerActionMethods = {
     const skill = this.getSkillById(unit, skillId);
     if (!unit || !skill || unit.hp <= 0 || !this.canUseSkill(unit, skill)) return false;
     const hitTiles = this.getSkillHitTilesAt(unit, skill, unit.x, unit.y);
-    const targets = this.getSkillTargetsAt(unit, skill, unit.x, unit.y);
+    const targets = options.targetId
+      ? this.getSkillTargetsAt(unit, skill, unit.x, unit.y).filter((target) => target.id === options.targetId)
+      : this.getSkillTargetsAt(unit, skill, unit.x, unit.y);
     if (hitTiles.length === 0) return false;
+    if (skill.id === "allTheTrappings" && targets.length === 0) return false;
+    if (skill.id === "allTheTrappings" && unit.team === "player" && !options.targetId) {
+      this.beginSingleTargetSkillSelection(unit, skill);
+      return true;
+    }
+    if (skill.id === "fieldOfThorns" && !Array.isArray(options.thornTiles)) {
+      this.beginFieldOfThornsSelection(unit, skill);
+      return true;
+    }
     this.closeActionMenu();
     this.closeSelectionMenu(false);
     this.pendingItemUse = null;
     this.pendingParleyUse = null;
     this.pendingMiloRescue = null;
+    this.pendingPhoenixReckoningUse = null;
+    this.pendingFieldOfThornsUse = null;
+    this.pendingSingleTargetSkillUse = null;
     delete unit.pendingMoveOrigin;
     this.busy = true;
     this.selectedUnitId = unit.id;
@@ -1022,6 +1269,18 @@ export const playerActionMethods = {
       return true;
     }
 
+    if (skill.id === "fieldOfThorns") {
+      this.placeThornTiles(unit, options.thornTiles);
+      if (options.endTurn !== false) unit.acted = true;
+      this.refreshUnitSprite(unit);
+      this.time.delayedCall(520, () => {
+        this.busy = false;
+        this.clearSelection(`${unit.name} placed Field of Thorns.`);
+        this.checkEndOfPlayerPhase();
+      });
+      return true;
+    }
+
     const beginSkillImpact = () => {
       if (skill.animationState === "spin") {
         this.playUnitSpinAnimation(unit, SKILL_IMPACT_DELAY + 450);
@@ -1044,10 +1303,17 @@ export const playerActionMethods = {
           this.showFloatingText(this.boardX + target.x * TILE_SIZE + TILE_SIZE / 2, this.boardY + target.y * TILE_SIZE + 8, `+${healed} HP`, "#86efac");
         } else {
           target.hp = Math.max(0, target.hp - entry.damage);
+          if (entry.damage > 0 && target.unconsciousTurns > 0) target.unconsciousTurns = 0;
           if (target.id === "milo" && target.slowRebukeGuard === true && this.phase === "enemy" && entry.damage > 0) {
             target.slowRebukeDamageTaken = (target.slowRebukeDamageTaken || 0) + entry.damage;
           }
           this.showCombatResultText(target, { hit: true, critical: false, damage: entry.damage }, index);
+          if (skill.id === "allTheTrappings" && entry.damage >= 0) {
+            target.immobilizedTurns = Math.max(target.immobilizedTurns || 0, 2);
+            target.trapped = true;
+            this.showFloatingText(this.boardX + target.x * TILE_SIZE + TILE_SIZE / 2, this.boardY + target.y * TILE_SIZE + 30, "TRAPPED", "#fbbf24");
+            this.showCenteredPopup?.(`${target.name} is caught in Harold's trappings!`);
+          }
           this.time.delayedCall(index * 120, () => this.playUnitHurt(target, 360));
         }
         const didKill = entry.wasAlive && target.hp <= 0;
@@ -1059,6 +1325,7 @@ export const playerActionMethods = {
           this.awardSurvivalXp(target, unit, entry.wasAlive);
         }
       });
+      this.applyFactoryAttackReactions?.(skill, targetResults.map((entry) => entry.target).filter(Boolean).map((target) => ({ x: target.x, y: target.y })));
       if (totalXp > 0) this.awardXp(unit, totalXp);
       targetResults.forEach((entry) => {
         const target = entry.target;
@@ -1075,9 +1342,9 @@ export const playerActionMethods = {
           } else if (target.team === "civilian") {
             target.hp = 0;
             this.defeatedCivilians = [...new Set([...(this.defeatedCivilians || []), target.id])];
-            this.playUnitDeath(target, () => this.removeUnitSpriteAndData(target.id));
+            this.playUnitDeath(target, () => this.removeUnitSpriteAndData(target.id, unit.team === "player" ? unit.id : null));
           } else {
-            this.playUnitDeath(target, () => this.removeUnitSpriteAndData(target.id));
+            this.playUnitDeath(target, () => this.removeUnitSpriteAndData(target.id, unit.team === "player" ? unit.id : null));
           }
         } else {
           this.refreshUnitSprite(target);
@@ -1087,6 +1354,14 @@ export const playerActionMethods = {
       if (options.endTurn !== false) {
         unit.acted = skill.id === "shadowstep" ? false : true;
         if (skill.id === "battleFocus") unit.nextAttackBonus = 3;
+        if (skill.id === "brothersBligh") {
+          const partner = this.getBrotherSkillPartner(unit);
+          if (partner) {
+            delete partner.pendingMoveOrigin;
+            partner.acted = true;
+            this.refreshUnitSprite(partner);
+          }
+        }
         this.refreshUnitSprite(unit);
       }
       this.updateSelectedPanel();
@@ -1140,7 +1415,7 @@ export const playerActionMethods = {
 
   chooseActionItem(unitId) {
     const unit = this.units.find((u) => u.id === unitId);
-    if (!unit || unit.team !== "player" || unit.acted) return;
+    if (!unit || unit.team !== "player" || unit.acted || this.isUnitUnconscious(unit)) return;
     const items = unit.items || [];
     if (items.length === 0) {
       this.helpText.setText(`${unit.name} has no items yet. Choose another action.`);
@@ -1150,20 +1425,21 @@ export const playerActionMethods = {
   },
 
   getTradePartners(unit) {
-    if (!unit || unit.team !== "player" || unit.acted || unit.hp <= 0) return [];
+    if (!unit || unit.team !== "player" || unit.acted || unit.hp <= 0 || this.isUnitUnconscious(unit)) return [];
     return this.units.filter((other) => (
       other &&
       other.id !== unit.id &&
       other.team === "player" &&
       other.hp > 0 &&
       other.isMiloDecoy !== true &&
+      !this.isUnitUnconscious(other) &&
       distance(unit, other) === 1
     ));
   },
 
   chooseActionTrade(unitId) {
     const unit = this.units.find((u) => u.id === unitId);
-    if (!unit || unit.team !== "player" || unit.acted) return;
+    if (!unit || unit.team !== "player" || unit.acted || this.isUnitUnconscious(unit)) return;
     const partners = this.getTradePartners(unit);
     if (partners.length === 0) {
       this.helpText.setText("No adjacent ally to trade with.");
@@ -1340,8 +1616,8 @@ export const playerActionMethods = {
       getLabel: (item) => `${item.name}${item.uses ? ` x${item.uses}` : ""}`,
       getSummary: (item) => this.getItemSummary(unit, item),
       getTargets: (item) => this.getItemTargetsAt(unit, item, unit.x, unit.y),
-      canChoose: (item) => (item.uses ?? 1) > 0,
-      disabledText: (item) => `${item.name} has no uses left.`,
+      canChoose: (item) => !item.passive && !item.passiveMoveBonus && !item.passiveDefensePierce && !item.eggTracker && (item.uses ?? 1) > 0,
+      disabledText: (item) => item.passive || item.passiveMoveBonus || item.passiveDefensePierce || item.eggTracker ? `${item.name} is passive.` : `${item.name} has no uses left.`,
       onChoose: (item) => this.beginItemTargetSelection(unit, item),
     });
   },
@@ -1349,6 +1625,10 @@ export const playerActionMethods = {
   getItemTargetsAt(unit, item, x = unit.x, y = unit.y) {
     if (!unit || !item) return [];
     if (item.targetType === "self") return [unit];
+    if (item.targetType === "enemyInStrengthRange") {
+      const range = Math.max(1, unit.str || 1);
+      return this.units.filter((other) => other.team === "enemy" && other.hp > 0 && Math.abs(other.x - x) + Math.abs(other.y - y) <= range);
+    }
     if (item.targetType === "selfOrAdjacentAlly") {
       return this.units.filter((other) => {
         if (!other || other.team !== unit.team || other.hp <= 0) return false;
@@ -1366,13 +1646,21 @@ export const playerActionMethods = {
     if (item.heal) {
       return `${item.name}: restores ${item.heal} HP to the consumer. Can target ${unit.name} or an adjacent ally. Targets now: ${targets.length}.`;
     }
-    if (item.learnSkill) return `${item.name}: teaches ${this.getSkillTomeSkillForUnit(unit).name} to ${unit.name}.`;
+    if (item.leonOnlySkill) return `${item.name}: Leon can learn Field of Thorns. Other units cannot understand it.`;
+    if (item.strengthBoost) return `${item.name}: consumable. Raises Strength by ${item.strengthBoost}.`;
+    if (item.passiveMoveBonus) return `${item.name}: passive +${item.passiveMoveBonus} movement while carried.`;
+    if (item.passiveDefensePierce) return `${item.name}: holder's attacks ignore ${item.passiveDefensePierce} Defense.`;
+    if (item.tranqTurns) return `${item.name}: throw up to STR range to make an enemy unconscious for ${item.tranqTurns} turns.`;
+    if (item.learnSkill) return `${item.name}: teaches ${this.getSkillTomeSkillForUnit(unit, item).name} to ${unit.name}.`;
     if (item.permanentStatBoost) return `${item.name}: permanently adds +${item.permanentStatBoost} to HP, STR, MAG, DEF, RES, SPD, and LUCK.`;
     if (item.permanentLuckBoost) return `${item.name}: permanently adds +${item.permanentLuckBoost} Luck.`;
     return item.description || `${item.name}: item effect will be added later.`;
   },
 
-  getSkillTomeSkillForUnit(unit) {
+  getSkillTomeSkillForUnit(unit, item = null) {
+    if (item?.learnSkill === "fieldOfThorns") {
+      return { id: "fieldOfThorns", name: "Field of Thorns", cost: 2, type: "fieldOfThorns", damageFormula: "none", animationState: "magic", range: 4, maxTiles: 5 };
+    }
     const skill = CHAPTER_THREE_TOME_SKILLS[unit?.id] || CHAPTER_THREE_TOME_SKILLS.fallback;
     return { ...skill };
   },
@@ -1398,17 +1686,23 @@ export const playerActionMethods = {
     this.targetTileStroke = TARGET_HIGHLIGHT.item.stroke;
     this.redrawSelection();
     this.updateSelectedPanel();
-    this.helpText.setText(`Choose who eats ${item.name}. Press Space to cancel.`);
+    const verb = item.heal ? "who eats" : "a target for";
+    this.helpText.setText(`Choose ${verb} ${item.name}. Press Space to cancel.`);
   },
 
   useItem(unitId, itemId, targetId) {
     const unit = this.units.find((u) => u.id === unitId);
     const target = this.units.find((u) => u.id === targetId);
     const item = (unit?.items || []).find((candidate) => candidate.id === itemId);
-    if (!unit || !target || !item || unit.acted || unit.hp <= 0) return false;
+    if (!unit || !target || !item || unit.acted || unit.hp <= 0 || this.isUnitUnconscious(unit)) return false;
     const targets = this.getItemTargetsAt(unit, item, unit.x, unit.y);
     if (!targets.some((candidate) => candidate.id === target.id)) {
       this.helpText.setText(`${target.name} is not in range for ${item.name}.`);
+      return false;
+    }
+    if (item.leonOnlySkill && unit.id !== "leon") {
+      this.helpText.setText(`${unit.name} cannot understand ${item.name}.`);
+      this.showCenteredPopup?.(`${unit.name} cannot understand ${item.name}.`);
       return false;
     }
     if (item.heal) {
@@ -1422,7 +1716,7 @@ export const playerActionMethods = {
       this.showFloatingText(this.boardX + target.x * TILE_SIZE + TILE_SIZE / 2, this.boardY + target.y * TILE_SIZE + 8, `+${healed} HP`, "#86efac");
     }
     if (item.learnSkill) {
-      const learnedSkill = this.getSkillTomeSkillForUnit(target);
+      const learnedSkill = this.getSkillTomeSkillForUnit(target, item);
       target.skills = target.skills || [];
       if (target.skills.some((skill) => skill.id === learnedSkill.id)) {
         this.helpText.setText(`${target.name} already knows ${learnedSkill.name}.`);
@@ -1430,6 +1724,18 @@ export const playerActionMethods = {
       }
       target.skills.push(learnedSkill);
       this.showFloatingText(this.boardX + target.x * TILE_SIZE + TILE_SIZE / 2, this.boardY + target.y * TILE_SIZE + 8, learnedSkill.name, "#ddd6fe");
+      this.showCenteredPopup?.(`${target.name} learned ${learnedSkill.name}!`);
+    }
+    if (item.strengthBoost) {
+      target.str = (target.str || 0) + item.strengthBoost;
+      this.showFloatingText(this.boardX + target.x * TILE_SIZE + TILE_SIZE / 2, this.boardY + target.y * TILE_SIZE + 8, `STR +${item.strengthBoost}`, "#fde68a");
+      this.showCenteredPopup?.(`${target.name}'s Strength rose by ${item.strengthBoost}!`);
+    }
+    if (item.tranqTurns) {
+      target.unconsciousTurns = Math.max(target.unconsciousTurns || 0, item.tranqTurns);
+      target.acted = true;
+      this.showFloatingText(this.boardX + target.x * TILE_SIZE + TILE_SIZE / 2, this.boardY + target.y * TILE_SIZE + 8, "UNCONSCIOUS", "#bfdbfe");
+      this.showCenteredPopup?.(`${target.name} is unconscious for ${item.tranqTurns} turns!`);
     }
     if (item.permanentStatBoost) {
       const boost = item.permanentStatBoost;
@@ -1462,14 +1768,17 @@ export const playerActionMethods = {
     this.refreshUnitSprite(unit);
     this.refreshUnitSprite(target);
     this.updateSelectedPanel();
-    this.clearSelection(`${target.name} used ${item.name}.`);
+    const resultMessage = item.tranqTurns
+      ? `${unit.name} threw ${item.name} at ${target.name}.`
+      : `${target.name} used ${item.name}.`;
+    this.clearSelection(resultMessage);
     this.checkEndOfPlayerPhase();
     return true;
   },
 
   waitUnit(unitId) {
     const unit = this.units.find((u) => u.id === unitId);
-    if (!unit || unit.team !== "player" || unit.acted) return;
+    if (!unit || unit.team !== "player" || unit.acted || this.isUnitUnconscious(unit)) return;
     this.closeActionMenu();
     delete unit.pendingMoveOrigin;
     unit.counterStance = false;
@@ -1482,7 +1791,7 @@ export const playerActionMethods = {
 
   waitAndCounterUnit(unitId) {
     const unit = this.units.find((u) => u.id === unitId);
-    if (!unit || unit.team !== "player" || unit.acted || unit.hp <= 0) return;
+    if (!unit || unit.team !== "player" || unit.acted || unit.hp <= 0 || this.isUnitUnconscious(unit)) return;
     this.closeActionMenu();
     delete unit.pendingMoveOrigin;
     unit.acted = true;
@@ -1491,31 +1800,453 @@ export const playerActionMethods = {
     this.checkEndOfPlayerPhase();
   },
 
+  getAdjacentFactoryTiles(unit, predicate) {
+    if (!unit || !this.isFactoryBonusLevel()) return [];
+    return [[1, 0], [-1, 0], [0, 1], [0, -1]]
+      .map(([dx, dy]) => ({ x: unit.x + dx, y: unit.y + dy }))
+      .filter((tile) => this.isInBounds(tile.x, tile.y) && predicate(this.getTerrainAt(tile.x, tile.y), tile));
+  },
+
+  isAdjacentToFactoryMachinery(x, y) {
+    if (!this.isFactoryBonusLevel()) return false;
+    return [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => this.getTerrainAt(x + dx, y + dy) === "machinery");
+  },
+
+  getOpenableFactoryContainers(unit) {
+    if (!unit || !isChapterThreeGaiden(this.currentChapterNumber)) return [];
+    return [[1, 0], [-1, 0], [0, 1], [0, -1]]
+      .map(([dx, dy]) => ({ x: unit.x + dx, y: unit.y + dy }))
+      .filter((tile) => (
+        this.isInBounds(tile.x, tile.y) &&
+        this.getTerrainAt(tile.x, tile.y) === "container" &&
+        !this.openedFactoryContainers?.has(tileKey(tile.x, tile.y))
+      ));
+  },
+
+  canOpenFactoryChest(unit) {
+    if (!unit) return false;
+    if (this.isUnitUnconscious(unit)) return false;
+    if (isChapterThreeGaiden(this.currentChapterNumber) && (unit.team === "enemy" || unit.team === "neutral") && unit.className === "Thief") return true;
+    return (unit.skills || []).some((skill) => skill.id === "steal");
+  },
+
+  getInventoryMoveBonus(unit) {
+    return (unit?.items || []).reduce((total, item) => {
+      const bonus = Number(item?.passiveMoveBonus);
+      return total + (Number.isFinite(bonus) && bonus > 0 ? bonus : 0);
+    }, 0);
+  },
+
+  canUseStealAction(unit) {
+    if (!unit || unit.team !== "player" || unit.acted || unit.hp <= 0 || this.isUnitUnconscious(unit)) return false;
+    if (!this.canOpenFactoryChest(unit)) return false;
+    return false;
+  },
+
+  getFactoryChestItemAt(x, y) {
+    if (!isChapterThreeGaiden(this.currentChapterNumber)) return null;
+    const chest = CHAPTER_THREE_GAIDEN_CHESTS.find((entry) => entry.x === x && entry.y === y);
+    if (!chest) return null;
+    const item = CHAPTER_THREE_GAIDEN_ITEMS.find((entry) => entry.id === chest.itemId);
+    return item ? { ...item } : null;
+  },
+
+  getStealableAdjacentUnits(unit) {
+    if (!unit) return [];
+    return this.units.filter((other) => (
+      other &&
+      other.id !== unit.id &&
+      other.hp > 0 &&
+      other.team !== unit.team &&
+      distance(unit, other) === 1 &&
+      (other.items || []).length > 0
+    ));
+  },
+
+  getFirstStolenOrInventoryItem(unit) {
+    if (!unit) return null;
+    return (unit.items || [])[0] || null;
+  },
+
+  markItemStolen(item) {
+    if (!item) return item;
+    return {
+      ...item,
+      stolen: true,
+      stolenItem: true,
+      stolenChestItem: this.isChapterThreeGaidenChestItem?.(item) === true,
+      stolenAtChapter: "chapter3Bonus",
+    };
+  },
+
+  awardStealXp(unit) {
+    if (!unit || unit.team !== "player") return;
+    const dummy = { level: (unit.level || 1) + 2, team: "enemy", boss: false };
+    const xp = this.calculateXpGain(unit, dummy, true);
+    if (xp > 0) this.awardXp(unit, xp);
+  },
+
+  chooseActionSteal(unitId) {
+    const unit = this.units.find((candidate) => candidate.id === unitId);
+    if (!this.canUseStealAction(unit)) {
+      this.helpText.setText("No adjacent chest or inventory can be stolen from.");
+      return;
+    }
+    const chests = this.getOpenableFactoryContainers(unit).map((tile) => ({
+      ...tile,
+      id: `chest_${tile.x}_${tile.y}`,
+      name: "Chest",
+      title: tileLabel(this.getTerrainAt(tile.x, tile.y)),
+      isChestTarget: true,
+    }));
+    const units = this.getStealableAdjacentUnits(unit);
+    this.showChoiceMenu(unit, {
+      type: "item",
+      title: "Steal",
+      entries: [...chests, ...units],
+      getLabel: (target) => target.isChestTarget ? `Chest ${target.x},${target.y}` : target.name,
+      getSummary: (target) => target.isChestTarget
+        ? `Open this chest.`
+        : `Steal ${(target.items || [])[0]?.name || "an item"} from ${target.name}.`,
+      getTargets: (target) => [target],
+      onChoose: (target) => target.isChestTarget
+        ? this.openFactoryContainer(unit.id, target)
+        : this.stealFromUnit(unit.id, target.id),
+    });
+  },
+
+  getBreakableFactoryTerrain(unit) {
+    return [];
+  },
+
+  openFactoryContainer(unitId, forcedTarget = null) {
+    const unit = this.units.find((candidate) => candidate.id === unitId);
+    if (!unit || unit.acted || unit.hp <= 0 || this.isUnitUnconscious(unit)) return;
+    if (!this.canOpenFactoryChest(unit)) {
+      if (unit.team === "player") this.showActionMenu(unit, "Only units with Steal can open chests.");
+      return;
+    }
+    const target = forcedTarget || this.getOpenableFactoryContainers(unit)[0];
+    if (!target) {
+      this.showActionMenu(unit, "No locked container is in reach.");
+      return;
+    }
+
+    const item = this.getFactoryChestItemAt(target.x, target.y);
+    if (!item || this.openedFactoryContainers?.has(tileKey(target.x, target.y))) {
+      this.showActionMenu(unit, "No locked container is in reach.");
+      return;
+    }
+
+    this.closeActionMenu();
+    this.closeSelectionMenu(false);
+    this.openedFactoryContainers.add(tileKey(target.x, target.y));
+    this.destroyedFactoryTerrain.add(tileKey(target.x, target.y));
+    const gainedItem = unit.team === "enemy" || unit.team === "neutral" ? { ...this.markItemStolen(item), fromBonusChest: true } : item;
+    unit.items = [...(unit.items || []), gainedItem];
+    if (unit.team === "enemy" || unit.team === "neutral") unit.hasStolenChestItem = true;
+    else this.awardStealXp(unit);
+    unit.acted = true;
+    delete unit.pendingMoveOrigin;
+    this.drawBoard();
+    this.createEscapeCursor();
+    this.refreshUnitSprite(unit);
+    this.updateSelectedPanel();
+    const messageIsEnemySteal = unit.team === "enemy" || unit.team === "neutral";
+    this.showFloatingText(this.boardX + target.x * TILE_SIZE + TILE_SIZE / 2, this.boardY + target.y * TILE_SIZE + 8, messageIsEnemySteal ? "STOLEN" : "CHEST OPENED", "#fde68a");
+    const message = messageIsEnemySteal
+      ? `${unit.name} stole ${item.name}!`
+      : `${unit.name} opened a chest and found ${item.name}.`;
+    this.clearSelection(message);
+    if (messageIsEnemySteal) this.showCenteredPopup?.(message);
+    if (this.checkChapterThreeBonusVictory?.()) return;
+    if (messageIsEnemySteal) return;
+    this.checkEndOfPlayerPhase();
+  },
+
+  stealFromUnit(unitId, targetId) {
+    const unit = this.units.find((candidate) => candidate.id === unitId);
+    const target = this.units.find((candidate) => candidate.id === targetId);
+    if (!unit || !target || unit.acted || unit.hp <= 0 || distance(unit, target) !== 1 || !(target.items || []).length) return false;
+    const item = target.items.shift();
+    const stolenItem = this.markItemStolen(item);
+    unit.items = [...(unit.items || []), stolenItem];
+    if (unit.team === "player") this.awardStealXp(unit);
+    unit.acted = true;
+    delete unit.pendingMoveOrigin;
+    this.closeActionMenu();
+    this.closeSelectionMenu(false);
+    this.showFloatingText(this.boardX + target.x * TILE_SIZE + TILE_SIZE / 2, this.boardY + target.y * TILE_SIZE + 8, "STOLEN", "#fde68a");
+    this.refreshUnitSprite(unit);
+    this.refreshUnitSprite(target);
+    this.updateSelectedPanel();
+    this.clearSelection(`${unit.name} stole ${item.name} from ${target.name}.`);
+    if (unit.team === "enemy") return true;
+    this.checkEndOfPlayerPhase();
+    return true;
+  },
+
+  recoverStolenItemsFromUnit(unit, receiver = null) {
+    if (!isChapterThreeGaiden(this.currentChapterNumber)) return;
+    if (unit?.escapedWithItems) return;
+    const stolenItems = (unit?.items || []).filter((item) => this.isChapterThreeGaidenStolenChestItem?.(item));
+    if (!stolenItems.length) return;
+    const preferredRecipient = receiver || this.units.find((candidate) => candidate.id === unit.defeatedByUnitId);
+    const recipient = preferredRecipient?.team === "player" && preferredRecipient.hp > 0 && preferredRecipient.isMiloDecoy !== true
+      ? preferredRecipient
+      : this.units.find((candidate) => candidate.team === "player" && candidate.hp > 0 && candidate.isMiloDecoy !== true);
+    if (!recipient) return;
+    recipient.items = [...(recipient.items || []), ...stolenItems.map((item) => ({
+      ...item,
+      stolen: false,
+      stolenItem: false,
+      stolenChestItem: false,
+      recovered: true,
+    }))];
+    unit.items = (unit.items || []).filter((item) => !this.isChapterThreeGaidenStolenChestItem?.(item));
+    unit.hasStolenChestItem = (unit.items || []).some((item) => this.isChapterThreeGaidenStolenChestItem?.(item));
+    const itemNames = stolenItems.map((item) => item.name).join(", ");
+    this.showFloatingText(this.boardX + recipient.x * TILE_SIZE + TILE_SIZE / 2, this.boardY + recipient.y * TILE_SIZE + 8, "ITEM RECOVERED", "#fde68a");
+    const message = `${recipient.name} recovered ${itemNames}.`;
+    this.helpText.setText(message);
+    this.showCenteredPopup?.(message);
+  },
+
+  getAdjacentMarnieTalkTargets(unit) {
+    if (!unit || unit.team !== "player" || unit.hp <= 0 || this.isUnitUnconscious(unit) || !isChapterThreeGaiden(this.currentChapterNumber)) return [];
+    return this.units.filter((other) => (
+      other &&
+      other.id === "marnie" &&
+      other.team === "neutral" &&
+      other.hp > 0 &&
+      distance(unit, other) === 1
+    ));
+  },
+
+  talkToMarnie(unitId) {
+    const unit = this.units.find((candidate) => candidate.id === unitId);
+    const marnie = this.getAdjacentMarnieTalkTargets(unit)[0];
+    if (!unit || !marnie) return;
+    this.closeActionMenu();
+    this.chapterThreeBonusMarnieTalked = true;
+    this.marnieTalked = true;
+    this.busy = true;
+    this.showChapterTwoSetupDialogue({
+      speaker: "Marnie",
+      portrait: "marniePortrait",
+      text: "Hey you....you aren't one of them jackboots, help me get passed them and I'll give you half my earnings here.",
+      onContinue: () => {
+        marnie.team = "player";
+        marnie.neutral = false;
+        marnie.recruitableByTalk = false;
+        marnie.temporaryRecruit = true;
+        marnie.recruitedThisChapter = true;
+        marnie.permanentRecruit = false;
+        this.marnieTemporarilyRecruited = true;
+        if (!(marnie.skills || []).some((skill) => skill.id === "steal")) {
+          marnie.skills = [...(marnie.skills || []), { id: "steal", name: "Steal", cost: 0, type: "passive" }];
+        }
+        marnie.acted = false;
+        marnie.sigilPoints = marnie.sigilPoints ?? marnie.maxSigilPoints ?? 3;
+        this.refreshUnitSprite(marnie);
+        this.setUnitSpriteFrame(marnie, "idle", marnie.facing || "down");
+        this.showCenteredPopup("Marnie joined The Bards!", () => {
+          unit.acted = true;
+          delete unit.pendingMoveOrigin;
+          this.refreshUnitSprite(unit);
+          this.busy = false;
+          this.clearSelection("Marnie joined The Bards!");
+          this.checkEndOfPlayerPhase();
+        });
+      },
+    });
+  },
+
+  getFactoryTerrainHp(x, y) {
+    const key = tileKey(x, y);
+    if (this.factoryTerrainHp?.[key] != null) return this.factoryTerrainHp[key];
+    const terrain = this.getTerrainAt(x, y);
+    return terrain === "machinery" ? 8 : terrain === "crates" ? 5 : 0;
+  },
+
+  damageFactoryTerrain(x, y, amount = 4, source = {}) {
+    if (!this.isFactoryBonusLevel() || !this.isInBounds(x, y)) return false;
+    const terrain = this.getTerrainAt(x, y);
+    if (!this.isFactoryDestructibleTerrain(terrain)) return false;
+    const key = tileKey(x, y);
+    const hp = Math.max(0, this.getFactoryTerrainHp(x, y) - Math.max(1, amount));
+    this.factoryTerrainHp[key] = hp;
+    this.showFloatingText(this.boardX + x * TILE_SIZE + TILE_SIZE / 2, this.boardY + y * TILE_SIZE + 8, hp <= 0 ? "BROKEN" : `OBJ -${amount}`, "#fbbf24");
+    if (hp > 0) return true;
+
+    this.destroyedFactoryTerrain.add(key);
+    if (terrain === "machinery" && this.isFactoryIgnitionSource(source)) {
+      this.explodeFactoryMachinery(x, y);
+    }
+    this.drawBoard();
+    this.createEscapeCursor();
+    return true;
+  },
+
+  breakFactoryTerrain(unitId) {
+    const unit = this.units.find((candidate) => candidate.id === unitId);
+    if (!unit || unit.team !== "player" || unit.acted || unit.hp <= 0 || this.isUnitUnconscious(unit)) return;
+    const target = this.getBreakableFactoryTerrain(unit)[0];
+    if (!target) {
+      this.showActionMenu(unit, "No breakable factory object is in reach.");
+      return;
+    }
+
+    this.closeActionMenu();
+    this.damageFactoryTerrain(target.x, target.y, 4, { damageType: "physical", name: "Break" });
+    unit.acted = true;
+    delete unit.pendingMoveOrigin;
+    this.refreshUnitSprite(unit);
+    this.clearSelection(`${unit.name} attacked the obstruction.`);
+    this.checkEndOfPlayerPhase();
+  },
+
+  isFactoryIgnitionSource(source = {}) {
+    return false;
+  },
+
+  igniteFactorySpill(x, y) {
+    return false;
+  },
+
+  explodeFactoryMachinery(x, y) {
+    this.showFloatingText(this.boardX + x * TILE_SIZE + TILE_SIZE / 2, this.boardY + y * TILE_SIZE + 8, "BOOM", "#fb7185");
+    this.units
+      .filter((unit) => unit.hp > 0 && Math.abs(unit.x - x) + Math.abs(unit.y - y) <= 1)
+      .forEach((unit) => this.damageFactoryHazardUnit(unit, 5, "BLAST"));
+  },
+
+  damageFactoryHazardUnit(unit, amount, label) {
+    if (!unit || unit.hp <= 0) return;
+    unit.hp = Math.max(0, unit.hp - amount);
+    this.showFloatingText(this.boardX + unit.x * TILE_SIZE + TILE_SIZE / 2, this.boardY + unit.y * TILE_SIZE + 8, `${label} -${amount}`, "#fb7185");
+    if (unit.hp <= 0) this.playUnitDeath(unit, () => this.removeUnitSpriteAndData(unit.id));
+    else this.refreshUnitSprite(unit);
+  },
+
+  applyFactoryAttackReactions(source, affectedTiles = []) {
+    if (!this.isFactoryBonusLevel() || !this.isFactoryIgnitionSource(source)) return;
+    const seen = new Set();
+    affectedTiles.forEach((tile) => {
+      if (!tile || !this.isInBounds(tile.x, tile.y)) return;
+      [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => {
+        const x = tile.x + dx;
+        const y = tile.y + dy;
+        const key = tileKey(x, y);
+        if (!this.isInBounds(x, y) || seen.has(key)) return;
+        seen.add(key);
+        const terrain = this.getTerrainAt(x, y);
+        if (terrain === "spill") this.igniteFactorySpill(x, y);
+        if (terrain === "machinery") this.damageFactoryTerrain(x, y, 8, source);
+      });
+    });
+  },
+
+  placeThornTiles(unit, tiles = []) {
+    this.chapterThreeBonusThorns = this.chapterThreeBonusThorns || [];
+    tiles.slice(0, 5).forEach((tile) => {
+      const key = tileKey(tile.x, tile.y);
+      this.chapterThreeBonusThorns = this.chapterThreeBonusThorns.filter((thorn) => thorn.key !== key);
+      this.chapterThreeBonusThorns.push({
+        key,
+        x: tile.x,
+        y: tile.y,
+        ownerId: unit.id,
+        damage: Math.max(0, unit.def || 0),
+        turnsRemaining: 3,
+        triggersRemaining: 3,
+      });
+    });
+    this.renderThornMarkers();
+    this.showCenteredPopup("Field of Thorns spread across the floor.");
+  },
+
+  renderThornMarkers() {
+    if (!this.thornLayer) return;
+    this.thornLayer.removeAll(true);
+    (this.chapterThreeBonusThorns || []).forEach((thorn) => {
+      const marker = this.add.rectangle(
+        this.boardX + thorn.x * TILE_SIZE + TILE_SIZE / 2,
+        this.boardY + thorn.y * TILE_SIZE + TILE_SIZE / 2,
+        TILE_SIZE - 16,
+        TILE_SIZE - 16,
+        0x166534,
+        0.38
+      );
+      marker.setStrokeStyle(2, 0x86efac);
+      this.thornLayer.add(marker);
+    });
+  },
+
+  triggerThornAt(unit) {
+    if (!unit || unit.hp <= 0) return;
+    const key = tileKey(unit.x, unit.y);
+    const thorn = (this.chapterThreeBonusThorns || []).find((entry) => entry.key === key);
+    if (!thorn) return;
+    unit.hp = Math.max(0, unit.hp - thorn.damage);
+    thorn.triggersRemaining -= 1;
+    this.showFloatingText(this.boardX + unit.x * TILE_SIZE + TILE_SIZE / 2, this.boardY + unit.y * TILE_SIZE + 8, `THORNS -${thorn.damage}`, "#86efac");
+    if (this.helpText) this.helpText.setText(`${unit.name} triggered Field of Thorns!`);
+    if (unit.hp <= 0) this.playUnitDeath(unit, () => this.removeUnitSpriteAndData(unit.id));
+    else this.refreshUnitSprite(unit);
+    if (thorn.triggersRemaining <= 0) {
+      this.chapterThreeBonusThorns = (this.chapterThreeBonusThorns || []).filter((entry) => entry.key !== key);
+      this.showFloatingText(this.boardX + unit.x * TILE_SIZE + TILE_SIZE / 2, this.boardY + unit.y * TILE_SIZE + 30, "THORNS FADE", "#bbf7d0");
+    }
+    this.renderThornMarkers();
+  },
+
+  tickThornTurns() {
+    this.chapterThreeBonusThorns = (this.chapterThreeBonusThorns || [])
+      .map((thorn) => ({ ...thorn, turnsRemaining: (thorn.turnsRemaining || 0) - 1 }))
+      .filter((thorn) => {
+        if (thorn.turnsRemaining > 0) return true;
+        this.showFloatingText(this.boardX + thorn.x * TILE_SIZE + TILE_SIZE / 2, this.boardY + thorn.y * TILE_SIZE + 8, "THORNS EXPIRE", "#bbf7d0");
+        return false;
+      });
+    this.renderThornMarkers();
+  },
+
   canUseGlobalTurnAction() {
     return this.phase === "player" &&
       !this.busy &&
       !this.previewOpen &&
-      !this.actionMenuOpen &&
       !this.selectionMenuOpen &&
+      !this.pendingFieldOfThornsUse &&
+      !this.pendingSingleTargetSkillUse &&
       !this.levelUpAllocationOpen &&
       !this.tradeOpen;
   },
 
   getUnactedPlayerUnits() {
-    return this.units.filter((unit) => (
-      unit?.team === "player" &&
+    return this.units.filter((unit) => this.isControllablePlayerUnit(unit) && !unit.acted && !this.isUnitUnconscious(unit));
+  },
+
+  isControllablePlayerUnit(unit) {
+    return !!unit &&
+      unit.team === "player" &&
       unit.isMiloDecoy !== true &&
-      !unit.acted &&
-      unit.hp > 0
-    ));
+      unit.hp > 0 &&
+      this.isInBounds(unit.x, unit.y) &&
+      unit.hidden !== true &&
+      unit.inactive !== true;
   },
 
   clearGlobalTurnActionState() {
+    this.closeBattleContextMenu?.();
     this.closeActionMenu();
     this.closeSelectionMenu(false);
     this.pendingItemUse = null;
     this.pendingParleyUse = null;
     this.pendingMiloRescue = null;
+    this.pendingPhoenixReckoningUse = null;
+    this.pendingFieldOfThornsUse = null;
+    this.pendingSingleTargetSkillUse = null;
     this.selectedUnitId = null;
     this.moveTiles = [];
     this.targetTiles = [];
@@ -1570,13 +2301,28 @@ export const playerActionMethods = {
   },
 
   setupInput() {
+    this.input.mouse?.disableContextMenu?.();
     this.input.keyboard?.on("keydown-SPACE", (event) => {
       if (event?.preventDefault) event.preventDefault();
       this.handleSpaceCancel();
     });
+    this.input.keyboard?.on("keydown-ENTER", (event) => {
+      if (event?.preventDefault) event.preventDefault();
+      if (this.pendingFieldOfThornsUse) this.confirmFieldOfThornsSelection();
+    });
 
     this.input.on("pointerdown", (pointer) => {
-      if (this.phase !== "player" || this.busy || this.previewOpen || this.actionMenuOpen || this.selectionMenuOpen || this.levelUpAllocationOpen || this.tradeOpen) return;
+      const isRightClick = pointer.rightButtonDown?.() || pointer.button === 2;
+      if (isRightClick) {
+        if (pointer.event?.preventDefault) pointer.event.preventDefault();
+        this.openBattleContextMenu?.(pointer.x, pointer.y);
+        return;
+      }
+      if (this.battleContextMenuOpen) {
+        this.closeBattleContextMenu?.();
+        return;
+      }
+      if (this.phase !== "player" || this.busy || this.previewOpen || this.actionMenuOpen || this.selectionMenuOpen || this.levelUpAllocationOpen || this.tradeOpen || this.battleSaveSlotContainer) return;
       const tile = this.pointerToTile(pointer.x, pointer.y);
       if (!tile) return;
       const clickedUnit = this.getUnitAt(tile.x, tile.y);
@@ -1610,6 +2356,33 @@ export const playerActionMethods = {
         return;
       }
 
+      if (this.pendingPhoenixReckoningUse) {
+        if (this.isTargetTile(tile.x, tile.y)) {
+          this.usePhoenixReckoningInDirection(tile.x, tile.y);
+          return;
+        }
+        this.helpText.setText("Choose a highlighted line for Phoenix Reckoning, or press Space to cancel.");
+        return;
+      }
+
+      if (this.pendingFieldOfThornsUse) {
+        if (this.isTargetTile(tile.x, tile.y)) {
+          this.toggleFieldOfThornsTile(tile.x, tile.y);
+          return;
+        }
+        this.helpText.setText("Choose highlighted thorn tiles. Press Enter to confirm or Space to cancel.");
+        return;
+      }
+
+      if (this.pendingSingleTargetSkillUse) {
+        if (clickedUnit && this.isTargetTile(clickedUnit.x, clickedUnit.y)) {
+          this.useSingleTargetSkillOn(clickedUnit.id);
+          return;
+        }
+        this.helpText.setText("Choose a highlighted skill target, or press Space to cancel.");
+        return;
+      }
+
       if (this.pendingItemUse) {
         if (clickedUnit && this.isTargetTile(clickedUnit.x, clickedUnit.y)) {
           this.useItem(this.pendingItemUse.unitId, this.pendingItemUse.itemId, clickedUnit.id);
@@ -1623,19 +2396,24 @@ export const playerActionMethods = {
         this.showActionMenu(selectedUnit, `${selectedUnit.name} holds position. Choose an action.`);
         return;
       }
-      if (clickedUnit && clickedUnit.team === "player" && clickedUnit.isMiloDecoy !== true && !clickedUnit.acted) {
+      if (clickedUnit && clickedUnit.team === "player" && clickedUnit.isMiloDecoy !== true) {
         this.closeActionMenu();
         this.pendingItemUse = null;
         this.pendingParleyUse = null;
         this.pendingMiloRescue = null;
+        this.pendingPhoenixReckoningUse = null;
+        this.pendingFieldOfThornsUse = null;
+        this.pendingSingleTargetSkillUse = null;
         this.selectedUnitId = clickedUnit.id;
-        this.moveTiles = this.reachableTiles(clickedUnit);
+        this.moveTiles = clickedUnit.acted ? [] : this.reachableTiles(clickedUnit);
         this.targetTiles = [];
         this.targetTileColor = null;
         this.targetTileStroke = null;
         this.redrawSelection();
         this.updateSelectedPanel();
-        this.helpText.setText(`Selected ${clickedUnit.name}. Choose a tile to move to, click them again to act here, or press Space to cancel.`);
+        this.helpText.setText(clickedUnit.acted
+          ? `${clickedUnit.name} has already acted. Review their unit card and inventory.`
+          : `Selected ${clickedUnit.name}. Choose a tile to move to, click them again to act here, or press Space to cancel.`);
         return;
       }
       if (selectedUnit && clickedUnit && clickedUnit.team === "enemy" && this.isTargetTile(clickedUnit.x, clickedUnit.y)) {
@@ -1672,6 +2450,11 @@ export const playerActionMethods = {
   handleSpaceCancel() {
     if (this.levelUpAllocationOpen || this.busy) return;
 
+    if (this.battleContextMenuOpen) {
+      this.closeBattleContextMenu?.();
+      return;
+    }
+
     if (this.tradeOpen) return;
 
     if (this.previewOpen) {
@@ -1703,6 +2486,45 @@ export const playerActionMethods = {
       this.redrawSelection();
       if (unit && unit.team === "player" && !unit.acted) {
         this.showActionMenu(unit, "Parley cancelled. Choose another action.");
+      }
+      return;
+    }
+
+    if (this.pendingPhoenixReckoningUse) {
+      const unit = this.units.find((candidate) => candidate.id === this.pendingPhoenixReckoningUse.unitId) || selectedUnit;
+      this.pendingPhoenixReckoningUse = null;
+      this.targetTiles = [];
+      this.targetTileColor = null;
+      this.targetTileStroke = null;
+      this.redrawSelection();
+      if (unit && unit.team === "player" && !unit.acted) {
+        this.showActionMenu(unit, "Phoenix Reckoning cancelled. Choose another action.");
+      }
+      return;
+    }
+
+    if (this.pendingFieldOfThornsUse) {
+      const unit = this.units.find((candidate) => candidate.id === this.pendingFieldOfThornsUse.unitId) || selectedUnit;
+      this.pendingFieldOfThornsUse = null;
+      this.targetTiles = [];
+      this.targetTileColor = null;
+      this.targetTileStroke = null;
+      this.redrawSelection();
+      if (unit && unit.team === "player" && !unit.acted) {
+        this.showActionMenu(unit, "Field of Thorns cancelled. Choose another action.");
+      }
+      return;
+    }
+
+    if (this.pendingSingleTargetSkillUse) {
+      const unit = this.units.find((candidate) => candidate.id === this.pendingSingleTargetSkillUse.unitId) || selectedUnit;
+      this.pendingSingleTargetSkillUse = null;
+      this.targetTiles = [];
+      this.targetTileColor = null;
+      this.targetTileStroke = null;
+      this.redrawSelection();
+      if (unit && unit.team === "player" && !unit.acted) {
+        this.showActionMenu(unit, "Skill cancelled. Choose another action.");
       }
       return;
     }
@@ -1828,24 +2650,56 @@ export const playerActionMethods = {
     return this.units.find((unit) => unit.x === x && unit.y === y && unit.hp > 0) || null;
   },
 
+  isFactoryBonusLevel() {
+    return isChapterThreeGaiden(this.currentChapterNumber);
+  },
+
+  isFactoryBlockedTerrain(terrain) {
+    return terrain === "machinery" || terrain === "crates";
+  },
+
+  isFactoryDestructibleTerrain(terrain) {
+    return false;
+  },
+
+  isConveyorTerrain(terrain) {
+    return terrain === "conveyorUp" || terrain === "conveyorRight" || terrain === "conveyorDown" || terrain === "conveyorLeft";
+  },
+
+  getConveyorDelta(terrain) {
+    if (terrain === "conveyorUp") return { dx: 0, dy: -1 };
+    if (terrain === "conveyorRight") return { dx: 1, dy: 0 };
+    if (terrain === "conveyorDown") return { dx: 0, dy: 1 };
+    if (terrain === "conveyorLeft") return { dx: -1, dy: 0 };
+    return { dx: 0, dy: 0 };
+  },
+
+  getTerrainMovementCost(x, y) {
+    const terrain = this.getTerrainAt(x, y);
+    if (terrain === "spill") return 2;
+    return 1;
+  },
+
   isWalkable(x, y) {
     if (!this.isInBounds(x, y)) return false;
     const terrain = this.getTerrainAt(x, y);
-    return terrain !== "wall" && terrain !== "fence";
+    return terrain !== "wall" && terrain !== "fence" && !this.isFactoryBlockedTerrain(terrain);
   },
 
   reachableTiles(unit) {
     const queue = [{ x: unit.x, y: unit.y, steps: 0 }];
     const visited = new Set([tileKey(unit.x, unit.y)]);
     const reachable = [];
-    const movementRange = (unit.move || 0) + (unit.turnMoveBonus || 0);
+    const movementRange = unit.unconsciousTurns > 0 || unit.immobilizedTurns > 0
+      ? 0
+      : (unit.move || 0) + (unit.turnMoveBonus || 0) + this.getInventoryMoveBonus(unit);
     while (queue.length > 0) {
       const current = queue.shift();
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
         const nx = current.x + dx;
         const ny = current.y + dy;
         const key = tileKey(nx, ny);
-        const nextSteps = current.steps + 1;
+        const nextSteps = current.steps + this.getTerrainMovementCost(nx, ny);
         if (visited.has(key)) continue;
         if (!this.isWalkable(nx, ny)) continue;
         if (nextSteps > movementRange) continue;
@@ -1922,10 +2776,92 @@ export const playerActionMethods = {
     this.attackEnemy(attackerId, defenderId);
   },
 
+  canFactoryShiftUnit(unit, dx, dy) {
+    if (!unit || dx === 0 && dy === 0) return false;
+    const nx = unit.x + dx;
+    const ny = unit.y + dy;
+    return this.isInBounds(nx, ny) && this.isWalkable(nx, ny) && !this.getUnitAt(nx, ny);
+  },
+
+  slideFactoryUnit(unit, dx, dy, label = "SLIDE", onComplete = null) {
+    if (!this.canFactoryShiftUnit(unit, dx, dy)) {
+      if (typeof onComplete === "function") onComplete();
+      return;
+    }
+
+    const sprite = this.unitSprites[unit.id];
+    unit.x += dx;
+    unit.y += dy;
+    unit.facing = this.getDirectionFromDelta(dx, dy, unit.facing || "down");
+    this.playUnitState(unit, "move", PLAYER_MOVE_DURATION);
+    this.showFloatingText(
+      this.boardX + unit.x * TILE_SIZE + TILE_SIZE / 2,
+      this.boardY + unit.y * TILE_SIZE + 8,
+      label,
+      "#fde68a"
+    );
+
+    const finish = () => {
+      this.setUnitSpriteFrame(unit, "idle", unit.facing || "down");
+      this.refreshUnitSprite(unit);
+      if (typeof onComplete === "function") onComplete();
+    };
+
+    if (!sprite) {
+      finish();
+      return;
+    }
+
+    this.tweens.add({
+      targets: sprite.container,
+      x: this.boardX + unit.x * TILE_SIZE + TILE_SIZE / 2,
+      y: this.boardY + unit.y * TILE_SIZE + TILE_SIZE / 2,
+      duration: PLAYER_MOVE_DURATION,
+      ease: "Sine.easeInOut",
+      onComplete: finish,
+    });
+  },
+
+  applyFactorySpillSlide(unit, dx, dy, onComplete = null) {
+    if (!this.isFactoryBonusLevel() || this.getTerrainAt(unit.x, unit.y) !== "spill") {
+      if (typeof onComplete === "function") onComplete();
+      return;
+    }
+    this.slideFactoryUnit(unit, dx, dy, "SLIP", onComplete);
+  },
+
+  resolveFactoryConveyors(onComplete = null) {
+    if (!this.isFactoryBonusLevel()) {
+      if (typeof onComplete === "function") onComplete();
+      return;
+    }
+
+    const movers = this.units
+      .filter((unit) => unit.hp > 0 && this.isConveyorTerrain(this.getTerrainAt(unit.x, unit.y)))
+      .map((unit) => ({ unitId: unit.id, terrain: this.getTerrainAt(unit.x, unit.y) }));
+
+    const runNext = (index = 0) => {
+      if (index >= movers.length) {
+        if (typeof onComplete === "function") onComplete();
+        return;
+      }
+      const entry = movers[index];
+      const unit = this.units.find((candidate) => candidate.id === entry.unitId && candidate.hp > 0);
+      if (!unit || !this.isConveyorTerrain(this.getTerrainAt(unit.x, unit.y))) {
+        runNext(index + 1);
+        return;
+      }
+      const { dx, dy } = this.getConveyorDelta(entry.terrain);
+      this.slideFactoryUnit(unit, dx, dy, "BELT", () => runNext(index + 1));
+    };
+
+    runNext();
+  },
+
   moveUnit(unitId, x, y) {
     const unit = this.units.find((u) => u.id === unitId);
     const sprite = this.unitSprites[unitId];
-    if (!unit || !sprite || unit.team !== "player" || unit.acted) return;
+    if (!unit || !sprite || unit.team !== "player" || unit.acted || this.isUnitUnconscious(unit)) return;
 
     this.closeActionMenu();
     this.busy = true;
@@ -1960,8 +2896,17 @@ export const playerActionMethods = {
           this.redrawSelection();
           this.updateSelectedPanel();
           this.time.delayedCall(PLAYER_ACTION_PAUSE, () => {
-            this.busy = false;
-            this.showActionMenu(unit);
+            this.applyFactorySpillSlide(unit, Math.sign(x - oldX), Math.sign(y - oldY), () => {
+              unit.rangeBonus = this.getTerrainAt(unit.x, unit.y) === "catwalk" ? 1 : 0;
+              this.triggerThornAt(unit);
+              if (unit.hp <= 0) {
+                this.busy = false;
+                this.checkEndOfPlayerPhase();
+                return;
+              }
+              this.busy = false;
+              this.showActionMenu(unit, `${unit.name} moved. Choose an action, Wait, or End Turn to finish the turn.`);
+            });
           });
         },
       });
@@ -1978,7 +2923,7 @@ export const playerActionMethods = {
   attackEnemy(attackerId, defenderId) {
     const attacker = this.units.find((u) => u.id === attackerId);
     const defender = this.units.find((u) => u.id === defenderId);
-    if (!attacker || !defender) return;
+    if (!attacker || !defender || this.isUnitUnconscious(attacker)) return;
 
     const weapon = getWeaponForTarget(attacker, defender);
     if (!weapon) return;
@@ -1993,6 +2938,7 @@ export const playerActionMethods = {
     const defenderStartHp = defender.hp;
     const defenderWasAlive = defender.hp > 0;
     const sequence = this.resolveAttackSequence(attacker, defender, weapon);
+    this.applyFactoryAttackReactions?.(weapon, (sequence.targets || [defender]).map((target) => ({ x: target.x, y: target.y })));
     attacker.nextAttackBonus = 0;
     const didKill = defenderWasAlive && defender.hp <= 0;
     const defeatedFalan = didKill && defender.id === "falan";
@@ -2009,7 +2955,7 @@ export const playerActionMethods = {
         if (defeatedFalan) {
           this.refreshUnitSprite(defender);
         } else {
-          this.playUnitDeath(defender, () => this.removeUnitSpriteAndData(defender.id));
+          this.playUnitDeath(defender, () => this.removeUnitSpriteAndData(defender.id, attacker.id));
           this.clearSelection(`${attacker.name} defeated ${defender.name}!`);
         }
       } else {
@@ -2024,7 +2970,7 @@ export const playerActionMethods = {
           if (target.hp <= 0) {
             target.hp = 0;
             if (target.team === "civilian") this.defeatedCivilians = [...new Set([...(this.defeatedCivilians || []), target.id])];
-            this.playUnitDeath(target, () => this.removeUnitSpriteAndData(target.id));
+            this.playUnitDeath(target, () => this.removeUnitSpriteAndData(target.id, attacker.id));
           } else {
             this.refreshUnitSprite(target);
             this.setUnitSpriteFrame(target, "idle", target.facing || "down");
@@ -2100,6 +3046,15 @@ export const playerActionMethods = {
       overlay.setStrokeStyle(2, targetStroke, 0.95);
       this.overlayLayer.add(overlay);
     }
+    if (this.pendingFieldOfThornsUse?.selectedTiles?.length) {
+      this.pendingFieldOfThornsUse.selectedTiles.forEach((tile) => {
+        const x = this.boardX + tile.x * TILE_SIZE;
+        const y = this.boardY + tile.y * TILE_SIZE;
+        const overlay = this.add.rectangle(x + TILE_SIZE / 2, y + TILE_SIZE / 2, TILE_SIZE - 18, TILE_SIZE - 18, 0x166534, 0.65);
+        overlay.setStrokeStyle(3, 0xbbf7d0, 1);
+        this.overlayLayer.add(overlay);
+      });
+    }
   },
 
   updateSelectedPanel() {
@@ -2152,11 +3107,15 @@ export const playerActionMethods = {
       orb.setFillStyle(active ? 0x8b5cf6 : 0x2e1065, active ? 1 : 0.35);
       orb.setStrokeStyle(2, active ? 0xddd6fe : 0x6d28d9);
     });
-    this.unitStatsText.setText(`STR ${unit.str}   MAG ${unit.mag}\n${defLine}\nRES ${unit.res}\n${spdLine}\nLUCK ${unit.luck || 0}   MOV ${unit.move}`);
-    const itemSummary = (unit.items || []).length > 0
-      ? `
-Items: ${(unit.items || []).map((item) => `${item.name}${item.uses ? ` x${item.uses}` : ""}`).join(", ")}`
-      : "";
+    const moveBonus = this.getInventoryMoveBonus(unit);
+    const moveLine = moveBonus > 0 ? `MOV ${unit.move} +${moveBonus}` : `MOV ${unit.move}`;
+    const statuses = [];
+    if (this.isUnitUnconscious(unit)) statuses.push(`UNCON ${unit.unconsciousTurns}`);
+    if ((unit.immobilizedTurns || 0) > 0 || unit.trapped === true) statuses.push(`TRAPPED ${unit.immobilizedTurns || 1}`);
+    const statusLine = statuses.length ? `\nSTATUS ${statuses.join("  ")}` : "";
+    this.unitStatsText.setText(`STR ${unit.str}   MAG ${unit.mag}\n${defLine}\nRES ${unit.res}\n${spdLine}\nLUCK ${unit.luck || 0}   ${moveLine}${statusLine}`);
+    const itemSummary = `
+Items: ${(unit.items || []).map((item) => `${item.name}${item.uses ? ` x${item.uses}` : ""}`).join(", ") || "None"}`;
 
     this.weaponText.setText(
       weapon
