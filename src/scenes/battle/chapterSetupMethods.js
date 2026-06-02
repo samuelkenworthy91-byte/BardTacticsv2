@@ -83,12 +83,14 @@ import {
   createChapterThreeGaidenMarnie,
   createChapterThreeGaidenSwordThug,
   createChapterThreeGaidenThief,
-} from "../../chapters/chapter3Gaiden/index.js";
+} from "../../chapters/chapter3Gaiden.js";
+import { CHAPTER_FOUR_PLAYER_SPAWNS } from "../../chapters/chapter4.js";
 import {
   buildChapterTwoSaveData,
   CHAPTER_TWO_NUMBER,
   getLevelForChapter,
   getSaveDataChapterNumber,
+  isChapterFour,
   isChapterOne,
   isChapterThreeGaiden,
   isChapterTwoOrLater,
@@ -96,6 +98,7 @@ import {
 } from "../../chapters/progression.js";
 export const chapterSetupMethods = {
   getChapterThreeDeploySlots() {
+    if (isChapterFour(this.currentChapterNumber)) return CHAPTER_FOUR_PLAYER_SPAWNS;
     if (isChapterThreeGaiden(this.currentChapterNumber)) {
       return [
         ...CHAPTER_THREE_GAIDEN_PLAYER_SPAWNS,
@@ -133,6 +136,8 @@ export const chapterSetupMethods = {
   },
 
   getChapterThreeDeploymentRoster() {
+    if (isChapterFour(this.currentChapterNumber)) return this.getChapterFourDeploymentRoster();
+
     const defeated = new Set(this.defeatedAllies || []);
     const byId = new Map();
     const isGaiden = isChapterThreeGaiden(this.currentChapterNumber);
@@ -169,6 +174,38 @@ export const chapterSetupMethods = {
     });
   },
 
+  getChapterFourDeploymentRoster() {
+    const defeated = new Set(this.defeatedAllies || []);
+    const byId = new Map();
+    const marnieAllowed = this.marniePermanentlyRecruited === true;
+
+    const canDeploy = (unit) => {
+      if (!unit || unit.team !== "player" || unit.hp <= 0 || unit.alive === false || defeated.has(unit.id)) return false;
+      if (unit.isMiloDecoy === true) return false;
+      if (unit.id === "marnie" && !marnieAllowed) return false;
+      if (unit.id === "milo" && unit.permanentRecruit !== true) return false;
+      if (unit.temporaryRecruit === true) return false;
+      return true;
+    };
+
+    this.units
+      .filter(canDeploy)
+      .forEach((unit) => byId.set(unit.id, this.cloneDeployableUnit(unit)));
+
+    if (!byId.has("edwin") && !defeated.has("edwin")) {
+      const edwin = UNITS.find((unit) => unit.id === "edwin");
+      if (edwin) byId.set("edwin", this.cloneDeployableUnit({ ...edwin, team: "player" }));
+    }
+
+    const order = ["edwin", "leon", "izzy", "heath", "grimmy", "kane", "shade", "shade_leader", "ambrose", "ash", "milo", "marnie"];
+    return [...byId.values()].sort((a, b) => {
+      const aIndex = order.indexOf(a.id);
+      const bIndex = order.indexOf(b.id);
+      if (aIndex !== -1 || bIndex !== -1) return (aIndex === -1 ? 99 : aIndex) - (bIndex === -1 ? 99 : bIndex);
+      return (a.name || "").localeCompare(b.name || "");
+    });
+  },
+
   beginChapterThreeDeployment(onComplete = null) {
     if (this.chapterThreeDeploymentDone) {
       if (typeof onComplete === "function") onComplete();
@@ -183,14 +220,17 @@ export const chapterSetupMethods = {
   },
 
   getDeploymentLimitForCurrentChapter() {
+    if (isChapterFour(this.currentChapterNumber)) return 8;
     return isChapterThreeGaiden(this.currentChapterNumber) ? 8 : 5;
   },
 
   getDeploymentChapterLabel() {
+    if (isChapterFour(this.currentChapterNumber)) return "Chapter 4: Home Gone";
     return isChapterThreeGaiden(this.currentChapterNumber) ? "Chapter 3: Gaiden" : "Tipen Whippet";
   },
 
   canConfirmDeployment(selectedCount, deployLimit) {
+    if (isChapterFour(this.currentChapterNumber)) return selectedCount >= 1 && selectedCount <= deployLimit;
     if (isChapterThreeGaiden(this.currentChapterNumber)) return selectedCount >= 1 && selectedCount <= deployLimit;
     return selectedCount === deployLimit && deployLimit > 0;
   },
@@ -220,7 +260,7 @@ export const chapterSetupMethods = {
     const container = this.add.container(0, 0).setDepth(23000);
     const dim = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.72).setInteractive();
     const panel = createBannerPanel(this, GAME_WIDTH / 2, GAME_HEIGHT / 2, 840, 500, { innerInset: 16 });
-    const titleText = isChapterThreeGaiden(this.currentChapterNumber)
+    const titleText = isChapterThreeGaiden(this.currentChapterNumber) || isChapterFour(this.currentChapterNumber)
       ? `Deploy Up To ${deployLimit} Units`
       : `Deploy ${deployLimit} Unit${deployLimit === 1 ? "" : "s"}`;
     const title = this.add.text(GAME_WIDTH / 2, 42, titleText, {
@@ -281,7 +321,7 @@ export const chapterSetupMethods = {
         this.showChapterThreeDeploymentScreen();
       }, "15px");
       container.add([prompt, yes.container, no.container]);
-    } else if (isChapterThreeGaiden(this.currentChapterNumber)) {
+    } else if (isChapterThreeGaiden(this.currentChapterNumber) || isChapterFour(this.currentChapterNumber)) {
       const prompt = this.add.text(GAME_WIDTH / 2, 466, "Select at least 1 unit to start.", {
         fontSize: "15px",
         color: "#f4d7d7",

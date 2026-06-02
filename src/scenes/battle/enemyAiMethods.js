@@ -73,13 +73,14 @@ import {
   CHAPTER_THREE_GAIDEN_BOSS_ID,
   CHAPTER_THREE_GAIDEN_CHESTS,
   CHAPTER_THREE_GAIDEN_ITEMS,
-} from "../../chapters/chapter3Gaiden/index.js";
+} from "../../chapters/chapter3Gaiden.js";
 import {
   buildChapterTwoSaveData,
   CHAPTER_TWO_NUMBER,
   getLevelForChapter,
   getSaveDataChapterNumber,
   isChapterOne,
+  isChapterFour,
   isChapterThree,
   isChapterThreeGaiden,
   isChapterTwoOrLater,
@@ -92,6 +93,7 @@ export const enemyAiMethods = {
       return;
     }
 
+    if (this.checkChapterFourVictory?.()) return;
     if (this.checkChapterThreeGaidenVictory?.()) return;
     if (this.checkChapterThreeRoutVictory?.()) return;
     const remaining = this.units.filter((unit) => this.isControllablePlayerUnit?.(unit) && !unit.acted);
@@ -178,9 +180,11 @@ export const enemyAiMethods = {
       return;
     }
 
+    if (this.checkChapterFourVictory?.()) return;
     if (this.checkChapterThreeGaidenVictory?.()) return;
 
     if (this.enemyIndex >= this.enemyTurnOrder.length) {
+      if (this.checkChapterFourVictory?.()) return;
       if (this.checkChapterThreeGaidenVictory?.()) return;
       if (this.checkChapterThreeRoutVictory?.()) return;
       if (isChapterThree(this.currentChapterNumber) && (this.chapterThreeTurns || 0) >= CHAPTER_THREE_SURVIVAL_TURNS) {
@@ -326,8 +330,24 @@ export const enemyAiMethods = {
   applyTurnStartTerrainEffects(unit) {
     if (!unit || unit.hp <= 0) return;
     const terrain = this.getTerrainAt(unit.x, unit.y);
-    unit.turnMoveBonus = terrain === "road" ? 2 : 0;
+    unit.turnMoveBonus = terrain === "road" || terrain === "farmRoad" ? 2 : 0;
     unit.rangeBonus = terrain === "catwalk" ? 1 : 0;
+
+    if (terrain === "burningGrass") {
+      const oldHp = unit.hp;
+      unit.hp = Math.max(0, unit.hp - 2);
+      this.refreshUnitSprite(unit);
+      this.showFloatingText(
+        this.boardX + unit.x * TILE_SIZE + TILE_SIZE / 2,
+        this.boardY + unit.y * TILE_SIZE + 8,
+        `-${oldHp - unit.hp}`,
+        "#f97316"
+      );
+      if (unit.hp <= 0) {
+        this.playUnitDeath?.(unit, () => this.removeUnitSpriteAndData?.(unit.id));
+      }
+      return;
+    }
 
     const healAmount = terrain === "chinese" || terrain === "church" ? 3 : 0;
     if (healAmount <= 0) return;
@@ -921,6 +941,22 @@ export const enemyAiMethods = {
     return true;
   },
 
+  checkChapterFourVictory() {
+    if (!isChapterFour(this.currentChapterNumber) || this.postBattleStarted) return false;
+    const commandersRemaining = this.units.some((unit) => (
+      (unit.id === "bertram" || unit.id === "elspeth") &&
+      unit.team === "enemy" &&
+      unit.hp > 0
+    ));
+    if (commandersRemaining) return false;
+    this.helpText.setText("The Guildlite commanders are beaten back from Byron Farm.");
+    this.phaseText.setText("Victory");
+    this.phaseText.setColor("#86efac");
+    this.busy = true;
+    this.time.delayedCall(650, () => this.startPostBattleScene());
+    return true;
+  },
+
   getChapterThreeGaidenChestItemState(itemId) {
     if (!isChapterThreeGaiden(this.currentChapterNumber) || !itemId) return null;
     if (this.lostChapterThreeGaidenChestItems?.has(itemId)) return "lost/escaped";
@@ -1137,6 +1173,8 @@ export const enemyAiMethods = {
       ? `Player Phase ${this.chapterThreeTurns}/${CHAPTER_THREE_SURVIVAL_TURNS}. Survive and protect the 5 townsfolk.`
       : isChapterThreeGaiden(this.currentChapterNumber)
         ? `Player Phase ${this.chapterThreeTurns}. Take the supplies you can before it is too late. ${this.getChapterThreeGaidenLostChestSummary?.() || "0/6 chest items lost"}.`
+        : isChapterFour(this.currentChapterNumber)
+          ? "Player Phase. Push through the fire and defeat Bertram and Elspeth."
         : isChapterTwo(this.currentChapterNumber)
           ? "Player Phase. Capture all four forts. Fences block movement."
           : "Player Phase. Reach the glowing gate tile and choose Escape.");

@@ -368,6 +368,21 @@ export const BIOMES = {
       default: { key: "farmFieldTile", path: "/tiles/farm/field.png" },
     },
   },
+  destroyedFarm: {
+    terrainTextures: {
+      burnedGrass: { key: "destroyedFarmBurnedGrassTile", path: "/tiles/destroyed_farm/burned_grass.png" },
+      scorchedGrass: { key: "destroyedFarmScorchedGrassTile", path: "/tiles/destroyed_farm/scorched_grass.png" },
+      burningGrass: { key: "destroyedFarmBurningGrassTile", path: "/tiles/destroyed_farm/burning_grass.png" },
+      smokeTile: { key: "destroyedFarmSmokeTile", path: "/tiles/destroyed_farm/smoke_tile.png" },
+      farmRoad: { key: "destroyedFarmRoadTile", path: "/tiles/destroyed_farm/farm_road.png" },
+      mudPath: { key: "destroyedFarmMudPathTile", path: "/tiles/destroyed_farm/mud_path.png" },
+      farmhouseBurned: { key: "destroyedFarmHouseBurnedTile", path: "/tiles/destroyed_farm/farmhouse_burned.png" },
+      brokenFence: { key: "destroyedFarmBrokenFenceTile", path: "/tiles/destroyed_farm/broken_fence.png" },
+      collapsedFence: { key: "destroyedFarmCollapsedFenceTile", path: "/tiles/destroyed_farm/collapsed_fence.png" },
+      burningFence: { key: "destroyedFarmBurningFenceTile", path: "/tiles/destroyed_farm/burning_fence.png" },
+      default: { key: "destroyedFarmBurnedGrassTile", path: "/tiles/destroyed_farm/burned_grass.png" },
+    },
+  },
   town: {
     terrainTextures: {
       road: { key: "townRoadTile", path: "/tiles/town/road.png" },
@@ -494,6 +509,11 @@ export function queueChapterAssets(scene, levelData = LEVELS.chapter1) {
   queueImage(scene, "chapter3MaraThreatenedScene", "/scenes/chapter3_mara_threatened.jpg");
   queueImage(scene, "chapter3IzzyWindAttackScene", "/scenes/chapter3_izzy_wind_attack.jpg");
   queueImage(scene, "chapter3MaraAfterwardScene", "/scenes/chapter3_mara_afterward.jpg");
+  queueImage(scene, "chapter4VanArrivalScene", "/scenes/10_van_arrival_scene_1920x1080.png");
+  queueImage(scene, "chapter4BurningFarmScene", "/scenes/01_burning_byron_farm_backdrop_1920x1080.png");
+  queueImage(scene, "chapter4FarmhouseFireScene", "/scenes/02_farmhouse_on_fire_cutscene_1920x1080.png");
+  queueImage(scene, "chapter4FirelineScene", "/scenes/07_byron_farm_night_fireline_scene_1920x1080.png");
+  queueImage(scene, "chapter4BattleCourtyardScene", "/scenes/06_farmhouse_courtyard_battle_scene_1920x1080.png");
   queueImage(scene, ICE_OF_AGES_HIT_EFFECT_KEY, ICE_OF_AGES_HIT_EFFECT_PATH);
   queueImage(scene, BROTHERS_BLIGH_CUTIN_KEY, BROTHERS_BLIGH_CUTIN_PATH);
   queueImage(scene, BROTHERS_BLIGH_HIT_EFFECT_KEY, BROTHERS_BLIGH_HIT_EFFECT_PATH);

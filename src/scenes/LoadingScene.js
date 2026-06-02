@@ -10,6 +10,7 @@ import { createBannerPanel } from "../ui/banner.js";
 import {
   getLevelForChapter,
   getSceneDataChapterNumber,
+  isChapterFour,
   isChapterThreeGaiden,
   isChapterThreeOrLater,
   isChapterTwo,
@@ -41,7 +42,9 @@ export class LoadingScene extends Phaser.Scene {
       strokeThickness: 5,
     }).setOrigin(0.5);
     const chapterNumber = getSceneDataChapterNumber(this.nextSceneData);
-    const chapterLabel = isChapterThreeGaiden(chapterNumber)
+    const chapterLabel = isChapterFour(chapterNumber)
+      ? "Preparing Chapter 4: Home Gone"
+      : isChapterThreeGaiden(chapterNumber)
       ? "Preparing Chapter 3: Gaiden"
       : isChapterThreeOrLater(chapterNumber)
       ? "Preparing Chapter 3: Tipen Whippet"

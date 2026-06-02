@@ -21,6 +21,15 @@ export function tileColor(type) {
   if (type === "conveyorUp" || type === "conveyorRight" || type === "conveyorDown" || type === "conveyorLeft") return 0x334155;
   if (type === "machinery") return 0x57534e;
   if (type === "bayDoor") return 0xfacc15;
+  if (type === "burnedGrass") return 0x3f3f2f;
+  if (type === "scorchedGrass") return 0x57534e;
+  if (type === "burningGrass") return 0xb45309;
+  if (type === "smokeTile") return 0x6b7280;
+  if (type === "farmRoad") return 0x4b5563;
+  if (type === "mudPath") return 0x713f12;
+  if (type === "farmhouseBurned") return 0x7c2d12;
+  if (type === "brokenFence" || type === "collapsedFence") return 0x6b4f2d;
+  if (type === "burningFence") return 0xdc2626;
   return 0x1f2937;
 }
 
@@ -50,6 +59,16 @@ export function tileLabel(type) {
   if (type === "conveyorLeft") return "<";
   if (type === "machinery") return "MC";
   if (type === "bayDoor") return "BD";
+  if (type === "burnedGrass") return "BG";
+  if (type === "scorchedGrass") return "SG";
+  if (type === "burningGrass") return "FI";
+  if (type === "smokeTile") return "SM";
+  if (type === "farmRoad") return "R";
+  if (type === "mudPath") return "M";
+  if (type === "farmhouseBurned") return "FH";
+  if (type === "brokenFence") return "BF";
+  if (type === "collapsedFence") return "CF";
+  if (type === "burningFence") return "FF";
   return "?";
 }
 

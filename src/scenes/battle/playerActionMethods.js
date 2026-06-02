@@ -74,7 +74,7 @@ import {
 import {
   CHAPTER_THREE_GAIDEN_CHESTS,
   CHAPTER_THREE_GAIDEN_ITEMS,
-} from "../../chapters/chapter3Gaiden/index.js";
+} from "../../chapters/chapter3Gaiden.js";
 import {
   buildChapterTwoSaveData,
   CHAPTER_TWO_NUMBER,
@@ -2677,13 +2677,19 @@ export const playerActionMethods = {
   getTerrainMovementCost(x, y) {
     const terrain = this.getTerrainAt(x, y);
     if (terrain === "spill") return 2;
+    if (terrain === "mudPath") return 2;
     return 1;
   },
 
   isWalkable(x, y) {
     if (!this.isInBounds(x, y)) return false;
     const terrain = this.getTerrainAt(x, y);
-    return terrain !== "wall" && terrain !== "fence" && !this.isFactoryBlockedTerrain(terrain);
+    return terrain !== "wall" &&
+      terrain !== "fence" &&
+      terrain !== "brokenFence" &&
+      terrain !== "collapsedFence" &&
+      terrain !== "burningFence" &&
+      !this.isFactoryBlockedTerrain(terrain);
   },
 
   reachableTiles(unit) {

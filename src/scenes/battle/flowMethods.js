@@ -66,9 +66,11 @@ import {
   CHAPTER_TWO_OPENING,
   CHAPTER_TWO_TITLE,
 } from "../../chapters/chapter2.js";
-import { CHAPTER_THREE_GAIDEN_PLAYER_SPAWNS } from "../../chapters/chapter3Gaiden/index.js";
+import { CHAPTER_THREE_GAIDEN_PLAYER_SPAWNS } from "../../chapters/chapter3Gaiden.js";
+import { CHAPTER_FOUR_PLAYER_SPAWNS } from "../../chapters/chapter4.js";
 import {
   buildChapterThreeSaveData,
+  buildChapterFourSaveData,
   buildChapterThreeGaidenSaveData,
   buildChapterTwoSaveData,
   CHAPTER_THREE_NUMBER,
@@ -76,6 +78,7 @@ import {
   getLevelForChapter,
   getSaveDataChapterNumber,
   isChapterOne,
+  isChapterFour,
   isChapterThree,
   isChapterThreeGaiden,
   isChapterThreeOrLater,
@@ -271,7 +274,9 @@ export const flowMethods = {
     if (isChapterThreeOrLater(this.currentChapterNumber)) {
       const existingIds = new Set(this.units.map((unit) => unit.id));
       const occupiedTiles = new Set(this.units.map((unit) => `${unit.x},${unit.y}`));
-      const gaidenSpawnTiles = isChapterThreeGaiden(this.currentChapterNumber)
+      const chapterStartSpawnTiles = isChapterFour(this.currentChapterNumber)
+        ? CHAPTER_FOUR_PLAYER_SPAWNS
+        : isChapterThreeGaiden(this.currentChapterNumber)
         ? [
           ...CHAPTER_THREE_GAIDEN_PLAYER_SPAWNS,
           { x: 1, y: 6, facing: "up" },
@@ -284,17 +289,17 @@ export const flowMethods = {
       saveData.units
         .filter((unitState) => unitState.team === "player" && unitState.alive !== false && !existingIds.has(unitState.id))
         .forEach((unitState) => {
-          const gaidenPlacement = gaidenSpawnTiles.find((tile) => !occupiedTiles.has(`${tile.x},${tile.y}`));
+          const chapterStartPlacement = chapterStartSpawnTiles.find((tile) => !occupiedTiles.has(`${tile.x},${tile.y}`));
           this.units.push({
             ...unitState,
             team: "player",
             portraitKey: unitState.portraitKey || (String(unitState.id).startsWith("shade") ? "shadePortrait" : unitState.portraitKey),
             spriteSet: unitState.spriteSet || (String(unitState.id).startsWith("shade") ? "shade" : unitState.id),
-            x: gaidenPlacement?.x ?? unitState.x,
-            y: gaidenPlacement?.y ?? unitState.y,
+            x: chapterStartPlacement?.x ?? unitState.x,
+            y: chapterStartPlacement?.y ?? unitState.y,
             hp: restoreResources ? (unitState.maxHp || unitState.hp || 1) : Math.max(1, unitState.hp || 1),
             sigilPoints: restoreResources ? (unitState.maxSigilPoints ?? unitState.sigilPoints ?? 3) : (unitState.sigilPoints ?? 0),
-            facing: gaidenPlacement?.facing || unitState.facing || "up",
+            facing: chapterStartPlacement?.facing || unitState.facing || "up",
             acted: saveData.inBattleSave === true ? unitState.acted === true : false,
             spriteState: "idle",
             skills: (unitState.skills || []).map((skill) => ({ ...skill })),
@@ -302,7 +307,7 @@ export const flowMethods = {
             items: (unitState.items || []).map((item) => ({ ...item })),
           });
           existingIds.add(unitState.id);
-          if (gaidenPlacement) occupiedTiles.add(`${gaidenPlacement.x},${gaidenPlacement.y}`);
+          if (chapterStartPlacement) occupiedTiles.add(`${chapterStartPlacement.x},${chapterStartPlacement.y}`);
         });
     }
   },
@@ -353,10 +358,12 @@ export const flowMethods = {
   buildChapterSaveData(slotNumber = null) {
     const buildNextChapterSaveData = isChapterThree(this.currentChapterNumber) && this.shouldRouteToChapterThreeGaiden?.()
       ? buildChapterThreeGaidenSaveData
+      : isChapterFour(this.currentChapterNumber)
+        ? buildChapterFourSaveData
       : isChapterTwo(this.currentChapterNumber)
         ? buildChapterThreeSaveData
         : isChapterThree(this.currentChapterNumber) || isChapterThreeGaiden(this.currentChapterNumber)
-          ? buildChapterThreeSaveData
+          ? buildChapterFourSaveData
           : buildChapterTwoSaveData;
 
     const reserveUnits = Array.isArray(this.chapterThreeReserveUnits) ? this.chapterThreeReserveUnits : [];
@@ -385,6 +392,7 @@ export const flowMethods = {
       marnieTalked: this.marnieTalked === true,
       marnieTemporarilyRecruited: this.marnieTemporarilyRecruited === true,
       marniePermanentlyRecruited: this.marniePermanentlyRecruited === true,
+      completedChapterThreeGaiden: isChapterThreeGaiden(this.currentChapterNumber),
       lostChapterThreeGaidenChestItems: [...(this.lostChapterThreeGaidenChestItems || new Set())],
       mysteriousEggTracking: this.mysteriousEggTracking,
       units: serializedUnits,
@@ -470,6 +478,12 @@ export const flowMethods = {
       this.redrawSelection();
       this.updateSelectedPanel();
       this.helpText.setText("Loaded current turn.");
+      return;
+    }
+
+    if (isChapterFour(savedChapter)) {
+      this.pendingChapterThreeTransitionData = saveData || this.pendingChapterThreeTransitionData;
+      this.startChapterFourOpening();
       return;
     }
 

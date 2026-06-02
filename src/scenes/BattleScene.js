@@ -4,6 +4,7 @@ import { queueChapterAssets } from "../data/assets.js";
 import { CHAPTER_ONE_OPENING } from "../chapters/chapter1.js";
 import {
   getSceneDataChapterNumber,
+  isChapterFour,
   isChapterThreeGaiden,
   isChapterThreeOrLater,
   isChapterTwo,
@@ -28,6 +29,7 @@ export class BattleScene extends Phaser.Scene {
     this.playChapterTwoOpening = data.playChapterTwoOpening === true;
     this.playChapterThreeOpening = data.playChapterThreeOpening === true;
     this.playChapterThreeGaidenOpening = data.playChapterThreeGaidenOpening === true;
+    this.playChapterFourOpening = data.playChapterFourOpening === true;
     this.skipChapterTwoTitleCard = data.skipChapter2TitleCard === true;
     this.skipChapterThreeTitleCard = data.skipChapter3TitleCard === true;
     this.pendingChapterTwoTransitionData = data.pendingChapterTwoTransitionData || null;
@@ -172,7 +174,9 @@ export class BattleScene extends Phaser.Scene {
     this.updateSelectedPanel();
     this.setObjectiveDisplayVisible(false);
 
-    if (isChapterThreeGaiden(this.currentChapterNumber) && this.playChapterThreeGaidenOpening) {
+    if (isChapterFour(this.currentChapterNumber) && this.playChapterFourOpening) {
+      this.startChapterFourOpening();
+    } else if (isChapterThreeGaiden(this.currentChapterNumber) && this.playChapterThreeGaidenOpening) {
       this.startChapterThreeGaidenOpening();
     } else if (isChapterThreeOrLater(this.currentChapterNumber) && this.playChapterThreeOpening) {
       this.startChapterThreeOpening();

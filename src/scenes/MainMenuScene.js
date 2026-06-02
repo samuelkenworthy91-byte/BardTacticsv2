@@ -9,7 +9,7 @@ import {
 } from "../config/constants.js";
 import { queueImage } from "../data/assets.js";
 import { createBannerButton, createBannerPanel, fitImageToBounds } from "../ui/banner.js";
-import { buildChapterThreeGaidenTestSaveData } from "../utils/devTestSaves.js";
+import { buildChapterFourTestSaveData, buildChapterThreeGaidenTestSaveData } from "../utils/devTestSaves.js";
 export class MainMenuScene extends Phaser.Scene {
   constructor() {
     super("MainMenuScene");
@@ -28,7 +28,7 @@ export class MainMenuScene extends Phaser.Scene {
       bg.setAlpha(0.45);
     }
     this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x06030b, 0.58);
-    const panel = createBannerPanel(this, GAME_WIDTH / 2, GAME_HEIGHT / 2, 430, 318, { innerInset: 16 });
+    const panel = createBannerPanel(this, GAME_WIDTH / 2, GAME_HEIGHT / 2, 430, 382, { innerInset: 16 });
     const heading = this.add.text(0, -82, "Main Menu", {
       fontSize: "34px",
       fontStyle: "bold",
@@ -48,8 +48,15 @@ export class MainMenuScene extends Phaser.Scene {
         playChapterThreeGaidenOpening: true,
       });
     }, "18px");
-    this.statusText = this.add.text(0, 156, "", { fontSize: "14px", color: "#f4d7d7", align: "center", wordWrap: { width: 280 } }).setOrigin(0.5, 0);
-    panel.container.add([heading, subtitle, newGameButton.container, loadGameButton.container, chapterThreeGaidenTestButton.container, this.statusText]);
+    const chapterFourTestButton = createBannerButton(this, 0, 174, 310, 42, "Chapter 4 Test", () => {
+      this.scene.start("LoadingScene", {
+        loadFromSave: true,
+        saveData: buildChapterFourTestSaveData(),
+        playChapterFourOpening: true,
+      });
+    }, "18px");
+    this.statusText = this.add.text(0, 210, "", { fontSize: "14px", color: "#f4d7d7", align: "center", wordWrap: { width: 280 } }).setOrigin(0.5, 0);
+    panel.container.add([heading, subtitle, newGameButton.container, loadGameButton.container, chapterThreeGaidenTestButton.container, chapterFourTestButton.container, this.statusText]);
   }
 }
 

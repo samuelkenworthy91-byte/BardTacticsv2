@@ -1,11 +1,13 @@
 import { CHAPTER_TWO_TITLE } from "./chapter2.js";
 import { CHAPTER_THREE_TITLE } from "./chapter3.js";
-import { CHAPTER_THREE_GAIDEN_ID, CHAPTER_THREE_GAIDEN_TITLE } from "./chapter3Gaiden/index.js";
+import { CHAPTER_THREE_GAIDEN_ID, CHAPTER_THREE_GAIDEN_TITLE } from "./chapter3Gaiden.js";
+import { CHAPTER_FOUR_NUMBER, CHAPTER_FOUR_TITLE } from "./chapter4.js";
 import { LEVELS } from "./index.js";
 
 export const CHAPTER_ONE_NUMBER = 1;
 export const CHAPTER_TWO_NUMBER = 2;
 export const CHAPTER_THREE_NUMBER = 3;
+export { CHAPTER_FOUR_NUMBER };
 export const MYSTERIOUS_EGG_HATCH_MESSAGE = "The Mysterious Egg is starting to hatch...";
 export { CHAPTER_THREE_GAIDEN_ID };
 
@@ -31,7 +33,9 @@ export function getSaveDataChapterNumber(saveData, fallback = CHAPTER_ONE_NUMBER
 export function getSceneDataChapterNumber(sceneData = {}) {
   return getSaveDataChapterNumber(
     sceneData?.saveData,
-    sceneData?.playChapterThreeGaidenOpening
+    sceneData?.playChapterFourOpening
+      ? CHAPTER_FOUR_NUMBER
+      : sceneData?.playChapterThreeGaidenOpening
       ? CHAPTER_THREE_GAIDEN_ID
       : sceneData?.playChapterThreeOpening
       ? CHAPTER_THREE_NUMBER
@@ -62,12 +66,17 @@ export function isChapterThreeGaiden(chapterNumber) {
   return (chapterNumber || CHAPTER_ONE_NUMBER) === CHAPTER_THREE_GAIDEN_ID;
 }
 
+export function isChapterFour(chapterNumber) {
+  return (chapterNumber || CHAPTER_ONE_NUMBER) === CHAPTER_FOUR_NUMBER;
+}
+
 export function isChapterThreeOrLater(chapterNumber) {
-  if (isChapterThreeGaiden(chapterNumber)) return true;
+  if (isChapterThreeGaiden(chapterNumber) || isChapterFour(chapterNumber)) return true;
   return (chapterNumber || CHAPTER_ONE_NUMBER) >= CHAPTER_THREE_NUMBER;
 }
 
 export function getLevelForChapter(chapterNumber) {
+  if (isChapterFour(chapterNumber)) return LEVELS.chapter4;
   if (isChapterThreeGaiden(chapterNumber)) return LEVELS.chapter3Gaiden;
   if (isChapterThreeOrLater(chapterNumber)) return LEVELS.chapter3;
   if (isChapterTwo(chapterNumber)) return LEVELS.chapter2;
@@ -84,6 +93,10 @@ export function getChapterThreeTitleLabel() {
 
 export function getChapterThreeGaidenTitleLabel() {
   return `${CHAPTER_THREE_GAIDEN_TITLE.chapter}: ${CHAPTER_THREE_GAIDEN_TITLE.subtitle}`;
+}
+
+export function getChapterFourTitleLabel() {
+  return `${CHAPTER_FOUR_TITLE.chapter}: ${CHAPTER_FOUR_TITLE.subtitle}`;
 }
 
 export function buildChapterTwoSaveData({
@@ -151,6 +164,34 @@ export function buildChapterThreeGaidenSaveData({
     marnieTemporarilyRecruited: marnieTemporarilyRecruited === true,
     marniePermanentlyRecruited: marniePermanentlyRecruited === true,
     lostChapterThreeGaidenChestItems: [...new Set(lostChapterThreeGaidenChestItems || [])],
+    mysteriousEggTracking: normalizeMysteriousEggTracking(mysteriousEggTracking),
+    units,
+  };
+}
+
+export function buildChapterFourSaveData({
+  slotNumber = null,
+  defeatedAllies = [],
+  units = [],
+  marniePermanentlyRecruited = false,
+  completedChapterThreeGaiden = false,
+  mysteriousEggTracking = null,
+} = {}) {
+  return {
+    version: 6,
+    slotNumber,
+    currentChapter: CHAPTER_FOUR_NUMBER,
+    chapter: CHAPTER_FOUR_NUMBER,
+    chapterTitle: getChapterFourTitleLabel(),
+    completedChapters: [
+      CHAPTER_ONE_NUMBER,
+      CHAPTER_TWO_NUMBER,
+      CHAPTER_THREE_NUMBER,
+      ...(completedChapterThreeGaiden === true ? [CHAPTER_THREE_GAIDEN_ID] : []),
+    ],
+    savedAt: new Date().toISOString(),
+    defeatedAllies: [...new Set(defeatedAllies || [])],
+    marniePermanentlyRecruited: marniePermanentlyRecruited === true,
     mysteriousEggTracking: normalizeMysteriousEggTracking(mysteriousEggTracking),
     units,
   };

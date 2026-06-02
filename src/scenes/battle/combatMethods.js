@@ -83,6 +83,7 @@ export const combatMethods = {
     if (terrain === "gate") return 5;
     if (terrain === "catwalk") return 2;
     if (terrain === "church" && weapon?.damageType === "magical") return 5;
+    if (terrain === "farmhouseBurned") return 5;
     return 0;
   },
 
@@ -157,6 +158,7 @@ export const combatMethods = {
     if (!attacker || !defender || !weapon) return 0;
     const terrain = this.getTerrainAt(defender.x, defender.y);
     if (terrain === "catwalk") return 10;
+    if (terrain === "smokeTile") return 15;
     if (terrain !== "forest") return 0;
     const attackRange = Math.abs(attacker.x - defender.x) + Math.abs(attacker.y - defender.y);
     return attackRange <= 1 ? 10 : 25;

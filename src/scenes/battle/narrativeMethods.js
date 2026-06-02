@@ -75,12 +75,18 @@ import {
   CHAPTER_THREE_TITLE,
 } from "../../chapters/chapter3.js";
 import {
+  CHAPTER_FOUR_NUMBER,
+  CHAPTER_FOUR_OPENING,
+  CHAPTER_FOUR_POST_BATTLE_SCENE,
+  CHAPTER_FOUR_TITLE,
+} from "../../chapters/chapter4.js";
+import {
   CHAPTER_THREE_GAIDEN_DISPLAY_NAME,
   CHAPTER_THREE_GAIDEN_ID,
   CHAPTER_THREE_GAIDEN_OPENING,
   CHAPTER_THREE_GAIDEN_POST_BATTLE_SCENE,
   CHAPTER_THREE_GAIDEN_TITLE,
-} from "../../chapters/chapter3Gaiden/index.js";
+} from "../../chapters/chapter3Gaiden.js";
 import {
   buildChapterThreeSaveData,
   buildChapterTwoSaveData,
@@ -88,6 +94,7 @@ import {
   CHAPTER_TWO_NUMBER,
   getLevelForChapter,
   getSaveDataChapterNumber,
+  isChapterFour,
   isChapterOne,
   isChapterThree,
   isChapterThreeGaiden,
@@ -480,7 +487,9 @@ export const narrativeMethods = {
   },
 
   getPostBattleScene() {
+    if (isChapterFour(this.currentChapterNumber)) return CHAPTER_FOUR_POST_BATTLE_SCENE;
     if (isChapterThreeGaiden(this.currentChapterNumber)) {
+      this.pendingChapterThreeDestination = "chapter4";
       return CHAPTER_THREE_GAIDEN_POST_BATTLE_SCENE;
     }
     if (isChapterThree(this.currentChapterNumber)) {
@@ -689,14 +698,18 @@ export const narrativeMethods = {
 
     try {
       window.localStorage.setItem(getSaveSlotKey(slotNumber), JSON.stringify(saveData));
-      if (isChapterThree(this.currentChapterNumber) || isChapterThreeGaiden(this.currentChapterNumber)) this.pendingChapterThreeTransitionData = saveData;
+      if (isChapterFour(this.currentChapterNumber)) {
+        this.pendingChapterThreeTransitionData = saveData;
+      } else if (isChapterThree(this.currentChapterNumber) || isChapterThreeGaiden(this.currentChapterNumber)) this.pendingChapterThreeTransitionData = saveData;
       else this.pendingChapterTwoTransitionData = saveData;
       const statusText = isChapterTwo(this.currentChapterNumber)
         ? `Saved to Slot ${slotNumber}. Moving to Chapter 3...`
+        : isChapterFour(this.currentChapterNumber)
+          ? `Saved to Slot ${slotNumber}. Returning to menu...`
         : isChapterThree(this.currentChapterNumber) || isChapterThreeGaiden(this.currentChapterNumber)
           ? this.pendingChapterThreeDestination === CHAPTER_THREE_GAIDEN_ID
             ? `Saved to Slot ${slotNumber}. Starting Chapter 3: Gaiden...`
-            : `Saved to Slot ${slotNumber}. Chapter 4 next. Returning to menu.`
+            : `Saved to Slot ${slotNumber}. Starting Chapter 4...`
           : `Saved to Slot ${slotNumber}. Moving to Chapter 2...`;
       if (this.saveSlotStatusText) this.saveSlotStatusText.setText(statusText);
       this.time.delayedCall(550, () => this.finishCurrentChapter());
@@ -736,6 +749,15 @@ export const narrativeMethods = {
   },
 
   finishCurrentChapter() {
+    if (isChapterFour(this.currentChapterNumber)) {
+      if (this.saveSlotContainer) {
+        this.saveSlotContainer.destroy();
+        this.saveSlotContainer = null;
+      }
+      this.scene.start("MainMenuScene");
+      return;
+    }
+
     if (isChapterThree(this.currentChapterNumber) && this.shouldRouteToChapterThreeGaiden()) {
       if (this.saveSlotContainer) {
         this.saveSlotContainer.destroy();
@@ -756,7 +778,13 @@ export const narrativeMethods = {
         this.saveSlotContainer.destroy();
         this.saveSlotContainer = null;
       }
-      this.scene.start("MainMenuScene");
+      this.pendingChapterThreeTransitionData = this.pendingChapterThreeTransitionData || this.buildChapterSaveData(this.loadedSlotNumber || null);
+      this.currentChapterNumber = CHAPTER_FOUR_NUMBER;
+      this.phaseText.setText(CHAPTER_FOUR_TITLE.chapter);
+      this.phaseText.setColor("#fcd34d");
+      this.helpText.setText(`${CHAPTER_FOUR_TITLE.chapter}: ${CHAPTER_FOUR_TITLE.subtitle}.`);
+      this.busy = true;
+      this.showChapterFourTitleCard();
       return;
     }
 
@@ -765,7 +793,13 @@ export const narrativeMethods = {
         this.saveSlotContainer.destroy();
         this.saveSlotContainer = null;
       }
-      this.scene.start("MainMenuScene");
+      this.pendingChapterThreeTransitionData = this.pendingChapterThreeTransitionData || this.buildChapterSaveData(this.loadedSlotNumber || null);
+      this.currentChapterNumber = CHAPTER_FOUR_NUMBER;
+      this.phaseText.setText(CHAPTER_FOUR_TITLE.chapter);
+      this.phaseText.setColor("#fcd34d");
+      this.helpText.setText(`${CHAPTER_FOUR_TITLE.chapter}: ${CHAPTER_FOUR_TITLE.subtitle}.`);
+      this.busy = true;
+      this.showChapterFourTitleCard();
       return;
     }
     if (isChapterTwo(this.currentChapterNumber)) {
@@ -1071,11 +1105,43 @@ export const narrativeMethods = {
     });
   },
 
+  showChapterFourTitleCard(message) {
+    const displayMessage = message || "";
+
+    if (this.postBattleContainer) this.postBattleContainer.setVisible(false);
+    if (this.openingContainer) this.openingContainer.setVisible(false);
+    if (this.previewContainer) this.previewContainer.setVisible(false);
+
+    this.phase = "chapter4";
+    this.busy = true;
+    this.pendingChapterTransitionTarget = CHAPTER_FOUR_NUMBER;
+
+    this.setObjectiveDisplayVisible(false);
+    this.phaseText.setText(CHAPTER_FOUR_TITLE.chapter);
+    this.phaseText.setColor("#fcd34d");
+    this.helpText.setText(displayMessage || `${CHAPTER_FOUR_TITLE.chapter}: ${CHAPTER_FOUR_TITLE.subtitle}.`);
+
+    if (this.chapterTransitionChapterText) this.chapterTransitionChapterText.setText(CHAPTER_FOUR_TITLE.chapter);
+    if (this.chapterTransitionSubtitleText) this.chapterTransitionSubtitleText.setText(CHAPTER_FOUR_TITLE.subtitle);
+    if (this.chapterTransitionHintText) this.chapterTransitionHintText.setText(displayMessage || "Continue into the Chapter 4 opening.");
+
+    this.chapterTransitionContainer.setVisible(true);
+    this.chapterTransitionContainer.setAlpha(0);
+
+    this.tweens.add({
+      targets: this.chapterTransitionContainer,
+      alpha: 1,
+      duration: 420,
+      ease: "Quad.easeOut"
+    });
+  },
+
   continueFromChapterTransition() {
     const transitionTarget = this.pendingChapterTransitionTarget || CHAPTER_TWO_NUMBER;
     const isChapterThreeTransition = transitionTarget === CHAPTER_THREE_NUMBER;
     const isChapterThreeGaidenTransition = transitionTarget === CHAPTER_THREE_GAIDEN_ID;
-    var saveData = isChapterThreeTransition || isChapterThreeGaidenTransition ? this.pendingChapterThreeTransitionData : this.pendingChapterTwoTransitionData;
+    const isChapterFourTransition = transitionTarget === CHAPTER_FOUR_NUMBER;
+    var saveData = isChapterThreeTransition || isChapterThreeGaidenTransition || isChapterFourTransition ? this.pendingChapterThreeTransitionData : this.pendingChapterTwoTransitionData;
 
     if (!saveData) {
       saveData = this.buildChapterSaveData(this.loadedSlotNumber || null);
@@ -1101,10 +1167,11 @@ export const narrativeMethods = {
       loadFromSave: true,
       saveData: saveData,
       slotNumber: slotNumber,
-      playChapterTwoOpening: !isChapterThreeTransition && !isChapterThreeGaidenTransition,
+      playChapterTwoOpening: !isChapterThreeTransition && !isChapterThreeGaidenTransition && !isChapterFourTransition,
       playChapterThreeOpening: isChapterThreeTransition,
       playChapterThreeGaidenOpening: isChapterThreeGaidenTransition,
-      skipChapter2TitleCard: !isChapterThreeTransition,
+      playChapterFourOpening: isChapterFourTransition,
+      skipChapter2TitleCard: !isChapterThreeTransition && !isChapterFourTransition,
       skipChapter3TitleCard: isChapterThreeTransition,
       skipChapter3GaidenTitleCard: isChapterThreeGaidenTransition
     });
@@ -1517,9 +1584,30 @@ export const narrativeMethods = {
     this.updateOpeningUI();
   },
 
+  startChapterFourOpening() {
+    this.chapterTransitionContainer.setVisible(false).setAlpha(0);
+    this.phase = "intro";
+    this.busy = false;
+    this.setObjectiveDisplayVisible(false);
+    this.activeOpeningSequence = CHAPTER_FOUR_OPENING;
+    this.openingStep = 0;
+    this.openingLine = 0;
+    this.openingContainer.setVisible(true);
+    this.helpText.setText("Watch the Chapter 4 opening.");
+    this.updateOpeningUI();
+  },
+
   finishOpening() {
     this.openingContainer.setVisible(false);
     this.openingFullSceneImage.setVisible(false);
+    if (isChapterFour(this.currentChapterNumber)) {
+      this.beginChapterThreeDeployment(() => {
+        this.startPlayerPhase();
+        this.selectedUnitId = this.units.find((unit) => this.isControllablePlayerUnit?.(unit))?.id || null;
+        this.updateSelectedPanel();
+      });
+      return;
+    }
     if (isChapterThreeGaiden(this.currentChapterNumber)) {
       this.beginChapterThreeDeployment(() => {
         this.beginChapterThreeGaidenBattleStartEvent(() => {
